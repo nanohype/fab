@@ -1,0 +1,46 @@
+{
+  "$schema": "../schemas/standards.schema.json",
+  "kind": "nanohype/standards/llm-policy",
+  "version": "1",
+  "title": "LLM policy",
+  "summary": "Claude is the primary LLM for every build on the nanohype stack. Preferred delivery is AWS Bedrock — it keeps data inside the client's AWS trust boundary and simplifies enterprise compliance posture. This policy names the SDK per language, the model tiers, the preferred regions, and the requirements around prompt caching and provider escapes.",
+  "content": {
+    "primary_provider": "AWS Bedrock",
+    "models": {
+      "default": "anthropic.claude-sonnet-4-6",
+      "escalation": "anthropic.claude-opus-4-6",
+      "light": "anthropic.claude-haiku-4-5"
+    },
+    "regions_preferred": ["us-west-2", "us-east-1", "eu-central-1"],
+    "sdk_by_language": {
+      "typescript": "@aws-sdk/client-bedrock-runtime",
+      "python": "boto3 (bedrock-runtime client)",
+      "go": "github.com/aws/aws-sdk-go-v2/service/bedrockruntime",
+      "rust": "aws-sdk-bedrockruntime",
+      "java": "software.amazon.awssdk:bedrockruntime",
+      "csharp": "AWSSDK.BedrockRuntime"
+    },
+    "requirements": [
+      {
+        "id": "iam-role-auth",
+        "summary": "Authenticate via IAM role assumption (IRSA on EKS, ECS task role, Lambda execution role). No API keys in code, env vars, or secrets."
+      },
+      {
+        "id": "default-sonnet",
+        "summary": "Use claude-sonnet-4-6 for the bulk of inference. Escalate to opus only for complex reasoning or architecture decisions. Use haiku for classification, routing, and filter steps."
+      },
+      {
+        "id": "verify-region",
+        "summary": "Verify the chosen model is available in the deploy region before committing IaC. Cross-region inference profiles (us.anthropic.*) work but require explicit configuration."
+      },
+      {
+        "id": "prompt-caching-mandatory",
+        "summary": "Use Bedrock cachePoint markers on the system prompt and any stable context prefix. Measure cache-hit ratio and surface it in the architecture artifact."
+      },
+      {
+        "id": "no-default-non-anthropic",
+        "summary": "Direct Anthropic SDK is permitted only if the intake brief requires it or Bedrock lacks the needed model variant. OpenAI and other providers require explicit brief requirement — never default to GPT."
+      }
+    ]
+  }
+}

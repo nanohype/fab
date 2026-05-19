@@ -1,0 +1,90 @@
+{
+  "$schema": "../schemas/standards.schema.json",
+  "kind": "nanohype/standards/language-toolchain",
+  "version": "1",
+  "title": "Language toolchain",
+  "summary": "Per-language commands for the four executable phases (build, lint, test, docs) plus install, typecheck, manifest, lockfile, registry, and version-lookup metadata. Use this to dispatch language-agnostic build commands — never bake `npm run X` or `pytest` into a workflow that has to support multiple languages.",
+  "content": {
+    "toolchains": {
+      "typescript": {
+        "install": "npm ci",
+        "build": "npm run build",
+        "lint": "npm run lint",
+        "test": "npm test",
+        "docs": "npm run docs",
+        "typecheck": "npx tsc --noEmit",
+        "lockfile": "package-lock.json",
+        "manifest": "package.json",
+        "registry": "npm (registry.npmjs.org)",
+        "versionLookup": "npm view <pkg> version"
+      },
+      "go": {
+        "install": "go mod download",
+        "build": "go build ./...",
+        "lint": "golangci-lint run",
+        "test": "go test ./...",
+        "docs": "go doc ./...",
+        "lockfile": "go.sum",
+        "manifest": "go.mod",
+        "registry": "proxy.golang.org",
+        "versionLookup": "go list -m -versions <mod>"
+      },
+      "python": {
+        "install": "pip install --require-hashes -r requirements.lock.txt",
+        "build": "python -m build",
+        "lint": "ruff check . && ruff format --check .",
+        "test": "pytest",
+        "docs": "pdoc -o docs src",
+        "typecheck": "mypy src",
+        "lockfile": "requirements.lock.txt (or poetry.lock)",
+        "manifest": "pyproject.toml",
+        "registry": "PyPI (pypi.org)",
+        "versionLookup": "pip index versions <pkg>"
+      },
+      "rust": {
+        "install": "cargo fetch --locked",
+        "build": "cargo build --locked",
+        "lint": "cargo clippy --locked -- -D warnings && cargo fmt --check",
+        "test": "cargo test --locked",
+        "docs": "cargo doc --no-deps",
+        "lockfile": "Cargo.lock",
+        "manifest": "Cargo.toml",
+        "registry": "crates.io",
+        "versionLookup": "cargo search --limit 1 <crate>"
+      },
+      "java": {
+        "install": "mvn dependency:resolve -DskipTests",
+        "build": "mvn compile -DskipTests",
+        "lint": "mvn checkstyle:check spotbugs:check",
+        "test": "mvn test",
+        "docs": "mvn javadoc:javadoc",
+        "lockfile": "pom.xml (<dependencyManagement> pinned) or gradle.lockfile",
+        "manifest": "pom.xml",
+        "registry": "Maven Central (search.maven.org)",
+        "versionLookup": "mvn versions:display-dependency-updates"
+      },
+      "kotlin": {
+        "install": "./gradlew dependencies",
+        "build": "./gradlew build -x test",
+        "lint": "./gradlew ktlintCheck detekt",
+        "test": "./gradlew test",
+        "docs": "./gradlew dokkaHtml",
+        "lockfile": "gradle.lockfile",
+        "manifest": "build.gradle.kts",
+        "registry": "Maven Central (search.maven.org)",
+        "versionLookup": "./gradlew dependencyUpdates"
+      },
+      "csharp": {
+        "install": "dotnet restore --locked-mode",
+        "build": "dotnet build --no-restore --configuration Release",
+        "lint": "dotnet format --verify-no-changes && dotnet build /warnaserror",
+        "test": "dotnet test --no-build",
+        "docs": "dotnet tool run docfx docfx.json",
+        "lockfile": "packages.lock.json",
+        "manifest": "<project>.csproj",
+        "registry": "NuGet (nuget.org)",
+        "versionLookup": "dotnet list package --outdated"
+      }
+    }
+  }
+}

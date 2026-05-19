@@ -1,0 +1,68 @@
+{
+  "name": "@nanohype/fab",
+  "version": "0.2.0",
+  "description": "Reference factory for orchestrating Claude managed agents — open-source production-grade software pipeline with file-based skill overlays for personal recipes",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/nanohype/fab",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nanohype/fab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nanohype/fab/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "claude",
+    "factory",
+    "orchestration",
+    "anthropic",
+    "managed-agents",
+    "skills"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "fab": "./dist/bin/fab.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "src",
+    "tsconfig.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-standards.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "npm run build",
+    "lint": "npm run typecheck && eslint src/ __tests__/",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.2",
+    "eslint": "^10.2.0",
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.33.1",
+    "vitest": "^4.1.3"
+  }
+}

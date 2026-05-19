@@ -1,0 +1,105 @@
+{
+  "$schema": "../schemas/standards.schema.json",
+  "kind": "nanohype/standards/platform-tenant-contract",
+  "version": "1",
+  "title": "Platform tenant contract",
+  "summary": "Every k8s-native deliverable on the nanohype stack ships as a Platform tenant — a self-contained unit the eks-agent-platform operator can scaffold, suspend (via kill-switch), and tear down via CR reconciliation. This contract names the artifacts a chart must produce, the minimum Platform CR shape, the OTel resource attributes the operator expects, and the things you must NOT do inside a chart.",
+  "content": {
+    "required_artifacts": [
+      {
+        "path": "<app>/chart/Chart.yaml",
+        "description": "Helm chart manifest."
+      },
+      {
+        "path": "<app>/chart/values.yaml",
+        "description": "Base values shared across all environments."
+      },
+      {
+        "path": "<app>/chart/values-{dev,staging,production}.yaml",
+        "description": "Per-env delta files. Required even if empty — tooling consistency depends on the presence of all three."
+      },
+      {
+        "path": "<app>/chart/templates/deployment.yaml (or statefulset.yaml)",
+        "description": "The workload itself. Stateful workloads use StatefulSet; everything else uses Deployment."
+      },
+      {
+        "path": "<app>/chart/templates/service.yaml",
+        "description": "ClusterIP Service exposing the workload to in-cluster consumers."
+      },
+      {
+        "path": "<app>/chart/templates/serviceaccount.yaml",
+        "description": "ServiceAccount used by the pod. `eks.amazonaws.com/role-arn` annotation is rendered from `aws.platformRoleArn` per-env value, pointing at the landing-zone-owned IRSA role."
+      },
+      {
+        "path": "<app>/chart/templates/networkpolicy.yaml",
+        "description": "Default-deny NetworkPolicy plus explicit egress allow-list."
+      },
+      {
+        "path": "<app>/gitops/applicationset-entry.yaml",
+        "description": "ApplicationSet entry to be registered with `nanohype/eks-gitops` or `nanohype/aks-gitops`."
+      },
+      {
+        "path": "<app>/platform.yaml",
+        "description": "Platform CR (and any required BudgetPolicy CR) declaring the tenant boundary. The eks-agent-platform operator reconciles Namespace, ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, and the per-Platform IRSA role from this CR."
+      },
+      {
+        "path": "<app>/agentfleet.yaml (AI workloads only)",
+        "description": "Optional AgentFleet CR composing a kagent Agent + ModelConfig + KEDA scaler. Required only when the app runs an AI agent fleet inside its tenant."
+      }
+    ],
+    "platform_cr_shape": {
+      "apiVersion": "agents.stxkxs.io/v1alpha1",
+      "kind": "Platform",
+      "metadata": {
+        "name": "<app-name>",
+        "namespace": "tenants-<team>"
+      },
+      "spec": {
+        "displayName": "<human-readable>",
+        "persona": "<one of: sales-ops | support | finance | ops | founder | eng | marketing | legal | generic>",
+        "tenant": "<team>",
+        "budget": {
+          "name": "<BudgetPolicy CR name in same namespace>"
+        },
+        "identity": {
+          "allowedModelFamilies": ["anthropic"],
+          "extraPolicyArns": []
+        },
+        "compliance": {
+          "soc2": true,
+          "hipaa": false
+        },
+        "isolation": "namespace"
+      }
+    },
+    "otel_resource_attrs": [
+      {
+        "name": "agents.tenant",
+        "required": true,
+        "description": "The owning team. Matches Platform.spec.tenant."
+      },
+      {
+        "name": "agents.platform",
+        "required": true,
+        "description": "The Platform CR name. Used by dashboards to slice by app."
+      },
+      {
+        "name": "agents.model_family",
+        "required": false,
+        "description": "AI workloads only. One of: anthropic, amazon, meta, mistral, etc. Drives cost attribution and guardrail routing."
+      },
+      {
+        "name": "agents.model_id",
+        "required": false,
+        "description": "AI workloads only. The full Bedrock model ID being invoked."
+      }
+    ],
+    "do_not": [
+      "Do NOT scaffold IAM roles inside the chart. The IRSA role is provisioned by the corresponding landing-zone <app>-platform component; the chart's ServiceAccount annotates with its ARN via `aws.platformRoleArn`.",
+      "Do NOT add cloud-substrate tofu (VPCs, base IAM, KMS keys) inside the app. Substrate lives in `nanohype/landing-zone` as a per-app `<app>-platform` component.",
+      "Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability stack). Those are gitops-repo concerns in `nanohype/eks-gitops` or `aks-gitops`.",
+      "Do NOT skip per-env `values-{dev,staging,production}.yaml` — every chart has three deltas even if some are empty.",
+      "Do NOT hardcode AWS account IDs, region names, or KMS key ARNs in chart values. Per-env values plumb them in from landing-zone outputs at deploy time."
+    ]
+  }
+}

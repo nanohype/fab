@@ -1,0 +1,41 @@
+{
+  "$schema": "../schemas/standards.schema.json",
+  "kind": "nanohype/standards/version-currency",
+  "version": "1",
+  "title": "Version currency",
+  "summary": "Every new build adopts the current stable release of every language runtime, framework, and top-level dependency. Inherited defaults and template-shipped versions are not acceptable. Stale dependencies and EOL runtimes are rejected at build time. This policy prevents shipping a greenfield project on a 3-major-version-old typescript or an EOL python.",
+  "content": {
+    "rules": [
+      {
+        "id": "current-stable",
+        "summary": "Manifest entries must be within one major version of current stable. Entries more than one major behind require an inline `@pin <reason>` annotation adjacent to the dependency.",
+        "severity": "reject"
+      },
+      {
+        "id": "no-eol-runtimes",
+        "summary": "Language runtimes at end-of-life are rejected regardless of @pin annotations. EOL is EOL.",
+        "severity": "reject"
+      },
+      {
+        "id": "intake-version-pinning",
+        "summary": "The intake brief's `constraints.language_versions` names the primary language version. Briefs that name an EOL version are rejected before any work starts.",
+        "severity": "reject"
+      },
+      {
+        "id": "supply-chain-review",
+        "summary": "Version currency reports are reviewed for known CVEs in stale majors, abandoned upstreams, and license drift. Findings block release independently of @pin annotations.",
+        "severity": "reject"
+      }
+    ],
+    "registries": {
+      "typescript": "npm (registry.npmjs.org)",
+      "go": "proxy.golang.org",
+      "python": "PyPI (pypi.org)",
+      "rust": "crates.io",
+      "java": "Maven Central (search.maven.org)",
+      "kotlin": "Maven Central (search.maven.org)",
+      "csharp": "NuGet (nuget.org)"
+    },
+    "accepted_pin_reasons": ["security hold", "upstream bug", "compatibility with pinned peer"]
+  }
+}

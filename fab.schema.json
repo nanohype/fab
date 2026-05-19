@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nanohype.dev/fab/intake",
+  "title": "fab Intake",
+  "description": "Structured input contract for the fab coordinator agent. Any agent or system that wants to trigger the fab startup team sends a message conforming to this schema as the first user event.",
+  "type": "object",
+  "required": ["goal"],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "description": "What the team should accomplish. Be specific about the desired outcome, not the process."
+    },
+    "workflow": {
+      "type": "string",
+      "enum": [
+        "launch-prep",
+        "feature-build",
+        "mobile-ship",
+        "infra-setup",
+        "security-audit",
+        "perf-review",
+        "ux-review",
+        "data-quality",
+        "lead-gen",
+        "deal-close",
+        "market-push",
+        "content-engine",
+        "partnership",
+        "customer-onboard",
+        "renewal",
+        "sprint-plan",
+        "incident",
+        "automate"
+      ],
+      "description": "Optional predefined workflow to follow. If omitted, the coordinator decides the sequencing. Workflows are tagged factory (build pipeline), firm (business), or lab (meta)."
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Boundaries the team must operate within.",
+      "properties": {
+        "timeline": {
+          "type": "string",
+          "description": "Delivery window (e.g., '2 weeks', 'Q3 2026', 'ASAP')."
+        },
+        "deploy_target": {
+          "type": "string",
+          "enum": ["aws", "gcp", "fly", "vercel", "cloudflare", "k8s"],
+          "description": "Infrastructure target for engineering."
+        },
+        "budget": {
+          "type": "string",
+          "enum": ["minimal", "moderate", "generous"],
+          "description": "Resource budget signal — affects scope, tooling, and infrastructure choices."
+        },
+        "language": {
+          "type": "string",
+          "enum": ["typescript", "go", "python", "rust", "java", "kotlin", "csharp"],
+          "description": "Primary language for this build. Required for code-producing workflows (feature-build, mobile-ship, infra-setup, security-audit, perf-review, incident, automate, launch-prep). Dispatches the factory's LANGUAGE_TOOLCHAIN — build / lint / test / docs commands, manifest file, version-lookup command, registry. If the build spans languages, pick the primary and list the others in language_versions."
+        },
+        "language_versions": {
+          "type": "object",
+          "description": "Current stable versions for the language runtime and critical ecosystem components. Drafters declare versions explicitly — 'latest stable first' is the idiom. Example: {'node': '22', 'typescript': '5.9'} or {'python': '3.13', 'go': '1.24'}. EOL versions (Python ≤3.9, Node ≤18, Go ≤1.20) are rejected at intake.",
+          "additionalProperties": { "type": "string" }
+        },
+        "model": {
+          "type": "string",
+          "description": "Preferred Claude model (e.g., 'claude-sonnet-4-6', 'claude-opus-4-6')."
+        }
+      },
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "description": "Background the team needs to do their work. See docs/INTAKE_GUIDE.md for the quality bar on each field.",
+      "properties": {
+        "client": {
+          "type": "string",
+          "description": "Client or customer name. Used for branding, tone, and project routing. Avoid placeholder names like 'Acme Corp' — pick a name with character even for fictional clients."
+        },
+        "product": {
+          "type": "string",
+          "description": "Product or feature name. Slugged into the branch name (`feat/<slug>`) and the project subdirectory (`protohype/<slug>/`)."
+        },
+        "problem": {
+          "type": "string",
+          "description": "The core problem being solved, in the user's words. One paragraph. The team uses this to pick the right architecture and to write the PR description."
+        },
+        "audience": {
+          "type": "string",
+          "description": "Target users or personas. Influences UX, security model, and scaling assumptions."
+        },
+        "existing_systems": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Integrations the new build must respect. SSO platform (with features), source systems, data warehouse, observability stack, CRM, etc. Without this, the team guesses and usually picks a stack that doesn't connect to the customer's reality."
+        },
+        "competitors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Known competitors for sales/marketing positioning."
+        },
+        "success_criteria": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Falsifiable, measurable assertions. Each one must be answerable yes/no on a future date with a number or named test. '<3s p50 latency', '≥80% answers cite a source', 'zero leaks in red-team test'. Vague claims like 'fast' or 'reliable' are rejected by intake-analyst."
+        },
+        "security_requirements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Named anti-patterns to avoid, drawn from the threat model and past failures. 'Identity via Okta users.info, never fabricated email', 'Audit writes are awaited, never fire-and-forget', 'Every external client has explicit per-call timeout', 'Bedrock inference logging set to NONE in CDK, not just commented'. The factory production-bar covers generics; this section specializes."
+        },
+        "out_of_scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit scope fence with concrete examples. 'Voice and mobile SDK', 'Cross-workspace federation', 'Auto-submit to vendor — human approval required'. Required on tight timelines; protects from scope creep mid-workflow."
+        }
+      },
+      "additionalProperties": true
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "product",
+          "product-research",
+          "design",
+          "design-ux",
+          "design-accessibility",
+          "ux-writer",
+          "engineering",
+          "eng-frontend",
+          "eng-backend",
+          "eng-ai",
+          "eng-infra",
+          "eng-perf",
+          "eng-devex",
+          "eng-mobile",
+          "qa",
+          "qa-automation",
+          "qa-security",
+          "qa-data",
+          "qa-ux",
+          "intake-analyst",
+          "build-verifier",
+          "scaffold-validator",
+          "pr-reviewer",
+          "artifact-auditor",
+          "release-manager",
+          "compliance-automation",
+          "client-packager",
+          "onboarding-tester",
+          "devrel",
+          "tech-writer",
+          "sales",
+          "sales-solutions",
+          "sales-ops",
+          "lead-inbound",
+          "lead-outbound",
+          "lead-research",
+          "lead-partnerships",
+          "lead-social",
+          "lead-events",
+          "lead-referral",
+          "biz-dev",
+          "marketing",
+          "marketing-content",
+          "marketing-seo",
+          "marketing-email",
+          "brand-strategist",
+          "operations",
+          "ops-sre",
+          "ops-incident",
+          "ops-finops",
+          "ops-compliance",
+          "ops-automation",
+          "customer-success",
+          "cs-support",
+          "cs-renewals",
+          "chief-of-staff",
+          "legal",
+          "data-analyst",
+          "product-growth",
+          "prompt-optimizer",
+          "session-analyst",
+          "cross-project-learner",
+          "template-quality",
+          "external-reviewer"
+        ]
+      },
+      "description": "Restrict which roles participate. If omitted, the coordinator engages all relevant roles. Roles are organized into factory (30), firm (29), and lab (5) teams."
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "prd",
+          "okr-framework",
+          "design-system",
+          "architecture",
+          "test-plan",
+          "proposal",
+          "campaign",
+          "runbook",
+          "onboarding-playbook",
+          "battle-cards",
+          "qbr-template",
+          "compliance-checklist"
+        ]
+      },
+      "description": "Specific deliverables to produce. If omitted, the coordinator decides based on the goal and workflow."
+    }
+  },
+  "examples": [
+    {
+      "goal": "Ship Almanac — an internal Slack bot for NanoCorp that answers employee questions grounded in Notion, Confluence, and Google Drive. Every answer cites sources with page/doc URLs and last-modified timestamps, and results are filtered to what the asking user has access to in the source system — no data leaks across private spaces. Users invoke the bot as @almanac in Slack channels and DMs.",
+      "workflow": "feature-build",
+      "constraints": {
+        "timeline": "3 weeks",
+        "deploy_target": "aws",
+        "budget": "moderate",
+        "language": "typescript",
+        "language_versions": {
+          "node": "22",
+          "typescript": "5.9"
+        }
+      },
+      "context": {
+        "client": "NanoCorp",
+        "product": "Almanac",
+        "problem": "Employees waste hours hunting across Notion, Confluence, and Google Drive. Tribal knowledge isn't searchable. Existing Slack search is keyword-only and doesn't cross tools.",
+        "audience": "NanoCorp employees (engineering, sales, ops) asking questions in Slack DMs and team channels",
+        "existing_systems": [
+          "Notion",
+          "Confluence",
+          "Google Drive",
+          "Slack",
+          "Okta SSO (SAML + SCIM for workforce identity)"
+        ],
+        "success_criteria": [
+          "<3s median answer latency for @almanac queries",
+          "Every answer includes at least one cited source with URL + freshness timestamp",
+          "Zero cross-tenant / cross-space data leaks verified by red-team test",
+          "Stale-source warning surfaces when Almanac cites a doc >90 days old"
+        ],
+        "security_requirements": [
+          "Per-user identity propagation from Slack → Okta → source-system OAuth",
+          "Answers must respect source-system ACLs end-to-end; Almanac falls back to 'I don't have access' on redacted hits — not a TODO",
+          "Audit log of every Almanac query + retrieved doc IDs + user ID, retained 1 year, with retry and DLQ on transient failures",
+          "No source content stored in model provider logs — prompt caching with PII scrubbing",
+          "Rate limiter must use shared state (Redis or DynamoDB) — multi-instance deployment, no in-memory Maps",
+          "Per-user OAuth token storage must scale to 10k+ users cost-effectively — shared-secret + DynamoDB token store, not one Secrets Manager secret per user"
+        ],
+        "out_of_scope": [
+          "Writing back to source systems (read-only)",
+          "Voice and mobile SDK",
+          "Cross-workspace federation (single Slack workspace only)"
+        ]
+      },
+      "artifacts": ["prd", "architecture", "test-plan", "runbook", "onboarding-playbook", "compliance-checklist"],
+      "roles": [
+        "product",
+        "product-research",
+        "eng-backend",
+        "eng-ai",
+        "eng-infra",
+        "qa-security",
+        "qa-data",
+        "ops-compliance",
+        "tech-writer"
+      ]
+    }
+  ]
+}
