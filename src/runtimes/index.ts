@@ -9,11 +9,11 @@ export type RuntimeKind = 'managed-agents' | 'local' | 'claude-cli';
 const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set(['managed-agents', 'local', 'claude-cli']);
 
 /**
- * Resolve the configured runtime from the `SPASTIC_RUNTIME` env var.
+ * Resolve the configured runtime from the `JAUNTY_RUNTIME` env var.
  *
- * Default is `managed-agents`. Set `SPASTIC_RUNTIME=local` to run workflows
+ * Default is `managed-agents`. Set `JAUNTY_RUNTIME=local` to run workflows
  * against `@anthropic-ai/claude-agent-sdk` in-process, or
- * `SPASTIC_RUNTIME=claude-cli` to drive the `claude` CLI as a subprocess
+ * `JAUNTY_RUNTIME=claude-cli` to drive the `claude` CLI as a subprocess
  * (subscription-billable via the user's existing Claude Code auth). The
  * trade-offs are documented in `docs/transports.md`.
  *
@@ -33,10 +33,10 @@ export function createRuntime(api: AnthropicAgents): AgentRuntime {
 }
 
 export function resolveRuntimeKind(): RuntimeKind {
-  const choice = (process.env.SPASTIC_RUNTIME ?? 'managed-agents').trim();
+  const choice = (process.env.JAUNTY_RUNTIME ?? 'managed-agents').trim();
   if (RUNTIME_KINDS.has(choice as RuntimeKind)) return choice as RuntimeKind;
   throw new Error(
-    `Unknown SPASTIC_RUNTIME value: "${choice}". Expected "managed-agents" (default), "local", or "claude-cli".`,
+    `Unknown JAUNTY_RUNTIME value: "${choice}". Expected "managed-agents" (default), "local", or "claude-cli".`,
   );
 }
 

@@ -99,7 +99,7 @@ describe('buildClaudeArgs', () => {
     expect(args[args.indexOf('--add-dir') + 1]).toBe('/workspace/marshal');
   });
 
-  it('appends SPASTIC_CLAUDE_EXTRA_ARGS verbatim', () => {
+  it('appends JAUNTY_CLAUDE_EXTRA_ARGS verbatim', () => {
     const args = buildClaudeArgs({
       sessionId: 'sess',
       systemPrompt: 'p',
@@ -109,7 +109,7 @@ describe('buildClaudeArgs', () => {
       addDir: null,
       resumeFrom: null,
       title: undefined,
-      env: { SPASTIC_CLAUDE_EXTRA_ARGS: '--debug api --effort high' } as NodeJS.ProcessEnv,
+      env: { JAUNTY_CLAUDE_EXTRA_ARGS: '--debug api --effort high' } as NodeJS.ProcessEnv,
     });
 
     expect(args).toContain('--debug');
@@ -196,10 +196,10 @@ describe('buildMcpConfigJson', () => {
     }
   });
 
-  it('throws under SPASTIC_MCP_STRICT=1 when gateway server is missing token', () => {
+  it('throws under JAUNTY_MCP_STRICT=1 when gateway server is missing token', () => {
     expect(() =>
       buildMcpConfigJson(['memory'], {
-        SPASTIC_MCP_STRICT: '1',
+        JAUNTY_MCP_STRICT: '1',
       } as NodeJS.ProcessEnv),
     ).toThrow(/MCP_GATEWAY_TOKEN is not set/);
   });

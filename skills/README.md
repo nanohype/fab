@@ -1,21 +1,21 @@
-# Spastic skills
+# Jaunty skills
 
-Skills are the markdown files spastic ships to its agents — the production-bar preamble, the quality-check rubric, the per-role briefs, the intake guide. Anything an agent reads as "instructions" goes here.
+Skills are the markdown files jaunty ships to its agents — the production-bar preamble, the quality-check rubric, the per-role briefs, the intake guide. Anything an agent reads as "instructions" goes here.
 
-This directory holds **baselines**. They're shipped with spastic so the system works out of the box. If you want your factory to feel like _yours_, drop your own files into the **overlay** chain — your files win, no fork needed.
+This directory holds **baselines**. They're shipped with jaunty so the system works out of the box. If you want your factory to feel like _yours_, drop your own files into the **overlay** chain — your files win, no fork needed.
 
 ## The overlay chain
 
-When spastic loads a skill named `<skill>`, it walks four locations in priority order. **First match wins** as the base:
+When jaunty loads a skill named `<skill>`, it walks four locations in priority order. **First match wins** as the base:
 
-| Priority    | Location                              | When to use                                                           |
-| ----------- | ------------------------------------- | --------------------------------------------------------------------- |
-| 1 (highest) | `$SPASTIC_SKILLS_DIR/<skill>.md`      | One-off override for a specific invocation (CI, scripts, experiments) |
-| 2           | `~/.spastic/skills/<skill>.md`        | Your personal recipe across every project                             |
-| 3           | `<cwd>/.spastic/skills/<skill>.md`    | Per-project tuning checked into the project's repo                    |
-| 4 (lowest)  | `<spastic-package>/skills/<skill>.md` | Bundled baseline (this directory)                                     |
+| Priority    | Location                             | When to use                                                           |
+| ----------- | ------------------------------------ | --------------------------------------------------------------------- |
+| 1 (highest) | `$JAUNTY_SKILLS_DIR/<skill>.md`      | One-off override for a specific invocation (CI, scripts, experiments) |
+| 2           | `~/.jaunty/skills/<skill>.md`        | Your personal recipe across every project                             |
+| 3           | `<cwd>/.jaunty/skills/<skill>.md`    | Per-project tuning checked into the project's repo                    |
+| 4 (lowest)  | `<jaunty-package>/skills/<skill>.md` | Bundled baseline (this directory)                                     |
 
-For example: spastic looks for `quality-check.md`. If `~/.spastic/skills/quality-check.md` exists, it's used. Otherwise the bundled baseline (`spastic/skills/quality-check.md`) wins.
+For example: jaunty looks for `quality-check.md`. If `~/.jaunty/skills/quality-check.md` exists, it's used. Otherwise the bundled baseline (`jaunty/skills/quality-check.md`) wins.
 
 ## Two override styles
 
@@ -26,9 +26,9 @@ For example: spastic looks for `quality-check.md`. If `~/.spastic/skills/quality
 Example, by file:
 
 ```
-~/.spastic/skills/quality-check.md            ← REPLACES the baseline
-~/.spastic/skills/factory-preamble.append.md  ← ADDS voice rules to the bundled preamble
-<my-project>/.spastic/skills/brief-prd.append.md  ← project-specific brief addenda
+~/.jaunty/skills/quality-check.md            ← REPLACES the baseline
+~/.jaunty/skills/factory-preamble.append.md  ← ADDS voice rules to the bundled preamble
+<my-project>/.jaunty/skills/brief-prd.append.md  ← project-specific brief addenda
 ```
 
 ## What's bundled today
@@ -43,9 +43,9 @@ Example, by file:
 ## Quick start: write your first overlay
 
 ```sh
-mkdir -p ~/.spastic/skills
+mkdir -p ~/.jaunty/skills
 # Add a personal anti-pattern checklist that runs after every quality-check
-cat > ~/.spastic/skills/quality-check.append.md <<'EOF'
+cat > ~/.jaunty/skills/quality-check.append.md <<'EOF'
 
 ## Personal anti-patterns (append)
 
@@ -55,13 +55,13 @@ cat > ~/.spastic/skills/quality-check.append.md <<'EOF'
 EOF
 ```
 
-Next time spastic loads the quality-check skill for any role, those three rules get appended onto the baseline.
+Next time jaunty loads the quality-check skill for any role, those three rules get appended onto the baseline.
 
 ## Debug / inspect
 
 ```sh
-# Coming in a follow-up: `spastic skills resolve <skill>` prints the resolution chain
-# Today: just `ls -la $SPASTIC_SKILLS_DIR ~/.spastic/skills $(pwd)/.spastic/skills`
+# Coming in a follow-up: `jaunty skills resolve <skill>` prints the resolution chain
+# Today: just `ls -la $JAUNTY_SKILLS_DIR ~/.jaunty/skills $(pwd)/.jaunty/skills`
 ```
 
 ## Brief-skill overlay caveat
@@ -70,7 +70,7 @@ Brief skills (`brief-prd`, `brief-design-review`, etc.) load by default from `na
 
 ## See also
 
-- [Platform Reference](https://github.com/nanohype/nanohype/blob/main/docs/platform-reference.md) — the org-wide view of the stack spastic produces work on
-- [`spastic/CLAUDE.md`](../CLAUDE.md) — Claude Code instructions for working inside this repo
-- [`spastic/src/overlay.ts`](../src/overlay.ts) — the resolver
-- [`spastic/__tests__/overlay.test.ts`](../__tests__/overlay.test.ts) — tests covering priority, append, missing-file
+- [Platform Reference](https://github.com/nanohype/nanohype/blob/main/docs/platform-reference.md) — the org-wide view of the stack jaunty produces work on
+- [`jaunty/CLAUDE.md`](../CLAUDE.md) — Claude Code instructions for working inside this repo
+- [`jaunty/src/overlay.ts`](../src/overlay.ts) — the resolver
+- [`jaunty/__tests__/overlay.test.ts`](../__tests__/overlay.test.ts) — tests covering priority, append, missing-file

@@ -39,7 +39,7 @@ For `main` on production repos:
 - **Require status checks to pass**:
   - install / build / lint / test / docs (the four-phase contract from `FOUR_PHASE_CONTRACT`).
   - security scan (CodeQL / Snyk / Trivy).
-  - merge gate (spastic-issued status check from `pr-reviewer`, `qa-security`, `build-verifier`, `artifact-auditor`).
+  - merge gate (jaunty-issued status check from `pr-reviewer`, `qa-security`, `build-verifier`, `artifact-auditor`).
 - **Require branches to be up to date before merging**: on (forces rebase or merge of main).
 - **Require signed commits**: on for prod repos.
 - **Require linear history**: on.

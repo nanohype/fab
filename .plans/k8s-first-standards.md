@@ -14,7 +14,7 @@ Status: NOT STARTED.
 
 ### `IAC_BY_TARGET`
 
-Current shape (from spastic CLAUDE.md):
+Current shape (from jaunty CLAUDE.md):
 
 > aws→AWS CDK (TS/Python/Go/Java/C#), gcp→Pulumi (TS/Python/Go/C#), k8s→Helm+Kustomize, fly→fly.toml, vercel→vercel.json, cloudflare→Wrangler, serverless→SAM/Serverless. Terraform is NOT the default on AWS.
 

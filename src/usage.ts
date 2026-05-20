@@ -1,5 +1,5 @@
 import type { AnthropicAgents } from './api.js';
-import type { SpasticState, Session, TeamRole } from './types.js';
+import type { JauntyState, Session, TeamRole } from './types.js';
 
 // ── Pricing (Sonnet 4) ─────────────────────────────────────────────
 
@@ -39,15 +39,15 @@ function estimateCost(inputTokens: number, outputTokens: number): number {
   return (inputTokens / 1_000_000) * INPUT_COST_PER_MTOK + (outputTokens / 1_000_000) * OUTPUT_COST_PER_MTOK;
 }
 
-function resolveRole(session: Session, state: SpasticState): TeamRole | 'unknown' {
-  // Match by agent ID in spastic state
+function resolveRole(session: Session, state: JauntyState): TeamRole | 'unknown' {
+  // Match by agent ID in jaunty state
   const agentId = session.agent?.id;
   if (!agentId) return 'unknown';
   const match = state.agents.find((a) => a.agentId === agentId);
   return match?.role ?? 'unknown';
 }
 
-export async function aggregateUsage(api: AnthropicAgents, state: SpasticState, since?: Date): Promise<UsageReport> {
+export async function aggregateUsage(api: AnthropicAgents, state: JauntyState, since?: Date): Promise<UsageReport> {
   const result = await api.listSessions(100);
   let sessions = result.data;
 

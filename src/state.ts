@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
-  SpasticState,
+  JauntyState,
   DeployedAgent,
   GitRepoResource,
   JournalConfig,
@@ -16,14 +16,14 @@ import { parseGitHubUrl } from './git.js';
 
 // Anchored to the project root, not cwd — survives cd
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const STATE_FILE = join(PROJECT_ROOT, '.spastic-state.json');
+const STATE_FILE = join(PROJECT_ROOT, '.jaunty-state.json');
 
-const EMPTY: SpasticState = {
+const EMPTY: JauntyState = {
   agents: [],
   skillIds: {},
   environmentId: null,
-  memory: { enabled: true, path: '/workspace/.spastic/memory.md' },
-  journal: { enabled: true, basePath: '/workspace/.spastic/journal' },
+  memory: { enabled: true, path: '/workspace/.jaunty/memory.md' },
+  journal: { enabled: true, basePath: '/workspace/.jaunty/journal' },
   repos: [],
   modelOverrides: {},
   sprint: null,
@@ -32,10 +32,10 @@ const EMPTY: SpasticState = {
   projectLanguage: 'typescript',
 };
 
-export async function loadState(): Promise<SpasticState> {
+export async function loadState(): Promise<JauntyState> {
   try {
     const raw = await readFile(STATE_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<SpasticState>;
+    const parsed = JSON.parse(raw) as Partial<JauntyState>;
     // Merge with defaults so partial state files (missing optional fields)
     // load cleanly without forcing the caller to populate every field.
     return { ...EMPTY, ...parsed };
@@ -44,13 +44,13 @@ export async function loadState(): Promise<SpasticState> {
   }
 }
 
-export async function saveState(state: SpasticState): Promise<void> {
+export async function saveState(state: JauntyState): Promise<void> {
   await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
 }
 
 // ── Agents ──────────────────────────────────────────────────────────
 
-export async function addAgent(agent: DeployedAgent): Promise<SpasticState> {
+export async function addAgent(agent: DeployedAgent): Promise<JauntyState> {
   const state = await loadState();
   state.agents = state.agents.filter((a) => a.role !== agent.role);
   state.agents.push(agent);
@@ -65,7 +65,7 @@ export async function getAgentByRole(role: TeamRole): Promise<DeployedAgent | un
 
 // ── Skills ──────────────────────────────────────────────────────────
 
-export async function addSkill(role: TeamRole, skillId: string): Promise<SpasticState> {
+export async function addSkill(role: TeamRole, skillId: string): Promise<JauntyState> {
   const state = await loadState();
   state.skillIds[role] = skillId;
   await saveState(state);
@@ -85,7 +85,7 @@ export async function clearSkills(): Promise<void> {
 
 // ── Environment ─────────────────────────────────────────────────────
 
-export async function setEnvironmentId(id: string): Promise<SpasticState> {
+export async function setEnvironmentId(id: string): Promise<JauntyState> {
   const state = await loadState();
   state.environmentId = id;
   await saveState(state);
@@ -104,7 +104,7 @@ export async function getMemoryConfig(): Promise<MemoryConfig> {
   return state.memory;
 }
 
-export async function setMemoryConfig(config: Partial<MemoryConfig>): Promise<SpasticState> {
+export async function setMemoryConfig(config: Partial<MemoryConfig>): Promise<JauntyState> {
   const state = await loadState();
   state.memory = { ...state.memory, ...config };
   await saveState(state);
@@ -118,7 +118,7 @@ export async function getJournalConfig(): Promise<JournalConfig> {
   return state.journal;
 }
 
-export async function setJournalConfig(config: Partial<JournalConfig>): Promise<SpasticState> {
+export async function setJournalConfig(config: Partial<JournalConfig>): Promise<JauntyState> {
   const state = await loadState();
   state.journal = { ...state.journal, ...config };
   await saveState(state);
@@ -132,7 +132,7 @@ export async function getRepos(): Promise<GitRepoResource[]> {
   return state.repos;
 }
 
-export async function addRepo(repo: GitRepoResource): Promise<SpasticState> {
+export async function addRepo(repo: GitRepoResource): Promise<JauntyState> {
   const state = await loadState();
   state.repos = state.repos.filter((r) => r.url !== repo.url);
   state.repos.push(repo);
@@ -140,7 +140,7 @@ export async function addRepo(repo: GitRepoResource): Promise<SpasticState> {
   return state;
 }
 
-export async function removeRepo(url: string): Promise<SpasticState> {
+export async function removeRepo(url: string): Promise<JauntyState> {
   const state = await loadState();
   state.repos = state.repos.filter((r) => r.url !== url);
   await saveState(state);
@@ -176,14 +176,14 @@ export async function getModelOverrides(): Promise<Record<string, string>> {
   return state.modelOverrides;
 }
 
-export async function setModelOverride(role: TeamRole, model: string): Promise<SpasticState> {
+export async function setModelOverride(role: TeamRole, model: string): Promise<JauntyState> {
   const state = await loadState();
   state.modelOverrides[role] = model;
   await saveState(state);
   return state;
 }
 
-export async function clearModelOverride(role: TeamRole): Promise<SpasticState> {
+export async function clearModelOverride(role: TeamRole): Promise<JauntyState> {
   const state = await loadState();
   const { [role]: _removed, ...rest } = state.modelOverrides;
   state.modelOverrides = rest;
@@ -198,21 +198,21 @@ export async function getSprintConfig(): Promise<SprintConfig | null> {
   return state.sprint;
 }
 
-export async function setSprintConfig(config: SprintConfig): Promise<SpasticState> {
+export async function setSprintConfig(config: SprintConfig): Promise<JauntyState> {
   const state = await loadState();
   state.sprint = config;
   await saveState(state);
   return state;
 }
 
-export async function clearSprint(): Promise<SpasticState> {
+export async function clearSprint(): Promise<JauntyState> {
   const state = await loadState();
   state.sprint = null;
   await saveState(state);
   return state;
 }
 
-export async function addSprintItem(item: SprintItem): Promise<SpasticState> {
+export async function addSprintItem(item: SprintItem): Promise<JauntyState> {
   const state = await loadState();
   if (!state.sprint) throw new Error('No active sprint');
   state.sprint.backlog.push(item);
@@ -220,7 +220,7 @@ export async function addSprintItem(item: SprintItem): Promise<SpasticState> {
   return state;
 }
 
-export async function updateSprintItem(id: string, update: Partial<SprintItem>): Promise<SpasticState> {
+export async function updateSprintItem(id: string, update: Partial<SprintItem>): Promise<JauntyState> {
   const state = await loadState();
   if (!state.sprint) throw new Error('No active sprint');
   const item = state.sprint.backlog.find((i) => i.id === id);
@@ -237,7 +237,7 @@ export async function getBudgetLimit(): Promise<number | null> {
   return state.budgetLimit;
 }
 
-export async function setBudgetLimit(limit: number | null): Promise<SpasticState> {
+export async function setBudgetLimit(limit: number | null): Promise<JauntyState> {
   const state = await loadState();
   state.budgetLimit = limit;
   await saveState(state);
@@ -251,14 +251,14 @@ export async function getVaultIds(): Promise<string[]> {
   return state.vaultIds;
 }
 
-export async function addVaultId(id: string): Promise<SpasticState> {
+export async function addVaultId(id: string): Promise<JauntyState> {
   const state = await loadState();
   if (!state.vaultIds.includes(id)) state.vaultIds.push(id);
   await saveState(state);
   return state;
 }
 
-export async function removeVaultId(id: string): Promise<SpasticState> {
+export async function removeVaultId(id: string): Promise<JauntyState> {
   const state = await loadState();
   state.vaultIds = state.vaultIds.filter((v) => v !== id);
   await saveState(state);
@@ -272,7 +272,7 @@ export async function getProjectLanguage(): Promise<Language> {
   return state.projectLanguage;
 }
 
-export async function setProjectLanguage(language: Language): Promise<SpasticState> {
+export async function setProjectLanguage(language: Language): Promise<JauntyState> {
   const state = await loadState();
   state.projectLanguage = language;
   await saveState(state);

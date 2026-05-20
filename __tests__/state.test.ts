@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadState, saveState, clearState } from '../src/state.js';
-import type { SpasticState } from '../src/types.js';
+import type { JauntyState } from '../src/types.js';
 
-const STATE_FILE = join(process.cwd(), '.spastic-state.json');
+const STATE_FILE = join(process.cwd(), '.jaunty-state.json');
 
 async function cleanup() {
   try {
@@ -31,12 +31,12 @@ describe('state', () => {
   });
 
   it('saveState + loadState roundtrip preserves all fields', async () => {
-    const state: SpasticState = {
+    const state: JauntyState = {
       agents: [{ role: 'product', agentId: 'agent_123', version: 1, deployedAt: '2026-04-08' }],
       skillIds: { product: 'skill_456' },
       environmentId: 'env_789',
       memory: { enabled: false, path: '/custom/memory.md' },
-      journal: { enabled: true, basePath: '/workspace/.spastic/journal' },
+      journal: { enabled: true, basePath: '/workspace/.jaunty/journal' },
       repos: [
         {
           type: 'github_repository',
@@ -70,8 +70,8 @@ describe('state', () => {
       agents: [{ role: 'pr-reviewer', agentId: 'agent_x', version: 2, deployedAt: '2026-04-08' }],
       skillIds: { 'pr-reviewer': 'skill_y' },
       environmentId: 'env_z',
-      memory: { enabled: true, path: '/workspace/.spastic/memory.md' },
-      journal: { enabled: true, basePath: '/workspace/.spastic/journal' },
+      memory: { enabled: true, path: '/workspace/.jaunty/memory.md' },
+      journal: { enabled: true, basePath: '/workspace/.jaunty/journal' },
       repos: [],
       modelOverrides: {},
       sprint: null,
@@ -103,8 +103,8 @@ describe('state', () => {
       agents: [],
       skillIds: {},
       environmentId: null,
-      memory: { enabled: true, path: '/workspace/.spastic/memory.md' },
-      journal: { enabled: true, basePath: '/workspace/.spastic/journal' },
+      memory: { enabled: true, path: '/workspace/.jaunty/memory.md' },
+      journal: { enabled: true, basePath: '/workspace/.jaunty/journal' },
       repos: [],
       modelOverrides: {},
       sprint: null,

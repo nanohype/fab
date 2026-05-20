@@ -43,7 +43,7 @@ modules/<scope>/<resource>/
 1. **PR opens.** CI runs `tofu init -backend=false` + `tofu validate` + `tofu fmt -check` + `tflint` + `checkov` (or `trivy`).
 2. **Plan job.** CI runs `tofu init` + `tofu plan -out=tfplan` against the target backend. Plan output posted as PR comment.
 3. **Review.** Plan is the load-bearing review artifact. Approver reads the plan, not just the HCL diff. Drift surfaces here.
-4. **Merge gate.** Spastic's `build-verifier` runs the plan as part of the four-phase contract. REJECT on plan errors.
+4. **Merge gate.** Jaunty's `build-verifier` runs the plan as part of the four-phase contract. REJECT on plan errors.
 5. **Apply.** Only after merge gate approval. Runs from CI with OIDC-federated cloud creds (no long-lived secrets). Records run-id + apply log in artifact bucket.
 6. **Drift detection.** Scheduled `tofu plan` against `main` weekly. Drift → ticket + plan output attached.
 

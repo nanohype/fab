@@ -700,7 +700,7 @@ export async function executeWorkflow(
       console.log(
         `${DIM}Check the Branch hook message above for the specific cause (missing intake JSON, missing context.product, no primary repo, or GitHub API failure).${RESET}`,
       );
-      console.log(`${DIM}If no primary repo is configured: spastic repo add <github-url> --token <github-pat>${RESET}`);
+      console.log(`${DIM}If no primary repo is configured: jaunty repo add <github-url> --token <github-pat>${RESET}`);
       return;
     }
     context = `${branchContext}\n\n${context}`;

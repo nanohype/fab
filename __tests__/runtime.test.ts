@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AnthropicAgents } from '../src/api.js';
 import type { AgentEvent, Session, UserEvent } from '../src/types.js';
 
-// Mock the state module so the tests don't touch `.spastic-state.json`
+// Mock the state module so the tests don't touch `.jaunty-state.json`
 // (which would race with state.test.ts running in parallel).
 vi.mock('../src/state.js', () => ({
   getAgentByRole: vi.fn(),

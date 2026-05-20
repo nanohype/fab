@@ -2,7 +2,7 @@
 
 ## What this is for
 
-`spastic.schema.json` defines the **shape** of an intake brief — which fields exist, what types they hold, what enums are valid. This document defines the **quality bar** — what each section needs to actually contain to produce a strong factory run.
+`jaunty.schema.json` defines the **shape** of an intake brief — which fields exist, what types they hold, what enums are valid. This document defines the **quality bar** — what each section needs to actually contain to produce a strong factory run.
 
 Anyone authoring a brief — you writing JSON by hand, a Claude session drafting one with you, an external API caller, or the `intake-analyst` agent enriching a thin one — applies this rubric before the brief enters the workflow. Briefs that fail the rubric get either enriched or returned with specific questions; weak briefs do not enter the workflow.
 

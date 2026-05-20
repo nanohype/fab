@@ -1,7 +1,7 @@
 import type { AgentEvent } from '../types.js';
 
 /**
- * Shared SDK message → spastic AgentEvent translator. The Agent SDK
+ * Shared SDK message → jaunty AgentEvent translator. The Agent SDK
  * (`@anthropic-ai/claude-agent-sdk`) and the `claude` CLI's
  * `--output-format stream-json` mode emit the same SDKMessage shape — they're
  * the same Claude Code binary under the hood — so one translator serves both

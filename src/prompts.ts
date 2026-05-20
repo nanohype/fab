@@ -1,11 +1,11 @@
-import type { SpasticState, TeamMember, TeamRole } from './types.js';
+import type { JauntyState, TeamMember, TeamRole } from './types.js';
 import { FACTORY_PREAMBLE, LANGUAGE_TOOLCHAIN } from './standards.js';
 
 /**
  * Build the final system prompt for an agent by augmenting the base
- * prompt from team.ts with dynamic sections based on spastic state.
+ * prompt from team.ts with dynamic sections based on jaunty state.
  */
-export function buildSystemPrompt(member: TeamMember, state: SpasticState): string {
+export function buildSystemPrompt(member: TeamMember, state: JauntyState): string {
   const sections: string[] = [member.system];
 
   // ── Factory Production Standards (factory group only) ─────────
