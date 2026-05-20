@@ -629,4 +629,4 @@ Per-dimension canonical reading. When grading, cite specific books to ground cla
 - Hunt & Thomas — camp-site rule
 - Knuth, _Literate Programming_ (1992) — code as communication
 
-The user's private overlay at `~/.spastic/skills/quality-check.md` may deepen any dimension further — additional architects, additional anti-pattern catalogs, additional taste. This baseline is the floor.
+The user's private overlay at `~/.jaunty/skills/quality-check.md` may deepen any dimension further — additional architects, additional anti-pattern catalogs, additional taste. This baseline is the floor.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://nanohype.dev/spastic/intake",
-  "title": "spastic Intake",
-  "description": "Structured input contract for the spastic coordinator agent. Any agent or system that wants to trigger the spastic startup team sends a message conforming to this schema as the first user event.",
+  "$id": "https://nanohype.dev/jaunty/intake",
+  "title": "jaunty Intake",
+  "description": "Structured input contract for the jaunty coordinator agent. Any agent or system that wants to trigger the jaunty startup team sends a message conforming to this schema as the first user event.",
   "type": "object",
   "required": ["goal"],
   "properties": {

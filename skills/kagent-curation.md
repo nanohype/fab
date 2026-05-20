@@ -125,7 +125,7 @@ Defaults:
 
 ### Advisor
 
-The Opus escalation tool. `maxCallsPerSession` caps cost. Required by spastic's `consult_advisor` flow.
+The Opus escalation tool. `maxCallsPerSession` caps cost. Required by jaunty's `consult_advisor` flow.
 
 ## Composition with agentgateway
 

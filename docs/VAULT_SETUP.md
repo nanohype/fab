@@ -6,8 +6,8 @@ How to obtain credentials for each service.
 
 1. Copy `.env.vault` to `.env.vault.local`
 2. Fill in your tokens (see below for each service)
-3. Run `spastic vault setup`
-4. Run `spastic deploy` to attach the vault to sessions
+3. Run `jaunty vault setup`
+4. Run `jaunty deploy` to attach the vault to sessions
 
 Services are split into two groups:
 
@@ -71,7 +71,7 @@ Notion's MCP server requires OAuth user authentication. You need to create a pub
 
 1. Go to https://www.notion.so/my-integrations
 2. Click "New integration"
-3. Name it (e.g., "spastic")
+3. Name it (e.g., "jaunty")
 4. Type: **Public** (not internal — MCP requires public for OAuth)
 5. Under "OAuth Domain & URIs":
    - Redirect URI: `https://localhost:3000/callback` (you'll use this for the one-time auth flow)
@@ -129,7 +129,7 @@ The vault setup creates an `mcp_oauth` credential for Notion with:
 
 1. Go to https://api.slack.com/apps
 2. Click "Create New App" → "From scratch"
-3. Name it (e.g., "spastic"), select your workspace
+3. Name it (e.g., "jaunty"), select your workspace
 
 ### Step 2: Configure OAuth
 
@@ -271,7 +271,7 @@ API is mostly read (inspect files, components, styles). Write is limited to comm
 
 These services don't have hosted MCP endpoints. You need to deploy your own MCP server and set the `MCP_*_URL` env var to point at it.
 
-See the `mcp-proxy` project in protohype (or scaffold one with `spastic scaffold`).
+See the `mcp-proxy` project in protohype (or scaffold one with `jaunty scaffold`).
 
 ---
 
@@ -295,7 +295,7 @@ One Google Cloud project + one service account. See the consolidated Google setu
 
 ### Setup
 
-1. Go to https://console.cloud.google.com → create project (e.g., "spastic")
+1. Go to https://console.cloud.google.com → create project (e.g., "jaunty")
 2. Create service account: APIs & Services → Credentials → Service Account
 3. Create JSON key: click SA → Keys → Add Key → JSON
 4. Base64-encode: `base64 -i sa-key.json | tr -d '\n' | pbcopy`

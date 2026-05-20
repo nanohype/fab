@@ -22,11 +22,11 @@ export class ManagedAgentsRuntime implements AgentRuntime {
   async runRoleSession(role: TeamRole, message: string, options?: RunRoleOptions): Promise<AgentSession> {
     const entry = await getAgentByRole(role);
     if (!entry) {
-      throw new Error(`Role "${role}" is not deployed. Run: spastic deploy`);
+      throw new Error(`Role "${role}" is not deployed. Run: jaunty deploy`);
     }
     const envId = await getEnvironmentId();
     if (!envId) {
-      throw new Error('No environment configured. Run: spastic deploy');
+      throw new Error('No environment configured. Run: jaunty deploy');
     }
 
     // Repos + vaults come from the workspace state by default; allow caller

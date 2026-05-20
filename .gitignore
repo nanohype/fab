@@ -2,8 +2,8 @@ node_modules/
 dist/
 .env
 .env.vault.local
-.spastic-state.json
-.spastic-perf.json
+.jaunty-state.json
+.jaunty-perf.json
 *.tsbuildinfo
 dry-run.json
 service-account.json

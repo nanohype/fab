@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SCHEMA_PATH = join(PROJECT_ROOT, 'spastic.schema.json');
+const SCHEMA_PATH = join(PROJECT_ROOT, 'jaunty.schema.json');
 
 interface SchemaProperty {
   type?: string;
@@ -30,7 +30,7 @@ interface IntakeSchema {
 
 const schema: IntakeSchema = JSON.parse(readFileSync(SCHEMA_PATH, 'utf-8'));
 
-describe('spastic.schema.json', () => {
+describe('jaunty.schema.json', () => {
   it('keeps goal as the only top-level required field', () => {
     expect(schema.required).toEqual(['goal']);
   });

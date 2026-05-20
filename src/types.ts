@@ -528,7 +528,7 @@ export interface SprintConfig {
 // Primary language for a factory build. Drives LANGUAGE_TOOLCHAIN
 // (standards.ts) — build/lint/test/docs commands, manifest file,
 // version-lookup command, registry. Populated from the intake brief's
-// constraints.language and persisted on SpasticState.
+// constraints.language and persisted on JauntyState.
 
 export type Language = 'typescript' | 'go' | 'python' | 'rust' | 'java' | 'kotlin' | 'csharp';
 
@@ -551,7 +551,7 @@ export interface DeployedAgent {
   deployedAt: string;
 }
 
-export interface SpasticState {
+export interface JauntyState {
   agents: DeployedAgent[];
   skillIds: Record<string, string>;
   environmentId: string | null;

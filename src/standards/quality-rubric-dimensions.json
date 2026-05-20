@@ -3,7 +3,7 @@
   "kind": "nanohype/standards/quality-rubric-dimensions",
   "version": "1",
   "title": "Quality rubric — dimensions",
-  "summary": "The nine dimensions every build on the nanohype stack is graded against. This file names the dimensions, gives a one-line summary, and names the canonical lens for each (the named thinker / framework whose framing the dimension is graded through). The depth — specific REJECT criteria, anti-pattern catalogs, pattern-to-solution maps, reviewer assignments, weights, and merge-gate enforcement — lives in the reference client's bundled `quality-check` skill (`spastic/skills/quality-check.md`) and can be overlaid by any consumer with their own deepened version.",
+  "summary": "The nine dimensions every build on the nanohype stack is graded against. This file names the dimensions, gives a one-line summary, and names the canonical lens for each (the named thinker / framework whose framing the dimension is graded through). The depth — specific REJECT criteria, anti-pattern catalogs, pattern-to-solution maps, reviewer assignments, weights, and merge-gate enforcement — lives in the reference client's bundled `quality-check` skill (`jaunty/skills/quality-check.md`) and can be overlaid by any consumer with their own deepened version.",
   "content": {
     "dimensions": [
       {

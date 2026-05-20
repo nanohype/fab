@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { buildSystemPrompt } from '../src/prompts.js';
 import { TEAM } from '../src/team.js';
-import type { SpasticState } from '../src/types.js';
+import type { JauntyState } from '../src/types.js';
 
-function makeState(overrides?: Partial<SpasticState>): SpasticState {
+function makeState(overrides?: Partial<JauntyState>): JauntyState {
   return {
     agents: [],
     skillIds: {},
     environmentId: null,
-    memory: { enabled: true, path: '/workspace/.spastic/memory.md' },
-    journal: { enabled: true, basePath: '/workspace/.spastic/journal' },
+    memory: { enabled: true, path: '/workspace/.jaunty/memory.md' },
+    journal: { enabled: true, basePath: '/workspace/.jaunty/journal' },
     repos: [],
     modelOverrides: {},
     sprint: null,
@@ -44,7 +44,7 @@ describe('buildSystemPrompt', () => {
   it('appends memory section when enabled', () => {
     const prompt = buildSystemPrompt(
       product,
-      makeState({ memory: { enabled: true, path: '/workspace/.spastic/memory.md' } }),
+      makeState({ memory: { enabled: true, path: '/workspace/.jaunty/memory.md' } }),
     );
     expect(prompt).toContain('Company Memory');
     expect(prompt).toContain('memory_query');
@@ -55,7 +55,7 @@ describe('buildSystemPrompt', () => {
   it('omits memory section when disabled', () => {
     const prompt = buildSystemPrompt(
       product,
-      makeState({ memory: { enabled: false, path: '/workspace/.spastic/memory.md' } }),
+      makeState({ memory: { enabled: false, path: '/workspace/.jaunty/memory.md' } }),
     );
     expect(prompt).not.toContain('Company Memory');
   });
@@ -63,7 +63,7 @@ describe('buildSystemPrompt', () => {
   it('appends journal section with role-specific path', () => {
     const prompt = buildSystemPrompt(product, makeState());
     expect(prompt).toContain('Personal Journal');
-    expect(prompt).toContain('/workspace/.spastic/journal/product.md');
+    expect(prompt).toContain('/workspace/.jaunty/journal/product.md');
   });
 
   it('appends self-evaluation block', () => {

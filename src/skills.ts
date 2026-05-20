@@ -483,8 +483,8 @@ export function getAllSkillDefs(): [TeamRole, SkillDef][] {
  *
  * Resolution order:
  *
- *   1. Skill overlay (`$SPASTIC_SKILLS_DIR` → `~/.spastic/skills/` →
- *      `<cwd>/.spastic/skills/` → bundled `spastic/skills/`). If a skill
+ *   1. Skill overlay (`$JAUNTY_SKILLS_DIR` → `~/.jaunty/skills/` →
+ *      `<cwd>/.jaunty/skills/` → bundled `jaunty/skills/`). If a skill
  *      `<def.name>.md` lives in any of those layers it wins as the base.
  *   2. Type-specific loader (brief → nanohype template, composed →
  *      nanohype references, generated → built at runtime). Used when no
@@ -529,7 +529,7 @@ async function loadByType(
     case 'generated':
       // Specialist roles — skill content is a thin wrapper around the
       // SkillDef description. The deep expertise lives in the system
-      // prompt + any overlay at `spastic/skills/<def.name>.md`.
+      // prompt + any overlay at `jaunty/skills/<def.name>.md`.
       return {
         content: `---\nname: ${def.name}\ndescription: ${def.description}\n---\n\n${def.description}`,
         referenceFiles: [],
@@ -551,8 +551,8 @@ export async function previewSkillContent(role: TeamRole, nanohypePath: string):
 export function resolveNanohypePath(flagValue?: string): string {
   if (flagValue) return resolve(flagValue);
   if (process.env.NANOHYPE_PATH) return resolve(process.env.NANOHYPE_PATH);
-  // Default: sibling directory (nanohype/nanohype alongside nanohype/spastic)
-  // From dist/skills.js → spastic/ → parent (nanohype monorepo root) → nanohype/
+  // Default: sibling directory (nanohype/nanohype alongside nanohype/jaunty)
+  // From dist/skills.js → jaunty/ → parent (nanohype monorepo root) → nanohype/
   const thisDir = fileURLToPath(new URL('.', import.meta.url));
   return resolve(thisDir, '..', '..', 'nanohype');
 }

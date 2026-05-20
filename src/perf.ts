@@ -1,9 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AnthropicAgents } from './api.js';
-import type { SpasticState } from './types.js';
+import type { JauntyState } from './types.js';
 
-const PERF_FILE = join(process.cwd(), '.spastic-perf.json');
+const PERF_FILE = join(process.cwd(), '.jaunty-perf.json');
 
 export interface RoleMetrics {
   sessions: number;
@@ -48,7 +48,7 @@ async function savePerf(data: PerfData): Promise<void> {
 export async function collectSessionMetrics(
   api: AnthropicAgents,
   sessionId: string,
-  state: SpasticState,
+  state: JauntyState,
 ): Promise<void> {
   const perf = await loadPerf();
   const agentIdToRole = new Map<string, string>();

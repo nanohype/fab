@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
-import type { AgentEvent, SpasticState, TeamMember, TeamRole, UserEvent } from '../types.js';
+import type { AgentEvent, JauntyState, TeamMember, TeamRole, UserEvent } from '../types.js';
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getPrimaryRepo } from '../state.js';
@@ -16,18 +16,18 @@ import { isTerminal, translateSdkMessage } from './sdk-events.js';
 
 /**
  * Subprocess-driven runtime that spawns `claude -p` per role session. Lets
- * spastic execute workflows against the user's Claude Code subscription
+ * jaunty execute workflows against the user's Claude Code subscription
  * credentials today (the SDK's subscription-auth path lights up
  * 2026-06-15). Each role session is a single `claude -p` process; multi-
  * turn within a session uses `--input-format stream-json` (stdin piping);
  * cross-process continuation (`revise`) uses `--resume <session-id>`.
  *
  * Configuration knobs:
- *   - `SPASTIC_CLAUDE_BARE=1`     pass `--bare` (skip user CLAUDE.md, hooks,
+ *   - `JAUNTY_CLAUDE_BARE=1`     pass `--bare` (skip user CLAUDE.md, hooks,
  *                                  auto-memory; force ANTHROPIC_API_KEY auth)
- *   - `SPASTIC_CLAUDE_PATH`        override binary lookup (default: `claude`)
- *   - `SPASTIC_CLAUDE_EXTRA_ARGS`  space-separated flags appended to every spawn
- *   - `SPASTIC_CLAUDE_MCP_DIR`     directory for per-session MCP config files
+ *   - `JAUNTY_CLAUDE_PATH`        override binary lookup (default: `claude`)
+ *   - `JAUNTY_CLAUDE_EXTRA_ARGS`  space-separated flags appended to every spawn
+ *   - `JAUNTY_CLAUDE_MCP_DIR`     directory for per-session MCP config files
  *                                  (default: os.tmpdir())
  *
  * Parity matrix lives in `docs/transports.md`.
@@ -52,7 +52,7 @@ export class ClaudeCliRuntime implements AgentRuntime {
       systemPrompt,
       model: member.model,
       mcpConfigPath,
-      bare: process.env.SPASTIC_CLAUDE_BARE === '1',
+      bare: process.env.JAUNTY_CLAUDE_BARE === '1',
       addDir: repo ? `/workspace/${repo.repo}` : null,
       resumeFrom: null,
       title: options?.title,
@@ -286,7 +286,7 @@ class ResumedClaudeCliSession implements AgentSession {
         systemPrompt: null, // resume inherits the original session's system prompt
         model: null,
         mcpConfigPath: null,
-        bare: process.env.SPASTIC_CLAUDE_BARE === '1',
+        bare: process.env.JAUNTY_CLAUDE_BARE === '1',
         addDir: repo ? `/workspace/${repo.repo}` : null,
         resumeFrom: this.id,
         title: undefined,
@@ -402,7 +402,7 @@ export function buildClaudeArgs(opts: BuildClaudeArgsOptions): string[] {
   }
 
   // Escape hatch. Power users can append arbitrary flags via env var.
-  const extra = opts.env.SPASTIC_CLAUDE_EXTRA_ARGS?.trim();
+  const extra = opts.env.JAUNTY_CLAUDE_EXTRA_ARGS?.trim();
   if (extra) {
     args.push(...extra.split(/\s+/));
   }
@@ -444,15 +444,15 @@ const GATEWAY_HOSTED: ReadonlySet<string> = new Set([
  * Gateway-routed servers (see {@link GATEWAY_HOSTED}) get
  * `Authorization: Bearer <MCP_GATEWAY_TOKEN>` injected. Third-party direct
  * servers (github, linear, slack, notion, sentry, figma, hunter) pass
- * through without spastic-side auth headers — Claude Code handles those
+ * through without jaunty-side auth headers — Claude Code handles those
  * via its own credential store.
  *
  * **Missing gateway token behaviour:**
- *   - Default (`SPASTIC_MCP_STRICT` unset): gateway servers are silently
+ *   - Default (`JAUNTY_MCP_STRICT` unset): gateway servers are silently
  *     dropped from the config and a single-line warning is written to
  *     stderr. The agent runs with whatever non-gateway servers remain
  *     plus Claude Code's built-in tools.
- *   - Strict (`SPASTIC_MCP_STRICT=1`): missing token throws. Use this in
+ *   - Strict (`JAUNTY_MCP_STRICT=1`): missing token throws. Use this in
  *     production where every declared MCP server is load-bearing.
  */
 export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv): string | null {
@@ -462,7 +462,7 @@ export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv
   if (servers.length === 0) return null;
 
   const gatewayToken = env.MCP_GATEWAY_TOKEN ?? '';
-  const strict = env.SPASTIC_MCP_STRICT === '1';
+  const strict = env.JAUNTY_MCP_STRICT === '1';
   const skipped: string[] = [];
 
   const mcpServers: Record<string, McpHttpEntry> = {};
@@ -474,7 +474,7 @@ export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv
         if (strict) {
           throw new Error(
             `MCP server "${server.name}" routes through the gateway but MCP_GATEWAY_TOKEN is not set. ` +
-              `Set the token, remove the server from the role's mcpServers list, or unset SPASTIC_MCP_STRICT to fall back to skip-with-warning.`,
+              `Set the token, remove the server from the role's mcpServers list, or unset JAUNTY_MCP_STRICT to fall back to skip-with-warning.`,
           );
         }
         skipped.push(server.name);
@@ -494,7 +494,7 @@ export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv
   if (skipped.length > 0) {
     process.stderr.write(
       `[claude-cli] MCP_GATEWAY_TOKEN not set — dropping gateway server(s): ${skipped.join(', ')}. ` +
-        `Set MCP_GATEWAY_TOKEN to enable them, or set SPASTIC_MCP_STRICT=1 to fail loudly.\n`,
+        `Set MCP_GATEWAY_TOKEN to enable them, or set JAUNTY_MCP_STRICT=1 to fail loudly.\n`,
     );
   }
 
@@ -507,7 +507,7 @@ export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv
 // ── Internal helpers ───────────────────────────────────────────────────
 
 function spawnClaude(args: string[]): ChildProcessWithoutNullStreams {
-  const claudePath = process.env.SPASTIC_CLAUDE_PATH ?? 'claude';
+  const claudePath = process.env.JAUNTY_CLAUDE_PATH ?? 'claude';
   const proc = spawn(claudePath, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -518,7 +518,7 @@ function spawnClaude(args: string[]): ChildProcessWithoutNullStreams {
     if (err.code === 'ENOENT') {
       process.stderr.write(
         `[claude-cli] "${claudePath}" not found on PATH. ` +
-          `Install Claude Code (https://docs.claude.com/en/docs/claude-code) or set SPASTIC_CLAUDE_PATH.\n`,
+          `Install Claude Code (https://docs.claude.com/en/docs/claude-code) or set JAUNTY_CLAUDE_PATH.\n`,
       );
     } else {
       process.stderr.write(`[claude-cli] subprocess error: ${err.message}\n`);
@@ -528,8 +528,8 @@ function spawnClaude(args: string[]): ChildProcessWithoutNullStreams {
 }
 
 function writeMcpConfigFile(sessionId: string, json: string): string {
-  const dir = process.env.SPASTIC_CLAUDE_MCP_DIR ?? tmpdir();
-  const path = join(dir, `spastic-mcp-${sessionId}.json`);
+  const dir = process.env.JAUNTY_CLAUDE_MCP_DIR ?? tmpdir();
+  const path = join(dir, `jaunty-mcp-${sessionId}.json`);
   writeFileSync(path, json, { encoding: 'utf-8', mode: 0o600 });
   return path;
 }
@@ -559,7 +559,7 @@ function isResultSuccess(raw: unknown): boolean {
  * through `runRoleSession`; this lets tests verify state plumbing without
  * spawning anything.
  */
-export function _buildClaudeCliSystemPrompt(role: TeamRole, state: SpasticState): string {
+export function _buildClaudeCliSystemPrompt(role: TeamRole, state: JauntyState): string {
   const member: TeamMember | undefined = TEAM.find((m) => m.role === role);
   if (!member) throw new Error(`Unknown role: "${role}"`);
   return buildSystemPrompt(member, state);

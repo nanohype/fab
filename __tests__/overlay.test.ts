@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appendOverlays, loadSkillWithOverlay, overlayLayers, resolveSkillPath } from '../src/overlay.js';
 
-// Bundled baseline lives at <spastic>/skills/ — resolved the same way
+// Bundled baseline lives at <jaunty>/skills/ — resolved the same way
 // the runtime does it.
 const BUNDLED_DIR = resolve(fileURLToPath(new URL('../src', import.meta.url)), '..', 'skills');
 
@@ -20,13 +20,13 @@ interface Workspace {
 }
 
 function makeWorkspace(): Workspace {
-  const root = mkdtempSync(join(tmpdir(), 'spastic-overlay-'));
+  const root = mkdtempSync(join(tmpdir(), 'jaunty-overlay-'));
   const envDir = join(root, 'env');
   const userHome = join(root, 'home');
   const projectCwd = join(root, 'project');
   mkdirSync(envDir, { recursive: true });
-  mkdirSync(join(userHome, '.spastic', 'skills'), { recursive: true });
-  mkdirSync(join(projectCwd, '.spastic', 'skills'), { recursive: true });
+  mkdirSync(join(userHome, '.jaunty', 'skills'), { recursive: true });
+  mkdirSync(join(projectCwd, '.jaunty', 'skills'), { recursive: true });
 
   // Track files written to the bundled dir so we can clean them up.
   const writtenBundled: string[] = [];
@@ -48,7 +48,7 @@ function makeWorkspace(): Workspace {
   };
 
   const env: NodeJS.ProcessEnv = {
-    SPASTIC_SKILLS_DIR: envDir,
+    JAUNTY_SKILLS_DIR: envDir,
     HOME: userHome,
   };
 
@@ -65,13 +65,13 @@ function makeWorkspace(): Workspace {
 
 describe('overlayLayers', () => {
   it('returns the four layers in highest-to-lowest priority order', () => {
-    const layers = overlayLayers({ SPASTIC_SKILLS_DIR: '/tmp/env' }, '/tmp/cwd');
+    const layers = overlayLayers({ JAUNTY_SKILLS_DIR: '/tmp/env' }, '/tmp/cwd');
     expect(layers.map((l) => l.source)).toEqual(['env', 'user', 'project', 'bundled']);
     expect(layers[0].dir).toBe('/tmp/env');
-    expect(layers[2].dir).toBe('/tmp/cwd/.spastic/skills');
+    expect(layers[2].dir).toBe('/tmp/cwd/.jaunty/skills');
   });
 
-  it('returns null env layer when SPASTIC_SKILLS_DIR is unset', () => {
+  it('returns null env layer when JAUNTY_SKILLS_DIR is unset', () => {
     const layers = overlayLayers({}, '/tmp/cwd');
     expect(layers[0].source).toBe('env');
     expect(layers[0].dir).toBeNull();
@@ -106,8 +106,8 @@ describe('resolveSkillPath', () => {
 
   it('env > user > project > bundled — env wins when all four have the same skill', () => {
     writeFileSync(join(ws.envDir, 'priority.md'), '# Env\n');
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'priority.md'), '# User\n');
-    writeFileSync(join(ws.projectCwd, '.spastic', 'skills', 'priority.md'), '# Project\n');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'priority.md'), '# User\n');
+    writeFileSync(join(ws.projectCwd, '.jaunty', 'skills', 'priority.md'), '# Project\n');
     ws.bundledFile('priority.md', '# Bundled\n');
 
     const result = resolveSkillPath('priority', ws.env, ws.projectCwd);
@@ -116,8 +116,8 @@ describe('resolveSkillPath', () => {
   });
 
   it('user wins when env is empty but user has the skill', () => {
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'pick-user.md'), '# User\n');
-    writeFileSync(join(ws.projectCwd, '.spastic', 'skills', 'pick-user.md'), '# Project\n');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'pick-user.md'), '# User\n');
+    writeFileSync(join(ws.projectCwd, '.jaunty', 'skills', 'pick-user.md'), '# Project\n');
     ws.bundledFile('pick-user.md', '# Bundled\n');
 
     const result = resolveSkillPath('pick-user', ws.env, ws.projectCwd);
@@ -125,7 +125,7 @@ describe('resolveSkillPath', () => {
   });
 
   it('project wins when env and user are empty but project has the skill', () => {
-    writeFileSync(join(ws.projectCwd, '.spastic', 'skills', 'pick-project.md'), '# Project\n');
+    writeFileSync(join(ws.projectCwd, '.jaunty', 'skills', 'pick-project.md'), '# Project\n');
     ws.bundledFile('pick-project.md', '# Bundled\n');
 
     const result = resolveSkillPath('pick-project', ws.env, ws.projectCwd);
@@ -135,15 +135,15 @@ describe('resolveSkillPath', () => {
   it('collects .append.md from every layer in low-to-high priority order', () => {
     ws.bundledFile('skill-with-appends.md', '# Base\n');
     writeFileSync(join(ws.envDir, 'skill-with-appends.append.md'), '# env-append\n');
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'skill-with-appends.append.md'), '# user-append\n');
-    writeFileSync(join(ws.projectCwd, '.spastic', 'skills', 'skill-with-appends.append.md'), '# project-append\n');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'skill-with-appends.append.md'), '# user-append\n');
+    writeFileSync(join(ws.projectCwd, '.jaunty', 'skills', 'skill-with-appends.append.md'), '# project-append\n');
 
     const result = resolveSkillPath('skill-with-appends', ws.env, ws.projectCwd);
     expect(result.appends.map((a) => a.source)).toEqual(['project', 'user', 'env']);
   });
 
   it('does not require a base to collect appends (caller decides what to do)', () => {
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'no-base.append.md'), '# user-append\n');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'no-base.append.md'), '# user-append\n');
     const result = resolveSkillPath('no-base', ws.env, ws.projectCwd);
     expect(result.base).toBeNull();
     expect(result.appends).toHaveLength(1);
@@ -175,15 +175,15 @@ describe('loadSkillWithOverlay', () => {
 
   it('user override wins over bundled base', async () => {
     ws.bundledFile('overridden.md', 'baseline body');
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'overridden.md'), 'user body');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'overridden.md'), 'user body');
     const result = await loadSkillWithOverlay('overridden', ws.env, ws.projectCwd);
     expect(result).toBe('user body');
   });
 
   it('concatenates base + appends with low-priority appends first', async () => {
     ws.bundledFile('layered.md', 'BASE');
-    writeFileSync(join(ws.projectCwd, '.spastic', 'skills', 'layered.append.md'), 'PROJECT');
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'layered.append.md'), 'USER');
+    writeFileSync(join(ws.projectCwd, '.jaunty', 'skills', 'layered.append.md'), 'PROJECT');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'layered.append.md'), 'USER');
     writeFileSync(join(ws.envDir, 'layered.append.md'), 'ENV');
 
     const result = await loadSkillWithOverlay('layered', ws.env, ws.projectCwd);
@@ -210,7 +210,7 @@ describe('appendOverlays', () => {
   });
 
   it('concatenates appends onto an externally-loaded body', async () => {
-    writeFileSync(join(ws.userHome, '.spastic', 'skills', 'brief-prd.append.md'), 'extra user notes');
+    writeFileSync(join(ws.userHome, '.jaunty', 'skills', 'brief-prd.append.md'), 'extra user notes');
     const result = await appendOverlays('baseline brief text', 'brief-prd', ws.env, ws.projectCwd);
     expect(result).toBe('baseline brief text\n\nextra user notes');
   });

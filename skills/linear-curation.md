@@ -116,7 +116,7 @@ Per-team templates for common issue types:
 
 Linear MCP server enables programmatic access. Common patterns:
 
-- **Workflow auto-creation**: spastic workflow runs → creates issues in the relevant team's backlog.
+- **Workflow auto-creation**: jaunty workflow runs → creates issues in the relevant team's backlog.
 - **Status sync to Notion**: PRD pages roll up linked Linear issue status.
 - **Slack notifications**: Linear → Slack on status change of high-priority issues.
 
