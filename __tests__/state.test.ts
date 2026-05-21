@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
 import { loadState, saveState, clearState } from '../src/state.js';
 import type { FabState } from '../src/types.js';
 
-const STATE_FILE = join(process.cwd(), '.fab-state.json');
+const STATE_FILE = process.env.FAB_STATE_FILE!;
 
 async function cleanup() {
   try {
@@ -115,5 +114,11 @@ describe('state', () => {
 
     const raw = await readFile(STATE_FILE, 'utf-8');
     expect(() => JSON.parse(raw)).not.toThrow();
+  });
+
+  it('loadState throws on a corrupt state file instead of silently resetting', async () => {
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(STATE_FILE, '{ not valid json', 'utf-8');
+    await expect(loadState()).rejects.toThrow(/corrupt/i);
   });
 });

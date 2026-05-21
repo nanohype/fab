@@ -1,6 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import type {
   FabState,
   DeployedAgent,
@@ -14,9 +14,14 @@ import type {
 } from './types.js';
 import { parseGitHubUrl } from './git.js';
 
-// Anchored to the project root, not cwd — survives cd
-const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const STATE_FILE = join(PROJECT_ROOT, '.fab-state.json');
+/**
+ * Absolute path to the state file. Defaults to ~/.fab/state.json — a
+ * stable per-user location that survives `cd`, reinstalls, and npx cache
+ * churn. Override with FAB_STATE_FILE (used by tests; an escape hatch).
+ */
+export function stateFilePath(): string {
+  return process.env.FAB_STATE_FILE ?? join(homedir(), '.fab', 'state.json');
+}
 
 const EMPTY: FabState = {
   agents: [],
@@ -33,19 +38,31 @@ const EMPTY: FabState = {
 };
 
 export async function loadState(): Promise<FabState> {
+  const file = stateFilePath();
+  let raw: string;
   try {
-    const raw = await readFile(STATE_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<FabState>;
-    // Merge with defaults so partial state files (missing optional fields)
-    // load cleanly without forcing the caller to populate every field.
-    return { ...EMPTY, ...parsed };
+    raw = await readFile(file, 'utf-8');
+  } catch (err) {
+    // A missing file is a fresh start. Any other read error is real —
+    // don't mask it by silently resetting state.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { ...EMPTY };
+    throw err;
+  }
+  try {
+    // Merge onto defaults so partial state files (missing optional
+    // fields) load cleanly without populating every field.
+    return { ...EMPTY, ...(JSON.parse(raw) as Partial<FabState>) };
   } catch {
-    return { ...EMPTY };
+    throw new Error(
+      `State file is corrupt: ${file}\n` + 'Fix or remove it, then re-run — `fab recover` rebuilds it from the API.',
+    );
   }
 }
 
 export async function saveState(state: FabState): Promise<void> {
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+  const file = stateFilePath();
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify(state, null, 2) + '\n', 'utf-8');
 }
 
 // ── Agents ──────────────────────────────────────────────────────────
