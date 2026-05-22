@@ -1,0 +1,79 @@
+# RBAC for the sdk-k8s runtime.
+#
+# FAB_RUNTIME=sdk-k8s dispatches each role-session as its own AgentSandbox;
+# the eks-agent-platform operator turns that into a hardened, single-use pod.
+# fab manages the AgentSandbox CRs and tails the resulting session pods,
+# which span two namespaces:
+#
+#   - the management namespace (FAB_K8S_NAMESPACE) holds the Platform CR and
+#     the AgentSandbox CRs fab creates;
+#   - the tenant namespace (tenants-<platform>) is where the operator runs
+#     the session pods — fab reads the Platform's .status.namespace to find
+#     it, then tails the pod logs there.
+#
+# fab's ServiceAccount is `fab` in namespace `fab` (deploy/serviceaccount.yaml).
+#
+# fab also needs to trust the cluster's API server CA. Set NODE_EXTRA_CA_CERTS
+# to /var/run/secrets/kubernetes.io/serviceaccount/ca.crt on fab's pod so the
+# K8sClient's plain `fetch` calls verify TLS without extra configuration.
+---
+# Management namespace — create / read / delete AgentSandbox CRs, and read
+# the owning Platform to resolve its tenant namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fab-sdk-k8s-dispatch
+  # The namespace that holds the Platform CR — fab's FAB_K8S_NAMESPACE.
+  namespace: eks-agent-platform
+rules:
+  - apiGroups: ['agents.stxkxs.io']
+    resources: ['agentsandboxes']
+    verbs: ['create', 'get', 'list', 'watch', 'delete']
+  - apiGroups: ['agents.stxkxs.io']
+    resources: ['platforms']
+    verbs: ['get']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fab-sdk-k8s-dispatch
+  namespace: eks-agent-platform
+subjects:
+  - kind: ServiceAccount
+    name: fab
+    namespace: fab
+roleRef:
+  kind: Role
+  name: fab-sdk-k8s-dispatch
+  apiGroup: rbac.authorization.k8s.io
+---
+# Tenant namespace — the session pods run here. fab only reads them: get the
+# pod (to wait for the container to start) and stream its log.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fab-sdk-k8s-logs
+  # Replace with your Platform's tenant namespace: tenants-<platform>.
+  namespace: tenants-acme
+rules:
+  - apiGroups: ['']
+    resources: ['pods']
+    verbs: ['get', 'list']
+  - apiGroups: ['']
+    resources: ['pods/log']
+    verbs: ['get']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fab-sdk-k8s-logs
+  # Replace with your Platform's tenant namespace: tenants-<platform>.
+  namespace: tenants-acme
+subjects:
+  - kind: ServiceAccount
+    name: fab
+    namespace: fab
+roleRef:
+  kind: Role
+  name: fab-sdk-k8s-logs
+  apiGroup: rbac.authorization.k8s.io

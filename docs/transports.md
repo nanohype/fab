@@ -1,12 +1,13 @@
 # Transports
 
-Fab runs the same role definitions + workflow code against three transports:
+Fab runs the same role definitions + workflow code against four transports:
 
 - **`managed-agents`** (default) — Anthropic-hosted REST API. Sessions and sandboxes live on Anthropic infrastructure.
 - **`sdk`** — `@anthropic-ai/claude-agent-sdk` running the agent loop in fab's own process. Sessions run in-process; tools touch the working directory.
+- **`sdk-k8s`** — the `sdk` agent loop, but each role-session dispatched as its own isolated pod on the eks-agent-platform substrate. See [Per-session pod isolation](#per-session-pod-isolation-sdk-k8s).
 - **`claude-cli`** — `claude -p` subprocess per role session. Drives the Claude Code CLI binary directly; bills against the user's existing Claude Code login (subscription-billable today).
 
-Pick the transport via `FAB_RUNTIME=managed-agents | sdk | claude-cli` at startup. The default is `managed-agents` to match the production behavior the rest of nanohype was built around.
+Pick the transport via `FAB_RUNTIME=managed-agents | sdk | sdk-k8s | claude-cli` at startup. The default is `managed-agents` to match the production behavior the rest of nanohype was built around.
 
 ## How to switch
 
@@ -99,7 +100,27 @@ By default the `managed-agents` transport runs each session's tool sandbox on An
 
 `FAB_SANDBOX` is read only by the `managed-agents` transport.
 
-## What's the same across all three
+## Per-session pod isolation (sdk-k8s)
+
+`FAB_RUNTIME=sdk-k8s` runs the same `sdk` agent loop, but dispatches each role-session as its own isolated pod instead of running them all in fab's process. fab creates an `AgentSandbox` custom resource; the [eks-agent-platform](https://github.com/nanohype/eks-agent-platform) operator turns it into a hardened, single-use pod — Pod Security `restricted`, a default-deny NetworkPolicy, the dedicated tainted node pool, the Platform's tenant IRSA ServiceAccount, and an optional gVisor/Kata RuntimeClass. The pod runs `fab role-session` — the unmodified `sdk` loop — and its event stream comes back as pod-log JSON lines that fab tails and re-emits. To the workflow layer it is just another session.
+
+Paired with `FAB_INFERENCE=bedrock` this is the regulated-enterprise end state: every role-session a separately-isolated pod, inferring on the adopter's own Bedrock, with each hardening dial available as configuration. The session is one-way — the `sdk` role-loop never needs follow-up input — so a remote session only streams events out; an interrupt deletes the CR.
+
+`sdk-k8s` must run inside the cluster.
+
+| Env var                 | Default | Effect                                                                                     |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `FAB_RUNTIME=sdk-k8s`   | unset   | Select this runtime                                                                        |
+| `FAB_K8S_NAMESPACE`     | —       | Namespace holding the Platform CR — also where fab creates the `AgentSandbox` CRs          |
+| `FAB_K8S_SESSION_IMAGE` | —       | The fab container image each session pod runs                                              |
+| `FAB_K8S_PLATFORM`      | —       | The Platform the role-sessions run under; its tenant IRSA role scopes their Bedrock access |
+| `FAB_K8S_RUNTIME_CLASS` | unset   | RuntimeClass for the session pod — `gvisor` or `kata` for kernel-level isolation           |
+
+`FAB_INFERENCE` and `AWS_REGION` are forwarded onto each session pod so the in-pod loop infers against the same backend as the dispatcher.
+
+The operator runs the session pods in the Platform's tenant namespace (`tenants-<platform>`), distinct from the namespace the `AgentSandbox` CRs live in. `deploy/rbac.yaml` grants fab's ServiceAccount both — the AgentSandbox + Platform reads in the management namespace, the pod-log reads in the tenant namespace. fab also needs to trust the cluster's API-server CA: set `NODE_EXTRA_CA_CERTS` to `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` on its pod.
+
+## What's the same across all transports
 
 - **Roster.** All three transports run the same roles from `src/team/`.
 - **Workflows.** `src/workflows.ts` is transport-agnostic. The same revision-loop, merge-gate, and external-reviewer calibration code runs in every mode.
