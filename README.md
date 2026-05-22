@@ -91,6 +91,24 @@ The subprocess inherits `~/.claude/CLAUDE.md`, hooks, user-level skills, and aut
 
 `fab workflows` lists the built-in workflows; each has its own role sequence and (for code-producing workflows) a merge-gate finalizer. See `src/workflows.ts` for the full catalog.
 
+## Running in a cluster
+
+A `Dockerfile` and example manifests under `deploy/` run fab workflows as Kubernetes Jobs. The in-cluster path uses the `sdk` runtime with inference served from AWS Bedrock — the agent loop runs in the pod, and Bedrock auth comes from an IRSA-bound ServiceAccount rather than a static key.
+
+```sh
+# Build and push the image
+docker build -t <registry>/fab:<tag> .
+docker push <registry>/fab:<tag>
+
+# Create the namespace + IRSA ServiceAccount (set the role ARN first)
+kubectl apply -f deploy/serviceaccount.yaml
+
+# Run a workflow as a Job (set the image, workflow, and intake JSON)
+kubectl apply -f deploy/job.yaml
+```
+
+The IRSA role is an AWS resource: provision it in your cloud-infra layer with `bedrock:InvokeModel` permission on the Claude models you use, and put its ARN in `deploy/serviceaccount.yaml`. See [`docs/transports.md`](docs/transports.md#inference-backend) for the inference backend.
+
 ## Configuration
 
 ```sh

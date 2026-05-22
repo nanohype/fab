@@ -1,0 +1,68 @@
+# Example Job: one fab workflow run inside the cluster.
+#
+# Copy this, set the image, fill in the workflow name + intake JSON, then
+# `kubectl apply`. fab runs the sdk runtime with inference served from AWS
+# Bedrock — the agent loop executes in this pod and Bedrock auth comes from
+# the ServiceAccount's IRSA role, not a static key.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fab-feature-build
+  namespace: fab
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      serviceAccountName: fab
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fab
+          # Build from the Dockerfile and push to your registry; pin a
+          # digest in production rather than a moving tag.
+          image: ghcr.io/nanohype/fab:latest
+          args: ['workflow', 'feature-build', '<intake-json>']
+          workingDir: /work
+          env:
+            - name: FAB_RUNTIME
+              value: sdk
+            - name: FAB_INFERENCE
+              value: bedrock
+            - name: AWS_REGION
+              value: us-east-1
+            - name: FAB_STATE_FILE
+              value: /work/.fab-state.json
+            # FAB_INFERENCE=bedrock authenticates via IRSA. The advisor
+            # escalation still calls the Anthropic API — create this Secret
+            # if your roles escalate, otherwise the var is skipped.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fab-anthropic
+                  key: api-key
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ['ALL']
+          resources:
+            requests:
+              cpu: '500m'
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: work
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
