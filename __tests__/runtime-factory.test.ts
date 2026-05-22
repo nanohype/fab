@@ -4,6 +4,7 @@ import {
   resolveRuntimeKind,
   ClaudeCliRuntime,
   SdkRuntime,
+  SdkK8sRuntime,
   ManagedAgentsRuntime,
 } from '../src/runtimes/index.js';
 
@@ -28,6 +29,11 @@ describe('runtime factory', () => {
   it('honors FAB_RUNTIME=sdk', () => {
     process.env.FAB_RUNTIME = 'sdk';
     expect(resolveRuntimeKind()).toBe('sdk');
+  });
+
+  it('honors FAB_RUNTIME=sdk-k8s', () => {
+    process.env.FAB_RUNTIME = 'sdk-k8s';
+    expect(resolveRuntimeKind()).toBe('sdk-k8s');
   });
 
   it('honors FAB_RUNTIME=managed-agents explicitly', () => {
@@ -56,6 +62,13 @@ describe('runtime factory', () => {
     const stubApi = {} as unknown as Parameters<typeof createRuntime>[0];
     const rt = createRuntime(stubApi);
     expect(rt).toBeInstanceOf(SdkRuntime);
+  });
+
+  it('createRuntime returns an SdkK8sRuntime when configured', () => {
+    process.env.FAB_RUNTIME = 'sdk-k8s';
+    const stubApi = {} as unknown as Parameters<typeof createRuntime>[0];
+    const rt = createRuntime(stubApi);
+    expect(rt).toBeInstanceOf(SdkK8sRuntime);
   });
 
   it('createRuntime returns a ClaudeCliRuntime when configured', () => {
