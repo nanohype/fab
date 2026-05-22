@@ -120,9 +120,11 @@ Paired with `FAB_INFERENCE=bedrock` this is the regulated-enterprise end state: 
 
 The operator runs the session pods in the Platform's tenant namespace (`tenants-<platform>`), distinct from the namespace the `AgentSandbox` CRs live in. `deploy/rbac.yaml` grants fab's ServiceAccount both — the AgentSandbox + Platform reads in the management namespace, the pod-log reads in the tenant namespace. fab also needs to trust the cluster's API-server CA: set `NODE_EXTRA_CA_CERTS` to `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` on its pod.
 
+**Known limitation:** a dropped pod-log stream ends the session — fab emits a synthetic `session.error` rather than resuming from an offset, so a long-running role-session is more exposed to a transient API-server disconnect than the in-process `sdk` runtime. Log-stream reconnect (`sinceTime` + event-id de-dup) is a planned hardening.
+
 ## What's the same across all transports
 
-- **Roster.** All three transports run the same roles from `src/team/`.
+- **Roster.** All four transports run the same roles from `src/team/`.
 - **Workflows.** `src/workflows.ts` is transport-agnostic. The same revision-loop, merge-gate, and external-reviewer calibration code runs in every mode.
 - **Skill overlay.** The overlay chain (`$FAB_SKILLS_DIR` → `~/.fab/skills/` → `<cwd>/.fab/skills/` → bundled `fab/skills/`) resolves identically.
 - **Gate logic.** `src/gate.ts` — pure functions, no transport coupling.

@@ -9,12 +9,14 @@ A TypeScript CLI orchestrating 83 Claude agents organized around factory phases:
 
 Naming convention: `-curator` (knowledge stewardship) vs `-engineer` (production with tools) vs process names for gate roles. See [`docs/roster.md`](docs/roster.md) for the full roster.
 
-**Dual transports:**
+**Four transports, one env var.** Pick where Claude executes with `FAB_RUNTIME`:
 
-- **Managed Agents** (default) — Anthropic-hosted REST API. Sessions on Anthropic infrastructure.
-- **SDK** — `@anthropic-ai/claude-agent-sdk` running the agent loop in fab's own process.
+- **`managed-agents`** (default) — Anthropic-hosted REST API. Sessions on Anthropic infrastructure.
+- **`sdk`** — `@anthropic-ai/claude-agent-sdk` running the agent loop in fab's own process.
+- **`sdk-k8s`** — the `sdk` loop, each role-session dispatched as its own isolated pod (see [Kubernetes-dispatched sessions](#kubernetes-dispatched-sessions-sdk-k8s)).
+- **`claude-cli`** — `claude -p` per role-session, billed against your Claude subscription.
 
-Pick by setting `FAB_RUNTIME=managed-agents | sdk`. Trade-offs documented in [`docs/transports.md`](docs/transports.md).
+Trade-offs documented in [`docs/transports.md`](docs/transports.md).
 
 `src/team.ts` is the barrel re-exporting per-phase modules. `src/workflows.ts` is the source of truth for built-in workflows. **`skills/` is the bundled baseline of agent instructions** — quality-check rubric, factory preamble, intake guide, 31 curator/engineer baselines — that any user can override via the [skill overlay](skills/README.md) without forking.
 
