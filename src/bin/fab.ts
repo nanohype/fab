@@ -41,6 +41,7 @@ import { buildSystemPrompt } from '../prompts.js';
 import { resolveSandboxMode, environmentConfig } from '../sandbox.js';
 import { getWorkflow, listWorkflows, executeWorkflow, reviseWorkflow, streamWithAdvisor } from '../workflows.js';
 import { resolveRuntimeKind } from '../runtimes/index.js';
+import { executeRoleSession } from '../runtimes/role-session.js';
 import { ADVISOR_TOOL, hasAdvisorAccess } from '../advisor.js';
 import { aggregateUsage, formatUsageReport } from '../usage.js';
 import { loadPerf, formatPerfReport } from '../perf.js';
@@ -1693,6 +1694,11 @@ async function main(): Promise<void> {
         break;
       case 'sessions':
         await listSessions();
+        break;
+      // Internal — the in-pod entrypoint an AgentSandbox dispatches; kept
+      // out of printHelp because nobody runs it from a shell.
+      case 'role-session':
+        process.exitCode = await executeRoleSession(args);
         break;
       default:
         console.error(`Unknown command: ${args.command}`);
