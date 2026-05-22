@@ -52,6 +52,8 @@ fab status                 # show deployed agent status
 fab agents                 # list deployed agents and their model overrides
 ```
 
+Set `FAB_SANDBOX=self-hosted` before `fab deploy` to run the agent tool sandbox on infrastructure you host — see [`docs/transports.md`](docs/transports.md#self-hosted-sandbox).
+
 ## Interact
 
 ```sh

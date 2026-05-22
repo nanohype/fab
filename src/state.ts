@@ -14,6 +14,7 @@ import type {
   TeamRole,
 } from './types.js';
 import { parseGitHubUrl } from './git.js';
+import { resolveSandboxMode } from './sandbox.js';
 
 /**
  * Absolute path to the state file. Defaults to ~/.fab/state.json — a
@@ -138,6 +139,8 @@ export async function setMemoryConfig(config: Partial<MemoryConfig>): Promise<Fa
  * memory is disabled or no store has been provisioned yet (run `fab deploy`).
  */
 export async function getMemoryResource(): Promise<MemoryStoreResource | null> {
+  // Managed Agents Memory is not supported with self-hosted sandboxes.
+  if (resolveSandboxMode() === 'self-hosted') return null;
   const state = await loadState();
   if (!state.memory.enabled || !state.memory.storeId) return null;
   return {

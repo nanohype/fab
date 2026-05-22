@@ -38,6 +38,7 @@ import {
 import { getAllSkillDefs, getSkillDef, loadSkillContent, previewSkillContent, resolveNanohypePath } from '../skills.js';
 import { resolveMcpServers } from '../mcp.js';
 import { buildSystemPrompt } from '../prompts.js';
+import { resolveSandboxMode, environmentConfig } from '../sandbox.js';
 import { getWorkflow, listWorkflows, executeWorkflow, reviseWorkflow, streamWithAdvisor } from '../workflows.js';
 import { resolveRuntimeKind } from '../runtimes/index.js';
 import { ADVISOR_TOOL, hasAdvisorAccess } from '../advisor.js';
@@ -160,6 +161,7 @@ async function deploy(args: ParsedArgs): Promise<void> {
   // Reuse existing environment or create one
   const state = await loadState();
   const overrides = state.modelOverrides;
+  const sandboxMode = resolveSandboxMode();
 
   if (!dryRun) {
     if (state.environmentId) {
@@ -170,11 +172,7 @@ async function deploy(args: ParsedArgs): Promise<void> {
         // Environment was deleted — create new
         const env = await api!.createEnvironment({
           name: `fab-${Date.now()}`,
-          config: {
-            type: 'cloud',
-            networking: { type: 'unrestricted' },
-            packages: { npm: ['typescript', '@nanohype/sdk'], pip: ['pandas'] },
-          },
+          config: environmentConfig(sandboxMode),
         });
         state.environmentId = env.id;
         console.log(`  environment:    ${env.id} (created)\n`);
@@ -182,20 +180,21 @@ async function deploy(args: ParsedArgs): Promise<void> {
     } else {
       const env = await api!.createEnvironment({
         name: `fab-${Date.now()}`,
-        config: {
-          type: 'cloud',
-          networking: { type: 'unrestricted' },
-          packages: { npm: ['typescript', '@nanohype/sdk'], pip: ['pandas'] },
-        },
+        config: environmentConfig(sandboxMode),
       });
       state.environmentId = env.id;
       console.log(`  environment:    ${env.id} (created)\n`);
     }
   }
 
+  // Self-hosted sandboxes don't support Managed Agents Memory.
+  if (!dryRun && sandboxMode === 'self-hosted' && state.memory.enabled) {
+    console.log('  memory store:   skipped (not supported with self-hosted sandboxes)\n');
+  }
+
   // Reuse existing memory store or create one — shared cross-session
   // factory memory, attached to every role session.
-  if (!dryRun && state.memory.enabled) {
+  if (!dryRun && state.memory.enabled && sandboxMode === 'cloud') {
     let exists = false;
     if (state.memory.storeId) {
       try {

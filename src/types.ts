@@ -101,15 +101,22 @@ export interface CloudConfig {
   };
 }
 
+export interface SelfHostedConfig {
+  type: 'self_hosted';
+}
+
+/** The sandbox config for a Managed Agents environment. */
+export type EnvironmentConfig = CloudConfig | SelfHostedConfig;
+
 export interface EnvironmentCreateParams {
   name: string;
-  config: CloudConfig;
+  config: EnvironmentConfig;
 }
 
 export interface Environment {
   id: string;
   name: string;
-  config: CloudConfig;
+  config: EnvironmentConfig;
   created_at: string;
   updated_at: string;
   archived_at: string | null;

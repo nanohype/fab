@@ -88,6 +88,17 @@ Under `bedrock` the `sdk` runtime sets `CLAUDE_CODE_USE_BEDROCK` for the Agent S
 
 The advisor escalation (`consult_advisor`) calls the Anthropic API directly regardless of `FAB_INFERENCE`.
 
+## Self-hosted sandbox
+
+By default the `managed-agents` transport runs each session's tool sandbox on Anthropic-managed containers. `FAB_SANDBOX=self-hosted` instead points the environment at sandbox workers you host — Anthropic dispatches tool-execution work to them, and agent code never leaves your infrastructure.
+
+| `FAB_SANDBOX`     | Sandbox                      | Notes                                                                                                                                                                                                            |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloud` (default) | Anthropic-managed containers | The standard managed sandbox.                                                                                                                                                                                    |
+| `self-hosted`     | Workers you host             | `fab deploy` creates a `self_hosted` environment; you run the workers (the `eks-agent-platform` SandboxPool substrate). Native Memory is skipped — Anthropic does not yet support it with self-hosted sandboxes. |
+
+`FAB_SANDBOX` is read only by the `managed-agents` transport.
+
 ## What's the same across all three
 
 - **Roster.** All three transports run the same roles from `src/team/`.
