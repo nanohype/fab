@@ -6,13 +6,13 @@ import { loadState } from '../state.js';
 import { isTerminal, textOf, translateSdkMessage } from './sdk-events.js';
 
 /**
- * Local agent runtime backed by `@anthropic-ai/claude-agent-sdk`.
+ * SDK agent runtime backed by `@anthropic-ai/claude-agent-sdk`.
  *
  * Runs the same role definitions in-process via Claude Code's Agent SDK
  * instead of the Managed Agents REST API. The SDK is loaded dynamically so
  * fab remains installable without it (it ships as an optional
- * dependency); a clear error fires if local mode is selected without the
- * package present.
+ * dependency); a clear error fires if the sdk runtime is selected without
+ * the package present.
  *
  * Parity model vs {@link ManagedAgentsRuntime}:
  *   - Sessions: in-memory `Query` objects vs Anthropic-hosted sessions.
@@ -24,15 +24,14 @@ import { isTerminal, textOf, translateSdkMessage } from './sdk-events.js';
  *   - Tool confirmation: SDK uses permission modes. Workflow execution
  *     uses `bypassPermissions` to match the `always_allow` policy on
  *     deployed agent toolsets in managed-agents mode.
- *   - Memory: handled via SDK MCP server configuration (same gateway URLs
- *     as managed-agents mode).
+ *   - Memory: managed-agents-only; the sdk runtime has no shared memory.
  *   - Threading: SDK does not expose Anthropic threading; multi-thread
- *     events are not emitted locally.
+ *     events are not emitted by the sdk runtime.
  *
- * Picked by setting `FAB_RUNTIME=local` at startup. See
+ * Picked by setting `FAB_RUNTIME=sdk` at startup. See
  * `src/runtimes/index.ts` for the selection logic.
  */
-export class LocalRuntime implements AgentRuntime {
+export class SdkRuntime implements AgentRuntime {
   async runRoleSession(role: TeamRole, message: string, options?: RunRoleOptions): Promise<AgentSession> {
     const member = TEAM.find((m) => m.role === role);
     if (!member) {
@@ -43,7 +42,7 @@ export class LocalRuntime implements AgentRuntime {
     const systemPrompt = buildSystemPrompt(member, state);
 
     const sdk = await loadSdk();
-    const session = new LocalAgentSession(sdk, member.model, systemPrompt, options);
+    const session = new SdkAgentSession(sdk, member.model, systemPrompt, options);
     await session.start(message);
     return session;
   }
@@ -53,7 +52,7 @@ export class LocalRuntime implements AgentRuntime {
     // a fresh `query()` call — there is no persistent handle to attach
     // to. We construct an empty session pointed at the SDK and wait for
     // the caller's first input to actually re-open it via `sendInput`.
-    return new ResumedLocalAgentSession(sessionId);
+    return new ResumedSdkAgentSession(sessionId);
   }
 }
 
@@ -71,14 +70,14 @@ async function loadSdk(): Promise<AgentSdkModule> {
     return mod;
   } catch (err) {
     throw new Error(
-      `LocalRuntime requires "@anthropic-ai/claude-agent-sdk" to be installed.\n` +
+      `SdkRuntime requires "@anthropic-ai/claude-agent-sdk" to be installed.\n` +
         `Run: npm install @anthropic-ai/claude-agent-sdk`,
       { cause: err },
     );
   }
 }
 
-class LocalAgentSession implements AgentSession {
+class SdkAgentSession implements AgentSession {
   private inputQueue: { resolve: (value: IteratorResult<unknown>) => void }[] = [];
   private pendingInputs: unknown[] = [];
   private closed = false;
@@ -93,7 +92,7 @@ class LocalAgentSession implements AgentSession {
   ) {}
 
   get id(): string {
-    return this.capturedSessionId ?? 'local-session-pending';
+    return this.capturedSessionId ?? 'sdk-session-pending';
   }
 
   async start(initialMessage: string): Promise<void> {
@@ -113,7 +112,7 @@ class LocalAgentSession implements AgentSession {
         permissionMode: 'bypassPermissions',
         // Resources hint: the SDK uses cwd for filesystem-bound tools;
         // workflows.ts pre-creates branches on the cloud-mounted repos
-        // for managed-agents mode. Local mode operates against the
+        // for managed-agents mode. The sdk runtime operates against the
         // caller's cwd; the user is responsible for cloning the repos
         // beforehand.
         ...(this.options?.metadata && { metadata: this.options.metadata }),
@@ -142,10 +141,10 @@ class LocalAgentSession implements AgentSession {
         // SDK handles tool confirmation via permission hooks (PreToolUse)
         // and tool results via its internal loop, so explicit user-side
         // confirmations have no analogue at this layer. Workflow code
-        // does not depend on them in local mode.
+        // does not depend on them in the sdk runtime.
         return;
       default:
-        throw new Error(`LocalRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`);
+        throw new Error(`SdkRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`);
     }
   }
 
@@ -187,7 +186,7 @@ class LocalAgentSession implements AgentSession {
 
   private async enqueueInput(payload: unknown): Promise<void> {
     if (this.closed) {
-      throw new Error('LocalRuntime: cannot send input after the session is closed');
+      throw new Error('SdkRuntime: cannot send input after the session is closed');
     }
     const waiter = this.inputQueue.shift();
     if (waiter) {
@@ -208,7 +207,7 @@ class LocalAgentSession implements AgentSession {
 
   private async *translateEvents(): AsyncIterable<AgentEvent> {
     if (!this.sdkQuery) {
-      throw new Error('LocalRuntime: session has not been started');
+      throw new Error('SdkRuntime: session has not been started');
     }
     for await (const raw of this.sdkQuery) {
       const event = translateSdkMessage(raw, (id) => {
@@ -226,12 +225,12 @@ class LocalAgentSession implements AgentSession {
 
 /**
  * Stand-in for a resumed session before its first input fires. Once input
- * arrives it transitions into a live `LocalAgentSession`. We keep this
- * separate from {@link LocalAgentSession} because the SDK requires a fresh
+ * arrives it transitions into a live `SdkAgentSession`. We keep this
+ * separate from {@link SdkAgentSession} because the SDK requires a fresh
  * `query()` call with `options.resume` — there is no way to attach to an
  * already-running process by id.
  */
-class ResumedLocalAgentSession implements AgentSession {
+class ResumedSdkAgentSession implements AgentSession {
   constructor(public readonly id: string) {}
 
   get events(): AsyncIterable<AgentEvent> {
@@ -244,7 +243,7 @@ class ResumedLocalAgentSession implements AgentSession {
 
   async sendInput(_input: UserEvent): Promise<void> {
     throw new Error(
-      `LocalRuntime: resuming an existing local session by id is not supported (session "${this.id}"). ` +
+      `SdkRuntime: resuming an existing session by id is not supported (session "${this.id}"). ` +
         `Start a new session via runRoleSession() and pass the previous transcript as context if continuation is required.`,
     );
   }
@@ -259,7 +258,7 @@ class ResumedLocalAgentSession implements AgentSession {
  * without spinning up an SDK process. Re-exporting allows callers to mock
  * `buildSystemPrompt` if they want to assert prompt contents.
  */
-export function _buildLocalSystemPrompt(role: TeamRole, state: FabState): string {
+export function _buildSdkSystemPrompt(role: TeamRole, state: FabState): string {
   const member = TEAM.find((m) => m.role === role);
   if (!member) throw new Error(`Unknown role: "${role}"`);
   return buildSystemPrompt(member, state);

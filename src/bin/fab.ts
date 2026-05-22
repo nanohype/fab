@@ -69,7 +69,7 @@ function requireKey(): string {
 
 /**
  * Construct the Managed Agents client. In managed-agents mode the API key
- * is mandatory — the client is exercised against the REST API. In local /
+ * is mandatory — the client is exercised against the REST API. In sdk /
  * claude-cli mode the client is constructed but never invoked (the
  * runtimes don't touch the REST API), so a missing key is acceptable.
  * Returning a placeholder here lets `executeWorkflow`'s `createRuntime(api)`

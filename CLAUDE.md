@@ -20,7 +20,7 @@ Groups (`group` field):
 
 - `src/types.ts` — all interfaces (agents, sessions, events, state, workflows). `TeamGroup` + `TeamRole` unions here.
 - `src/api.ts` — `AnthropicAgents` class wrapping the managed agents REST API. Includes SSE reconnection with `Last-Event-ID`, pagination helper (`listAll`), and fast-model support.
-- `src/runtime.ts` + `src/runtimes/` — `AgentRuntime` interface + three implementations: `managed-agents.ts` against the REST API; `local.ts` against `@anthropic-ai/claude-agent-sdk` (API-billed); `claude-cli.ts` driving the `claude -p` subprocess per role session (subscription-billable via the user's existing Claude Code login). `src/runtimes/sdk-events.ts` holds the shared SDK message → `AgentEvent` translator. `src/runtimes/index.ts` exports `createRuntime(api)` which resolves the transport from `FAB_RUNTIME` (default `managed-agents`). Parity trade-offs documented in [`docs/transports.md`](docs/transports.md).
+- `src/runtime.ts` + `src/runtimes/` — `AgentRuntime` interface + three implementations: `managed-agents.ts` against the REST API; `sdk.ts` against `@anthropic-ai/claude-agent-sdk` (API-billed); `claude-cli.ts` driving the `claude -p` subprocess per role session (subscription-billable via the user's existing Claude Code login). `src/runtimes/sdk-events.ts` holds the shared SDK message → `AgentEvent` translator. `src/runtimes/index.ts` exports `createRuntime(api)` which resolves the transport from `FAB_RUNTIME` (default `managed-agents`). Parity trade-offs documented in [`docs/transports.md`](docs/transports.md).
 - `src/team.ts` — barrel that aggregates per-phase modules under `src/team/<phase>/<area>.ts`. Each module declares ≤ 8 specialists.
 - `src/prompts.ts` — `buildSystemPrompt()` augmentation layer: appends journal, self-eval, repo, sprint, revision, and factory-production-standards preamble sections based on state + group. The Build Verification Protocol dispatches language-specific commands via `LANGUAGE_TOOLCHAIN[state.projectLanguage]`.
 - `src/standards.ts` — factory production policies. Two layers: (1) **public bar** loaded at module init from the vendored `standards/*.json` (`LANGUAGE_TOOLCHAIN` only at present; future structured facts join via the same loader); (2) **private choreography** declared here as markdown blobs: `FOUR_PHASE_CONTRACT`, `VERSION_CURRENCY_POLICY`, `EVIDENCE_CONTRACT`, `QUALITY_RUBRIC` (dimension weights + per-role assignments + N/A criteria — the depth behind the public dimension names), `IAC_BY_TARGET`, `PLATFORM_TENANT_CONTRACT`, `LLM_POLICY`, `PRODUCTION_BAR` (9 dimensions with the specific REJECT criteria), `COMMIT_PR_POLICY`, `MERGE_GATE_CONTRACT`, `FACTORY_PREAMBLE` (assembled), `CODE_GATE_ROLES`, `DOCS_GATE_ROLES`. The public bar JSON is the [Platform Reference](../nanohype/docs/platform-reference.md); external clients see the guardrails, only fab knows the depth.
@@ -39,7 +39,7 @@ Groups (`group` field):
 
 ## Conventions
 
-- Zero required runtime dependencies — managed-agents mode uses native fetch + Node 24+. `@anthropic-ai/claude-agent-sdk` is an optional dependency consumed only when `FAB_RUNTIME=local`.
+- Zero required runtime dependencies — managed-agents mode uses native fetch + Node 24+. `@anthropic-ai/claude-agent-sdk` is an optional dependency consumed only when `FAB_RUNTIME=sdk`.
 - TypeScript strict mode, ES2022 target, Node16 module resolution
 - Raw arg parsing (no yargs/commander)
 - 2-space indent everywhere
@@ -74,7 +74,7 @@ Every factory agent (30 roles with `group: 'factory'`) receives `FACTORY_PREAMBL
 - **MCP servers always included**: the registry in `mcp.ts` provides default URLs. Env vars override, never gate.
 - **Stream termination**: `streamWithAdvisor` breaks on `session.status_idle`, `session.error`, and `session.status_terminated`. It continues through `session.status_rescheduled` (transient retry).
 - **Advisor access is scoped**: only phase leads + key gate roles get the `consult_advisor` tool (see `ADVISOR_ROLES` in `src/advisor.ts`). All specialist roles are excluded to keep Opus distribution in check. Per-session call cap is 3 (default) via `StreamOptions.maxAdvisorCalls`.
-- **Memory is native**: `deploy` provisions one shared Managed Agents Memory store (`state.memory.storeId`); `runRoleSession` attaches it to every session via `resources`, mounted at `/mnt/memory/`. There is no memory MCP server and no `buildSystemPrompt` memory section. Managed-agents transport only — `local` / `claude-cli` have no shared memory.
+- **Memory is native**: `deploy` provisions one shared Managed Agents Memory store (`state.memory.storeId`); `runRoleSession` attaches it to every session via `resources`, mounted at `/mnt/memory/`. There is no memory MCP server and no `buildSystemPrompt` memory section. Managed-agents transport only — `sdk` / `claude-cli` have no shared memory.
 
 ## Environment
 

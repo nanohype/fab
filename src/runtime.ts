@@ -9,9 +9,8 @@ import type { AgentEvent, GitRepoResource, TeamRole, UserEvent } from './types.j
  *     are deployed cloud-side, sessions persist on Anthropic's infrastructure,
  *     multiagent coordination runs natively via the `multiagent: { type:
  *     "coordinator" }` agent config.
- *   - **LocalRuntime** (Phase 5c) — the Claude Agent SDK in-process. Sessions
- *     live in the local process, subagents use the SDK's Task surface, memory
- *     uses the native `memory_20250818` tool.
+ *   - **SdkRuntime** — the Claude Agent SDK in-process. Sessions live in
+ *     fab's process; subagents use the SDK's Task surface.
  *
  * Both transports expose the same `AgentSession` shape: events flow out via an
  * async iterable; follow-up inputs (tool confirmations, custom tool results,
@@ -52,14 +51,14 @@ export interface AgentSession {
 /**
  * Options for starting a role session. The transport may treat some fields
  * differently — e.g., `resources` (workspace repos) is meaningful for
- * Managed Agents but maps to `cwd` + `addDir` for the local SDK.
+ * Managed Agents but maps to `cwd` + `addDir` for the sdk runtime.
  */
 export interface RunRoleOptions {
   /** Human-readable session title — populated into the title field where the transport supports it. */
   title?: string;
   /** Repo resources to attach (for transports that support workspace mounts). */
   resources?: GitRepoResource[];
-  /** Vault ids for MCP auth (Managed Agents) — for local SDK, MCP auth lives in `mcpServers` config. */
+  /** Vault ids for MCP auth (Managed Agents) — for the sdk runtime, MCP auth lives in `mcpServers` config. */
   vaultIds?: string[];
   /** Per-session metadata; passed through to the transport for observability. */
   metadata?: Record<string, string>;
@@ -92,7 +91,7 @@ export interface AgentRuntime {
    * again.
    *
    * For ManagedAgents: trivial — server-side state lives at the session id.
-   * For Local SDK: maps to the SDK's `resume: session_id` option.
+   * For the sdk runtime: maps to the SDK's `resume: session_id` option.
    */
   resumeSession(sessionId: string): AgentSession;
 }

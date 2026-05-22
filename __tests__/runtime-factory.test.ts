@@ -3,7 +3,7 @@ import {
   createRuntime,
   resolveRuntimeKind,
   ClaudeCliRuntime,
-  LocalRuntime,
+  SdkRuntime,
   ManagedAgentsRuntime,
 } from '../src/runtimes/index.js';
 
@@ -25,9 +25,9 @@ describe('runtime factory', () => {
     expect(resolveRuntimeKind()).toBe('managed-agents');
   });
 
-  it('honors FAB_RUNTIME=local', () => {
-    process.env.FAB_RUNTIME = 'local';
-    expect(resolveRuntimeKind()).toBe('local');
+  it('honors FAB_RUNTIME=sdk', () => {
+    process.env.FAB_RUNTIME = 'sdk';
+    expect(resolveRuntimeKind()).toBe('sdk');
   });
 
   it('honors FAB_RUNTIME=managed-agents explicitly', () => {
@@ -51,11 +51,11 @@ describe('runtime factory', () => {
     expect(rt).toBeInstanceOf(ManagedAgentsRuntime);
   });
 
-  it('createRuntime returns a LocalRuntime when configured', () => {
-    process.env.FAB_RUNTIME = 'local';
+  it('createRuntime returns an SdkRuntime when configured', () => {
+    process.env.FAB_RUNTIME = 'sdk';
     const stubApi = {} as unknown as Parameters<typeof createRuntime>[0];
     const rt = createRuntime(stubApi);
-    expect(rt).toBeInstanceOf(LocalRuntime);
+    expect(rt).toBeInstanceOf(SdkRuntime);
   });
 
   it('createRuntime returns a ClaudeCliRuntime when configured', () => {

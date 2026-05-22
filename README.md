@@ -12,9 +12,9 @@ Naming convention: `-curator` (knowledge stewardship) vs `-engineer` (production
 **Dual transports:**
 
 - **Managed Agents** (default) — Anthropic-hosted REST API. Sessions on Anthropic infrastructure.
-- **Local** — `@anthropic-ai/claude-agent-sdk` in-process. Run workflows against your local filesystem.
+- **SDK** — `@anthropic-ai/claude-agent-sdk` running the agent loop in fab's own process.
 
-Pick by setting `FAB_RUNTIME=managed-agents | local`. Trade-offs documented in [`docs/transports.md`](docs/transports.md).
+Pick by setting `FAB_RUNTIME=managed-agents | sdk`. Trade-offs documented in [`docs/transports.md`](docs/transports.md).
 
 `src/team.ts` is the barrel re-exporting per-phase modules. `src/workflows.ts` is the source of truth for built-in workflows. **`skills/` is the bundled baseline of agent instructions** — quality-check rubric, factory preamble, intake guide, 31 curator/engineer baselines — that any user can override via the [skill overlay](skills/README.md) without forking.
 
@@ -62,11 +62,11 @@ fab stream <session-id>                    # tail an in-flight session
 fab standup                                # cross-team rollup via chief-of-staff
 ```
 
-## Local transport
+## SDK transport
 
 ```sh
-export FAB_RUNTIME=local
-# Skip `fab deploy` — local mode builds the role system prompt per-session.
+export FAB_RUNTIME=sdk
+# Skip `fab deploy` — the sdk runtime builds the role system prompt per-session.
 # Install the Agent SDK if it's not already present (it's an optional dependency):
 npm install @anthropic-ai/claude-agent-sdk
 fab workflow feature-build '<intake-json>'

@@ -1066,13 +1066,13 @@ async function runRoleSession(
   message: string,
   workflowName: string,
 ): Promise<string> {
-  // The runtime is responsible for the deployment-vs-local check
+  // The runtime is responsible for the deployment-vs-sdk check
   // (ManagedAgentsRuntime errors loudly if the role isn't deployed;
-  // LocalRuntime builds the system prompt inline).
+  // SdkRuntime builds the system prompt inline).
   const entry = await getAgentByRole(role);
   const session = await runtime.runRoleSession(role, message, { title: `${workflowName}: ${role}` });
   return streamSessionWithAdvisor(session, {
-    agentId: entry?.agentId ?? `local:${role}`,
+    agentId: entry?.agentId ?? `sdk:${role}`,
     agentRole: role,
     workflow: workflowName,
   });
@@ -1121,7 +1121,7 @@ export async function streamWithAdvisor(
 
 /**
  * The streaming + advisor + cost-tracking loop. Takes an `AgentSession`
- * so it runs against any transport — Managed Agents or the local
+ * so it runs against any transport — Managed Agents or the
  * Claude Agent SDK — without branching.
  */
 export async function streamSessionWithAdvisor(session: AgentSession, options?: StreamOptions): Promise<string> {

@@ -281,7 +281,7 @@ Custom interactive pieces beyond the standard hover/parallax kit. Each gets a na
   {
     "name": "RuntimeSelector",
     "section": "runtimes",
-    "spec": "Tab selector for Managed Agents / Local SDK / Claude CLI. Each tab swaps a config-flow diagram (auth source → runtime → execution surface)."
+    "spec": "Tab selector for Managed Agents / SDK / Claude CLI. Each tab swaps a config-flow diagram (auth source → runtime → execution surface)."
   }
 ]
 ```

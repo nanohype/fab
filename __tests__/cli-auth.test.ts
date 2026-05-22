@@ -28,9 +28,9 @@ describe('runtime kind resolution + auth posture', () => {
     expect(resolveRuntimeKind()).toBe('managed-agents');
   });
 
-  it('resolves to local when FAB_RUNTIME=local even without API key', () => {
-    process.env.FAB_RUNTIME = 'local';
-    expect(resolveRuntimeKind()).toBe('local');
+  it('resolves to sdk when FAB_RUNTIME=sdk even without API key', () => {
+    process.env.FAB_RUNTIME = 'sdk';
+    expect(resolveRuntimeKind()).toBe('sdk');
   });
 
   it('resolves to claude-cli when FAB_RUNTIME=claude-cli even without API key', () => {
