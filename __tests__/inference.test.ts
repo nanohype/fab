@@ -29,6 +29,11 @@ describe('inference backend resolution', () => {
     expect(resolveInferenceBackend()).toBe('api');
   });
 
+  it('honors FAB_INFERENCE=anthropic-aws', () => {
+    process.env.FAB_INFERENCE = 'anthropic-aws';
+    expect(resolveInferenceBackend()).toBe('anthropic-aws');
+  });
+
   it('tolerates surrounding whitespace', () => {
     process.env.FAB_INFERENCE = '  bedrock  ';
     expect(resolveInferenceBackend()).toBe('bedrock');
@@ -69,14 +74,56 @@ describe('model id resolution', () => {
   it('does not touch unmapped models on the api backend', () => {
     expect(resolveModelId('claude-sonnet-9-9', 'api')).toBe('claude-sonnet-9-9');
   });
+
+  it('passes canonical ids through unchanged for the anthropic-aws backend', () => {
+    expect(resolveModelId('claude-sonnet-4-6', 'anthropic-aws')).toBe('claude-sonnet-4-6');
+    expect(resolveModelId('claude-opus-4-7', 'anthropic-aws')).toBe('claude-opus-4-7');
+  });
 });
 
 describe('inference env overlay', () => {
+  const SAVED = {
+    ANTHROPIC_AWS_WORKSPACE_ID: process.env.ANTHROPIC_AWS_WORKSPACE_ID,
+    CLAUDE_CODE_USE_BEDROCK: process.env.CLAUDE_CODE_USE_BEDROCK,
+    CLAUDE_CODE_USE_FOUNDRY: process.env.CLAUDE_CODE_USE_FOUNDRY,
+  };
+  beforeEach(() => {
+    delete process.env.ANTHROPIC_AWS_WORKSPACE_ID;
+    delete process.env.CLAUDE_CODE_USE_BEDROCK;
+    delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+  });
+  afterEach(() => {
+    if (SAVED.ANTHROPIC_AWS_WORKSPACE_ID === undefined) delete process.env.ANTHROPIC_AWS_WORKSPACE_ID;
+    else process.env.ANTHROPIC_AWS_WORKSPACE_ID = SAVED.ANTHROPIC_AWS_WORKSPACE_ID;
+    if (SAVED.CLAUDE_CODE_USE_BEDROCK === undefined) delete process.env.CLAUDE_CODE_USE_BEDROCK;
+    else process.env.CLAUDE_CODE_USE_BEDROCK = SAVED.CLAUDE_CODE_USE_BEDROCK;
+    if (SAVED.CLAUDE_CODE_USE_FOUNDRY === undefined) delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+    else process.env.CLAUDE_CODE_USE_FOUNDRY = SAVED.CLAUDE_CODE_USE_FOUNDRY;
+  });
+
   it('returns no overlay for the api backend', () => {
     expect(inferenceEnv('api')).toBeUndefined();
   });
 
   it('sets CLAUDE_CODE_USE_BEDROCK for the bedrock backend', () => {
     expect(inferenceEnv('bedrock')).toEqual({ CLAUDE_CODE_USE_BEDROCK: '1' });
+  });
+
+  it('sets CLAUDE_CODE_USE_ANTHROPIC_AWS + workspace id for the anthropic-aws backend', () => {
+    process.env.ANTHROPIC_AWS_WORKSPACE_ID = 'wrkspc_01ABCDEF';
+    expect(inferenceEnv('anthropic-aws')).toEqual({
+      CLAUDE_CODE_USE_ANTHROPIC_AWS: '1',
+      ANTHROPIC_AWS_WORKSPACE_ID: 'wrkspc_01ABCDEF',
+    });
+  });
+
+  it('throws when anthropic-aws is selected without a workspace id', () => {
+    expect(() => inferenceEnv('anthropic-aws')).toThrow(/ANTHROPIC_AWS_WORKSPACE_ID/);
+  });
+
+  it('throws when anthropic-aws conflicts with a precedence-taking provider flag', () => {
+    process.env.ANTHROPIC_AWS_WORKSPACE_ID = 'wrkspc_01ABCDEF';
+    process.env.CLAUDE_CODE_USE_BEDROCK = '1';
+    expect(() => inferenceEnv('anthropic-aws')).toThrow(/CLAUDE_CODE_USE_BEDROCK/);
   });
 });

@@ -73,10 +73,11 @@ Claude CLI runtime accepts these env vars on top of the standard fab set:
 
 The `sdk` runtime hosts the agent loop in fab's own process, so it can point the underlying Agent SDK at a non-Anthropic inference backend. `FAB_INFERENCE` selects it — orthogonal to `FAB_RUNTIME`, and read only by the `sdk` runtime. `managed-agents` always infers on Anthropic infrastructure; `claude-cli` inherits the user's Claude Code configuration.
 
-| `FAB_INFERENCE` | Backend       | Notes                                                                                                                              |
-| --------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `api` (default) | Anthropic API | Billed per token against `ANTHROPIC_API_KEY`.                                                                                      |
-| `bedrock`       | AWS Bedrock   | Inference served from the adopter's AWS account. The agent loop still runs in fab's process; no inference token reaches Anthropic. |
+| `FAB_INFERENCE` | Backend                | Notes                                                                                                                                                                                                                                                               |
+| --------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api` (default) | Anthropic API          | Billed per token against `ANTHROPIC_API_KEY`.                                                                                                                                                                                                                       |
+| `bedrock`       | AWS Bedrock            | Inference served from the adopter's AWS account. The agent loop still runs in fab's process; no inference token reaches Anthropic.                                                                                                                                  |
+| `anthropic-aws` | Claude Platform on AWS | First-party Claude reached through the adopter's AWS account (SigV4/IAM auth, AWS Marketplace billing). Same canonical model ids as `api`. Runs on Anthropic infrastructure outside the AWS security boundary — opt-in, non-default; see the compliance note below. |
 
 ```sh
 export FAB_RUNTIME=sdk
@@ -86,6 +87,16 @@ fab workflow feature-build '<intake-json>'
 ```
 
 Under `bedrock` the `sdk` runtime sets `CLAUDE_CODE_USE_BEDROCK` for the Agent SDK and resolves AWS credentials through the standard chain — environment variables, shared config, IRSA, or instance role. Role model ids map to their Bedrock equivalents automatically (`claude-sonnet-4-6` → `anthropic.claude-sonnet-4-6`); a role pointed at a full Bedrock id, including a cross-region inference-profile id, passes through untouched. The AWS account must have [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) granted for the Claude models in use.
+
+```sh
+export FAB_RUNTIME=sdk
+export FAB_INFERENCE=anthropic-aws
+export ANTHROPIC_AWS_WORKSPACE_ID=wrkspc_01ABCDEFGHIJKLMN
+export AWS_REGION=us-east-1
+fab workflow feature-build '<intake-json>'
+```
+
+Under `anthropic-aws` the `sdk` runtime sets `CLAUDE_CODE_USE_ANTHROPIC_AWS` and forwards `ANTHROPIC_AWS_WORKSPACE_ID`; the request base URL derives from `AWS_REGION` (`https://aws-external-anthropic.<region>.api.aws`) and auth is SigV4 through the standard AWS credential chain (env vars, shared config, IRSA web-identity, instance role). Model ids are the same canonical ids as the `api` path — no Bedrock-style remap. `CLAUDE_CODE_USE_BEDROCK` / `CLAUDE_CODE_USE_FOUNDRY` take precedence in Claude Code's provider routing, so fab fails fast if either is set while `anthropic-aws` is selected. Because inference runs on Anthropic-managed infrastructure outside the AWS security boundary, this backend is **not** covered by AWS compliance programs — no FedRAMP High / IL4-5, Anthropic's HIPAA-ready program is unavailable, and AWS is not the sole data processor. Keep it opt-in per intake; use `bedrock` for regulated tenants.
 
 The advisor escalation (`consult_advisor`) calls the Anthropic API directly regardless of `FAB_INFERENCE`.
 
