@@ -126,14 +126,20 @@ const REGISTRY: Record<string, McpServerDef> = {
 // registers such servers by name so roles can reference them and the
 // vault supplies their upstream auth, matched by URL.
 //
+// Each entry must use an https URL and must not reuse a built-in server
+// name (so a tunnel can never silently shadow github/linear/etc.).
+// Entries that violate either rule are skipped with a warning.
+//
 // Format: comma-separated `name=url` pairs, e.g.
 //   FAB_MCP_TUNNEL="wiki=https://wiki.acme.tunnel.example/mcp,kb=https://kb.acme.tunnel.example/mcp"
 
 const TUNNEL_ENV = 'FAB_MCP_TUNNEL';
 
 /**
- * Parse a FAB_MCP_TUNNEL spec into MCP server definitions. Malformed
- * entries are skipped with a warning rather than failing the whole run.
+ * Parse a FAB_MCP_TUNNEL spec into MCP server definitions. Entries that are
+ * malformed (not `name=url`), reuse a built-in server name, or carry a
+ * non-https / unparseable URL are skipped with a warning rather than failing
+ * the whole run.
  */
 export function parseTunnelRegistry(spec: string | undefined): Record<string, McpServerDef> {
   const registry: Record<string, McpServerDef> = {};
@@ -147,6 +153,27 @@ export function parseTunnelRegistry(spec: string | undefined): Record<string, Mc
     const url = eq === -1 ? '' : trimmed.slice(eq + 1).trim();
     if (!name || !url) {
       process.stderr.write(`[mcp] ignoring malformed ${TUNNEL_ENV} entry (expected name=url): ${trimmed}\n`);
+      continue;
+    }
+    // A tunnel must never shadow a built-in server — that would redirect a
+    // role's `github`/`linear`/etc. to an operator-supplied URL.
+    if (Object.hasOwn(REGISTRY, name)) {
+      process.stderr.write(`[mcp] ignoring ${TUNNEL_ENV} entry "${name}": name collides with a built-in server\n`);
+      continue;
+    }
+    // The tunnel hands out an ordinary https URL; reject anything that isn't a
+    // parseable https URL (blocks http://, file://, javascript:, and garbage).
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      process.stderr.write(`[mcp] ignoring ${TUNNEL_ENV} entry "${name}": not a valid URL: ${url}\n`);
+      continue;
+    }
+    if (parsed.protocol !== 'https:') {
+      process.stderr.write(
+        `[mcp] ignoring ${TUNNEL_ENV} entry "${name}": tunnel URLs must use https (got "${parsed.protocol}"): ${url}\n`,
+      );
       continue;
     }
     registry[name] = {
