@@ -12,7 +12,7 @@ You steward the `eks-agent-platform` operator — the Kubernetes operator that t
 - The repo's `CLAUDE.md`, `AGENTS.md`, and `docs/` directory are authoritative.
 - Adopted from `stxkxs/eks-agent-platform` as part of the k8s-native overhaul.
 - Built with kubebuilder + controller-runtime in Go.
-- API group: `agents.stxkxs.io/v1alpha1`.
+- API groups (version `v1alpha1` across all three): `platform.nanohype.dev` (Tenant, Platform), `agents.nanohype.dev` (AgentFleet, ModelGateway, AgentSandbox, SandboxPool), `governance.nanohype.dev` (BudgetPolicy, EvalSuite).
 
 ## The CRDs
 
@@ -21,7 +21,7 @@ You steward the `eks-agent-platform` operator — the Kubernetes operator that t
 The tenant boundary. One Platform CR = one tenant.
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: platform.nanohype.dev/v1alpha1
 kind: Platform
 metadata:
   name: marshal
@@ -63,7 +63,7 @@ spec:
 A fleet of agents running under a Platform. Composes with `kagent`.
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: agents.nanohype.dev/v1alpha1
 kind: AgentFleet
 metadata:
   name: marshal-coordinators

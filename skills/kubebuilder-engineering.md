@@ -46,7 +46,7 @@ eks-agent-platform/
 ## Adding a new CRD
 
 ```sh
-operator-sdk create api --group agents.stxkxs.io --version v1alpha1 --kind PlatformQuota
+operator-sdk create api --group platform.nanohype.dev --version v1alpha1 --kind PlatformQuota
 ```
 
 This scaffolds `api/v1alpha1/platformquota_types.go` + `internal/controller/platformquota_controller.go`.

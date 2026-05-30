@@ -214,8 +214,8 @@ The factory ships k8s-native by default. Every app lands as a Platform tenant un
 
 - Application chart in \`<app>/chart/\` (Helm, with per-env values files)
 - ApplicationSet entry registered with \`nanohype/eks-gitops\` (EKS) or \`nanohype/aks-gitops\` (AKS)
-- \`Platform\` CR (\`agents.stxkxs.io/v1alpha1\`) declaring the tenant boundary; the eks-agent-platform operator reconciles Namespace, ResourceQuota, NetworkPolicy, IRSA, S3 + KMS grants
-- Optional \`AgentFleet\` CR (AI workloads) composing kagent + KEDA
+- \`Platform\` CR (\`platform.nanohype.dev/v1alpha1\`) declaring the tenant boundary; the eks-agent-platform operator reconciles Namespace, ResourceQuota, NetworkPolicy, IRSA, S3 + KMS grants
+- Optional \`AgentFleet\` CR (\`agents.nanohype.dev/v1alpha1\`, AI workloads) composing kagent + KEDA
 
 **Cloud substrate** (shared, slow-moving) — OpenTofu/Terragrunt against \`nanohype/landing-zone\`. VPC, base IAM, KMS keys, cost pipeline, EventBridge buses, Bedrock guardrail templates, WAF. Per-app substrate gaps land as new \`landing-zone\` components, NOT in-app tofu.
 
@@ -258,7 +258,7 @@ Every k8s-native factory deliverable lands as a Platform tenant — a self-conta
       <other resources>            # cronjob, ingress, hpa, etc. as needed
   gitops/
     applicationset-entry.yaml      # entry for nanohype/eks-gitops or nanohype/aks-gitops
-  platform.yaml                    # Platform CR (agents.stxkxs.io/v1alpha1)
+  platform.yaml                    # Platform CR (platform.nanohype.dev/v1alpha1)
 \`\`\`
 
 Optional, AI workloads only:
@@ -272,7 +272,7 @@ Optional, AI workloads only:
 The Platform CR declares the tenant boundary. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, per-Platform IRSA role + KMS grants + S3 bucket policy.
 
 \`\`\`yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: platform.nanohype.dev/v1alpha1
 kind: Platform
 metadata:
   name: <app-name>

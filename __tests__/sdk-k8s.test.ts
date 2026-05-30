@@ -53,7 +53,7 @@ describe('buildAgentSandboxManifest', () => {
     vi.stubEnv('FAB_INFERENCE', undefined);
     vi.stubEnv('AWS_REGION', undefined);
     const manifest = buildAgentSandboxManifest('go-engineer', 'build the thing', cfg);
-    expect(manifest.apiVersion).toBe('agents.stxkxs.io/v1alpha1');
+    expect(manifest.apiVersion).toBe('agents.nanohype.dev/v1alpha1');
     expect(manifest.kind).toBe('AgentSandbox');
     expect(manifest.metadata.generateName).toBe('fab-go-engineer-');
     expect(manifest.spec.platformRef).toEqual({ name: 'acme' });

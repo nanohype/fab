@@ -38,7 +38,7 @@ For multi-cluster: one agentgateway per cluster, fronted by Route53 latency-rout
 ## Route configuration
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: agents.nanohype.dev/v1alpha1
 kind: AgentRoute
 metadata: { name: marshal-coordinator, namespace: marshal }
 spec:
@@ -92,7 +92,7 @@ mTLS validation:
 ## Egress shaping
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: agents.nanohype.dev/v1alpha1
 kind: ModelEgress
 metadata: { name: bedrock-primary, namespace: marshal }
 spec:
