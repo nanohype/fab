@@ -1,5 +1,6 @@
 import type { FabState, TeamMember, TeamRole } from './types.js';
 import { FACTORY_PREAMBLE, LANGUAGE_TOOLCHAIN } from './standards.js';
+import { normalizeDelimiters } from './guardrails.js';
 
 /**
  * Build the final system prompt for an agent by augmenting the base
@@ -36,7 +37,10 @@ After completing your deliverables, append to ${journalPath}:
   // ── Git Repository ────────────────────────────────────────────
   if (state.repos.length > 0) {
     const repoList = state.repos
-      .map((r) => `- ${r.url} mounted at ${r.mount_path ?? '/workspace/' + r.url.split('/').pop()}`)
+      .map(
+        (r) =>
+          `- ${normalizeDelimiters(r.url)} mounted at ${normalizeDelimiters(r.mount_path ?? '/workspace/' + r.url.split('/').pop())}`,
+      )
       .join('\n');
 
     if (isEngineering) {
@@ -94,7 +98,7 @@ You can read code, run tests, and review configurations. Projects are in subdire
 
   // ── Source Directory Scope ────────────────────────────────────
   if (state.sourceDirs.length > 0 && (isEngineering || isVerifyOrOps(member.role))) {
-    const dirList = state.sourceDirs.map((d) => `- ${d}`).join('\n');
+    const dirList = state.sourceDirs.map((d) => `- ${normalizeDelimiters(d)}`).join('\n');
     sections.push(`## Source Directory Scope
 
 This brief scopes the factory's work to these directories of the target repo:
