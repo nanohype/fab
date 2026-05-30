@@ -26,10 +26,10 @@ metadata:
   # The namespace that holds the Platform CR — fab's FAB_K8S_NAMESPACE.
   namespace: eks-agent-platform
 rules:
-  - apiGroups: ['agents.stxkxs.io']
+  - apiGroups: ['agents.nanohype.dev']
     resources: ['agentsandboxes']
     verbs: ['create', 'get', 'list', 'watch', 'delete']
-  - apiGroups: ['agents.stxkxs.io']
+  - apiGroups: ['platform.nanohype.dev']
     resources: ['platforms']
     verbs: ['get']
 ---

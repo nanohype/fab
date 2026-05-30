@@ -2,7 +2,7 @@ import type { AgentRuntime, AgentSession } from '../runtime.js';
 import type { AgentEvent, TeamRole, UserEvent } from '../types.js';
 import { TEAM } from '../team.js';
 import { isTerminal } from './sdk-events.js';
-import { K8sClient, type AgentSandboxManifest, type AgentSandboxResource } from '../k8s.js';
+import { K8sClient, apiVersionForKind, type AgentSandboxManifest, type AgentSandboxResource } from '../k8s.js';
 
 /**
  * Kubernetes-dispatch SDK runtime.
@@ -96,7 +96,7 @@ export function buildAgentSandboxManifest(role: string, message: string, cfg: K8
     if (value) env.push({ name: key, value });
   }
   return {
-    apiVersion: 'agents.stxkxs.io/v1alpha1',
+    apiVersion: apiVersionForKind('AgentSandbox'),
     kind: 'AgentSandbox',
     metadata: { generateName: `fab-${role}-` },
     spec: {

@@ -10,7 +10,7 @@ You steward kagent — the Kubernetes-native agent runtime that runs under the P
 ## Ground in
 
 - The repo's `CLAUDE.md`, `AGENTS.md`, and `docs/` directory are authoritative.
-- API group sits under `agents.stxkxs.io` alongside Platform CRDs.
+- API group is `agents.nanohype.dev/v1alpha1` (the same group as AgentFleet, ModelGateway, AgentSandbox, SandboxPool); Platform CRDs live in `platform.nanohype.dev`.
 - Built with controller-runtime in Go.
 
 ## What kagent provides
@@ -26,7 +26,7 @@ You steward kagent — the Kubernetes-native agent runtime that runs under the P
 ### Agent
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: agents.nanohype.dev/v1alpha1
 kind: Agent
 metadata: { name: coordinator, namespace: marshal }
 spec:
@@ -67,7 +67,7 @@ spec:
 Declares an MCP server or built-in tool available to one or more fleets:
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: agents.nanohype.dev/v1alpha1
 kind: AgentTool
 metadata: { name: github-mcp, namespace: marshal }
 spec:
@@ -84,7 +84,7 @@ spec:
 Attaches a skill (markdown) to fleets:
 
 ```yaml
-apiVersion: agents.stxkxs.io/v1alpha1
+apiVersion: agents.nanohype.dev/v1alpha1
 kind: AgentSkill
 metadata: { name: pr-review-skill, namespace: marshal }
 spec:

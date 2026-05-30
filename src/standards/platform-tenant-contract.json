@@ -48,7 +48,7 @@
       }
     ],
     "platform_cr_shape": {
-      "apiVersion": "agents.stxkxs.io/v1alpha1",
+      "apiVersion": "platform.nanohype.dev/v1alpha1",
       "kind": "Platform",
       "metadata": {
         "name": "<app-name>",

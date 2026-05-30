@@ -15,9 +15,40 @@ import { readFileSync } from 'node:fs';
  */
 
 const TOKEN_PATH = '/var/run/secrets/kubernetes.io/serviceaccount/token';
-const AGENTS_GROUP = 'agents.stxkxs.io';
-const AGENTS_VERSION = 'v1alpha1';
+const CRD_VERSION = 'v1alpha1';
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Per-kind CRD group taxonomy on the `nanohype.dev` domain. Each kind lives in
+ * one of three groups; the version stays `v1alpha1` across all of them.
+ *
+ *   - `platform.nanohype.dev`   — Tenant, Platform
+ *   - `agents.nanohype.dev`     — AgentFleet, ModelGateway, AgentSandbox, SandboxPool
+ *   - `governance.nanohype.dev` — BudgetPolicy, EvalSuite
+ */
+export const CRD_GROUP_BY_KIND = {
+  Tenant: 'platform.nanohype.dev',
+  Platform: 'platform.nanohype.dev',
+  AgentFleet: 'agents.nanohype.dev',
+  ModelGateway: 'agents.nanohype.dev',
+  AgentSandbox: 'agents.nanohype.dev',
+  SandboxPool: 'agents.nanohype.dev',
+  BudgetPolicy: 'governance.nanohype.dev',
+  EvalSuite: 'governance.nanohype.dev',
+} as const;
+
+/** A CRD kind fab knows the group for. */
+export type CrdKind = keyof typeof CRD_GROUP_BY_KIND;
+
+/** Resolve the CRD group for a kind. */
+export function groupForKind(kind: CrdKind): string {
+  return CRD_GROUP_BY_KIND[kind];
+}
+
+/** Build the `apiVersion` (`<group>/<version>`) for a kind. */
+export function apiVersionForKind(kind: CrdKind): string {
+  return `${groupForKind(kind)}/${CRD_VERSION}`;
+}
 
 /** A session-pod environment entry — the literal-value form of `corev1.EnvVar`. */
 export interface EnvVar {
@@ -89,7 +120,8 @@ export class K8sClient {
   // ── Platform ──────────────────────────────────────────────────────
 
   async getPlatform(namespace: string, name: string): Promise<PlatformResource> {
-    return this.request('GET', `/apis/${AGENTS_GROUP}/${AGENTS_VERSION}/namespaces/${namespace}/platforms/${name}`);
+    const group = groupForKind('Platform');
+    return this.request('GET', `/apis/${group}/${CRD_VERSION}/namespaces/${namespace}/platforms/${name}`);
   }
 
   // ── Pods ──────────────────────────────────────────────────────────
@@ -126,7 +158,8 @@ export class K8sClient {
   // ── internals ─────────────────────────────────────────────────────
 
   private agentSandboxPath(namespace: string): string {
-    return `/apis/${AGENTS_GROUP}/${AGENTS_VERSION}/namespaces/${namespace}/agentsandboxes`;
+    const group = groupForKind('AgentSandbox');
+    return `/apis/${group}/${CRD_VERSION}/namespaces/${namespace}/agentsandboxes`;
   }
 
   private headers(): Record<string, string> {

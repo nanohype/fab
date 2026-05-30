@@ -36,7 +36,7 @@ Defines the shape any factory-produced k8s app must take:
 
 - Helm chart in `<app>/chart/` (Chart.yaml, values.yaml, values-{dev,staging,production}.yaml, templates/)
 - ApplicationSet entry in `<app>/gitops/applicationset-entry.yaml`
-- `Platform` CR (`agents.stxkxs.io/v1alpha1`) declaring tenant boundary, IRSA needs, ResourceQuota, NetworkPolicy
+- `Platform` CR (`platform.nanohype.dev/v1alpha1`) declaring tenant boundary, IRSA needs, ResourceQuota, NetworkPolicy
 - Optional `AgentFleet` CR if AI workload
 - OTel resource attributes (`agents.tenant`, `agents.platform`)
 - IRSA via Platform reconciler — agents do NOT scaffold IAM roles inline
