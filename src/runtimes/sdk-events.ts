@@ -31,6 +31,7 @@ interface MaybeResult {
   session_id: string;
   is_error?: boolean;
   errors?: string[];
+  total_cost_usd?: number;
 }
 
 export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => void): AgentEvent | null {
@@ -83,6 +84,9 @@ export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => v
       return {
         type: 'session.status_idle',
         id: r.uuid,
+        // Native run cost — the SDK / claude-cli report it on the result. The
+        // budget tracker in streamSessionWithAdvisor reads this on idle.
+        ...(typeof r.total_cost_usd === 'number' && { total_cost_usd: r.total_cost_usd }),
         processed_at: new Date().toISOString(),
       };
     }

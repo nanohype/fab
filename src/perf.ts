@@ -2,6 +2,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AnthropicAgents } from './api.js';
 import type { FabState } from './types.js';
+import { rateFor } from './pricing.js';
+import { TEAM } from './team.js';
 
 const PERF_FILE = join(process.cwd(), '.fab-perf.json');
 
@@ -100,21 +102,28 @@ export function formatPerfReport(perf: PerfData): string {
   );
 
   for (const [role, m] of roles) {
-    const cost = (m.totalInputTokens / 1e6) * 3 + (m.totalOutputTokens / 1e6) * 15;
+    const rate = rateFor(TEAM.find((t) => t.role === role)?.model);
+    const cost = (m.totalInputTokens / 1e6) * rate.input + (m.totalOutputTokens / 1e6) * rate.output;
     lines.push(
       `${role.padEnd(22)} ${String(m.sessions).padStart(4)} ${String(m.selfEvalPass).padStart(4)} ${String(m.selfEvalFail).padStart(4)} ${String(m.advisorCalls).padStart(4)} ${String(m.revisions).padStart(4)} ${fmtTok(m.totalInputTokens).padStart(10)} ${fmtTok(m.totalOutputTokens).padStart(10)} ${('$' + cost.toFixed(2)).padStart(8)}`,
     );
   }
 
   const totals = roles.reduce(
-    (acc, [_, m]) => ({
-      sessions: acc.sessions + m.sessions,
-      input: acc.input + m.totalInputTokens,
-      output: acc.output + m.totalOutputTokens,
-    }),
-    { sessions: 0, input: 0, output: 0 },
+    (acc, [role, m]) => {
+      const rate = rateFor(TEAM.find((t) => t.role === role)?.model);
+      return {
+        sessions: acc.sessions + m.sessions,
+        input: acc.input + m.totalInputTokens,
+        output: acc.output + m.totalOutputTokens,
+        // Sum the model-aware per-role costs — the roster mixes tiers, so a flat
+        // rate on the aggregate would mis-price (Opus roles especially).
+        cost: acc.cost + (m.totalInputTokens / 1e6) * rate.input + (m.totalOutputTokens / 1e6) * rate.output,
+      };
+    },
+    { sessions: 0, input: 0, output: 0, cost: 0 },
   );
-  const totalCost = (totals.input / 1e6) * 3 + (totals.output / 1e6) * 15;
+  const totalCost = totals.cost;
   lines.push(
     `${DIM}${'TOTAL'.padEnd(22)} ${String(totals.sessions).padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${fmtTok(totals.input).padStart(10)} ${fmtTok(totals.output).padStart(10)} ${('$' + totalCost.toFixed(2)).padStart(8)}${RESET}`,
   );

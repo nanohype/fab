@@ -2,7 +2,7 @@ import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
 import type { AgentEvent, FabState, TeamRole, UserEvent } from '../types.js';
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
-import { loadState } from '../state.js';
+import { loadState, getBudgetLimit } from '../state.js';
 import { inferenceEnv, resolveInferenceBackend, resolveModelId, type InferenceBackend } from '../inference.js';
 import { isTerminal, textOf, translateSdkMessage } from './sdk-events.js';
 
@@ -46,9 +46,15 @@ export class SdkRuntime implements AgentRuntime {
 
     const backend = resolveInferenceBackend();
     const model = resolveModelId(member.model, backend);
+    // Native per-run budget: the SDK stops the loop with an error_max_budget_usd
+    // result when this USD cap is exceeded. This is how budget enforcement
+    // reaches the sdk/sdk-k8s transports — managed-agents enforces it via span
+    // accumulation + interrupt in streamSessionWithAdvisor, which never fires
+    // here (these transports emit no cost spans).
+    const budgetUsd = await getBudgetLimit();
 
     const sdk = await loadSdk();
-    const session = new SdkAgentSession(sdk, model, systemPrompt, options, backend);
+    const session = new SdkAgentSession(sdk, model, systemPrompt, options, backend, budgetUsd);
     await session.start(message);
     return session;
   }
@@ -96,6 +102,7 @@ class SdkAgentSession implements AgentSession {
     private readonly systemPrompt: string,
     private readonly options?: RunRoleOptions,
     private readonly backend: InferenceBackend = 'api',
+    private readonly budgetUsd: number | null = null,
   ) {}
 
   get id(): string {
@@ -118,6 +125,7 @@ class SdkAgentSession implements AgentSession {
         model: this.model,
         systemPrompt: this.systemPrompt,
         permissionMode: 'bypassPermissions',
+        ...(this.budgetUsd != null && { maxBudgetUsd: this.budgetUsd }),
         ...(backendEnv && { env: { ...process.env, ...backendEnv } }),
         // Resources hint: the SDK uses cwd for filesystem-bound tools;
         // workflows.ts pre-creates branches on the cloud-mounted repos

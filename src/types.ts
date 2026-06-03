@@ -316,6 +316,8 @@ export interface SessionStatusEvent {
   type: 'session.status_running' | 'session.status_idle' | 'session.status_rescheduled' | 'session.status_terminated';
   id: string;
   stop_reason?: { type: string; event_ids?: string[] };
+  /** Native run cost from the SDK / claude-cli result. Unset on managed-agents (cost arrives via spans). */
+  total_cost_usd?: number;
   processed_at: string;
 }
 
