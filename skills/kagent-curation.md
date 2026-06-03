@@ -56,7 +56,7 @@ spec:
     advisor:
       enabled: true
       maxCallsPerSession: 3
-      model: anthropic.claude-opus-4-6
+      model: anthropic.claude-opus-4-8
   observability:
     otelEndpoint: otel-collector.observability:4317
     sampleRate: 0.1

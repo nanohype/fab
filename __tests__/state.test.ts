@@ -45,7 +45,7 @@ describe('state', () => {
           authorization_token: 'ghp_test_token',
         },
       ],
-      modelOverrides: { 'node-engineer': 'claude-opus-4-6' },
+      modelOverrides: { 'node-engineer': 'claude-opus-4-8' },
       sprint: null,
       vaultIds: [],
       budgetLimit: null,
@@ -63,7 +63,7 @@ describe('state', () => {
     expect(loaded.memory.enabled).toBe(false);
     expect(loaded.memory.storeId).toBe('memstore_test');
     expect(loaded.repos).toHaveLength(1);
-    expect(loaded.modelOverrides['node-engineer']).toBe('claude-opus-4-6');
+    expect(loaded.modelOverrides['node-engineer']).toBe('claude-opus-4-8');
     expect(loaded.sourceDirs).toEqual(['src/api']);
   });
 

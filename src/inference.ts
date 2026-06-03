@@ -45,6 +45,7 @@ export function resolveInferenceBackend(): InferenceBackend {
  * pinned snapshots that turn over between model generations.
  */
 const BEDROCK_MODEL_IDS: Readonly<Record<string, string>> = {
+  'claude-opus-4-8': 'anthropic.claude-opus-4-8',
   'claude-opus-4-7': 'anthropic.claude-opus-4-7',
   'claude-sonnet-4-6': 'anthropic.claude-sonnet-4-6',
   'claude-opus-4-6': 'anthropic.claude-opus-4-6-v1',

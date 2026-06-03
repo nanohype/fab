@@ -53,6 +53,7 @@ describe('model id resolution', () => {
 
   it('maps canonical ids to Bedrock ids for the bedrock backend', () => {
     expect(resolveModelId('claude-sonnet-4-6', 'bedrock')).toBe('anthropic.claude-sonnet-4-6');
+    expect(resolveModelId('claude-opus-4-8', 'bedrock')).toBe('anthropic.claude-opus-4-8');
     expect(resolveModelId('claude-opus-4-7', 'bedrock')).toBe('anthropic.claude-opus-4-7');
     expect(resolveModelId('claude-opus-4-6', 'bedrock')).toBe('anthropic.claude-opus-4-6-v1');
     expect(resolveModelId('claude-haiku-4-5', 'bedrock')).toBe('anthropic.claude-haiku-4-5-20251001-v1:0');

@@ -8,7 +8,7 @@
     "primary_provider": "AWS Bedrock",
     "models": {
       "default": "anthropic.claude-sonnet-4-6",
-      "escalation": "anthropic.claude-opus-4-6",
+      "escalation": "anthropic.claude-opus-4-8",
       "light": "anthropic.claude-haiku-4-5"
     },
     "regions_preferred": ["us-west-2", "us-east-1", "eu-central-1"],
