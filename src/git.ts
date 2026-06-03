@@ -114,3 +114,57 @@ export async function createBranchIfMissing(
   const createdData = (await create.json()) as GitHubRef;
   return { created: true, sha: createdData.object.sha };
 }
+
+interface GitHubContentFile {
+  type?: string;
+  encoding?: string;
+  content?: string;
+}
+
+/**
+ * Fetch a single file's UTF-8 text from `owner/repo` at `ref` via the GitHub
+ * Contents API. Used by the merge gate to verify CITATIONS fragments against
+ * the feature branch in the default managed-agents transport, where the work
+ * tree lives in the cloud sandbox rather than on fab's disk.
+ *
+ * Returns null when the file does not exist (404) — a clean signal, not an
+ * error. Throws on auth / rate-limit / network failures and on the >1MB
+ * "encoding: none" response (which would decode to empty and read as a false
+ * mismatch) so callers can fail open — skip verification — rather than mistake
+ * an infra problem for a fabricated citation.
+ */
+export async function fetchRepoFile(
+  token: string,
+  owner: string,
+  repo: string,
+  path: string,
+  ref: string,
+): Promise<string | null> {
+  const encodedPath = path
+    .split('/')
+    .filter((seg) => seg.length > 0)
+    .map(encodeURIComponent)
+    .join('/');
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(10000),
+    },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GET contents ${path} failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as GitHubContentFile;
+  if (data.type !== 'file') return null; // a directory or symlink — not a citable file
+  if (data.encoding !== 'base64' || typeof data.content !== 'string') {
+    throw new Error(`contents ${path}: unsupported encoding "${data.encoding}" (file too large?)`);
+  }
+  return Buffer.from(data.content, 'base64').toString('utf-8');
+}
