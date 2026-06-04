@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
-import type { AgentEvent, FabState, TeamMember, TeamRole, UserEvent } from '../types.js';
+import type { AgentEvent, EffortLevel, FabState, TeamMember, TeamRole, UserEvent } from '../types.js';
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getPrimaryRepo } from '../state.js';
@@ -55,6 +55,7 @@ export class ClaudeCliRuntime implements AgentRuntime {
       addDir: repo ? `/workspace/${repo.repo}` : null,
       resumeFrom: null,
       title: options?.title,
+      effort: member.effort ?? null,
       env: process.env,
     });
 
@@ -269,6 +270,7 @@ class ResumedClaudeCliSession implements AgentSession {
         addDir: repo ? `/workspace/${repo.repo}` : null,
         resumeFrom: this.id,
         title: undefined,
+        effort: null, // resume inherits the original session's effort
         env: process.env,
       });
       this.liveSession = new ClaudeCliSession({
@@ -307,6 +309,7 @@ export interface BuildClaudeArgsOptions {
   addDir: string | null;
   resumeFrom: string | null;
   title: string | undefined;
+  effort?: EffortLevel | null;
   env: NodeJS.ProcessEnv;
 }
 
@@ -342,6 +345,12 @@ export function buildClaudeArgs(opts: BuildClaudeArgsOptions): string[] {
   // CLI also accepts aliases (`sonnet`, `opus`).
   if (opts.model) {
     args.push('--model', opts.model);
+  }
+
+  // Reasoning effort (claude `--effort`). Unset for most roles; set per role to
+  // trade latency/cost for depth. managed-agents has no equivalent on agent-create.
+  if (opts.effort) {
+    args.push('--effort', opts.effort);
   }
 
   // System prompt. `--append-system-prompt` layers on Claude Code's own

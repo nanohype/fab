@@ -499,6 +499,13 @@ export type TeamRole =
   | 'prompt-optimizer'
   | 'learner';
 
+/**
+ * Reasoning-effort level. GA on the Messages API (Opus 4.6+); reachable on the
+ * sdk (`query()` `effort`) and claude-cli (`--effort`) transports, but NOT the
+ * managed-agents agent-create surface.
+ */
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export interface TeamMember {
   role: TeamRole;
   group?: TeamGroup;
@@ -508,6 +515,10 @@ export interface TeamMember {
   system: string;
   mcpServers: string[]; // server names from mcp.ts registry
   briefTemplate?: string; // nanohype brief template name for skill generation
+  // Optional per-role reasoning effort. Unset = the model's default. Applied
+  // only on the sdk / claude-cli transports (managed-agents doesn't expose it);
+  // assign per role via the same pilot path as model tiering (see docs/roster.md).
+  effort?: EffortLevel;
 }
 
 // ── Git Resources ───────────────────────────────────────────────────
