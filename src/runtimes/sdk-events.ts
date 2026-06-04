@@ -42,6 +42,12 @@ export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => v
     return null;
   }
 
+  // Other `system` messages — status updates, compaction boundaries, and any
+  // subtype the 0.3.x SDK introduces — carry no payload the workflow layer
+  // consumes; the run is driven by `assistant` + `result`. Ignore them
+  // explicitly so a new subtype is a documented no-op, not a silent drop.
+  if (m.type === 'system') return null;
+
   if (m.type === 'assistant') {
     const a = raw as MaybeAssistant;
     // An `assistant` message can contain interleaved text + tool_use blocks.

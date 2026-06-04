@@ -328,7 +328,7 @@ Claude is the primary LLM for every factory build. Preferred delivery: AWS Bedro
   - Auth: IAM role-based. No API keys in code or env.
 - Models:
   - Default: \`anthropic.claude-sonnet-4-6\` — most work
-  - Escalation: \`anthropic.claude-opus-4-6\` — complex reasoning, architecture decisions
+  - Escalation: \`anthropic.claude-opus-4-8\` — complex reasoning, architecture decisions
   - Light: \`anthropic.claude-haiku-4-5\` — classification, routing, filter steps
 - Regions (in order of preference): \`us-west-2\`, \`us-east-1\`, \`eu-central-1\`. Verify the chosen model is live in the region before committing IaC.
 - Prompt caching is mandatory. Use Bedrock \`cachePoint\` markers on the system prompt and any stable context prefix. Measure cache-hit ratio and surface it in the architecture artifact.

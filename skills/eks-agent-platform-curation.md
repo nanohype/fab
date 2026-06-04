@@ -30,7 +30,7 @@ spec:
   tenant: marshal
   modelAccess:
     - bedrock-claude-sonnet-4-6
-    - bedrock-claude-opus-4-6
+    - bedrock-claude-opus-4-8
   resourceQuota:
     cpu: '32'
     memory: 64Gi

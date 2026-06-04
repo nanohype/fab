@@ -32,7 +32,7 @@ Groups (`group` field):
 - `src/overlay.ts` — overlay resolver. Exports `resolveSkillPath`, `loadSkillWithOverlay`, `appendOverlays`. Priority: `$FAB_SKILLS_DIR` > `~/.fab/skills/` > `<cwd>/.fab/skills/` > bundled `fab/skills/`. Two override styles: `<skill>.md` (replace) and `<skill>.append.md` (concatenate). See [`skills/README.md`](skills/README.md) for the user-facing explanation
 - `src/workflows.ts` — 18 built-in workflows tagged `factory | firm | lab`, with parallel groups, review gates, revision support, and workflow-level merge gates (`gateProfile: 'code' | 'docs'`). `streamWithAdvisor` is the shared stream consumer. `runMergeGate` is the merge-gate finalizer.
 - `src/repl.ts` — interactive REPL with `/quit`, `/status`, `/threads`, `/switch`. Prompts for tool confirmation when `always_ask` policy fires.
-- `src/advisor.ts` — `ADVISOR_TOOL` (Opus 4.6 escalation) + `callAdvisor()`. Per-session call-budgeted.
+- `src/advisor.ts` — `ADVISOR_TOOL` (Opus 4.8 escalation) + `callAdvisor()`. Per-session call-budgeted.
 - `src/usage.ts` — token aggregation and cost estimation (local reporting)
 - `src/state.ts` — local `.fab-state.json` persistence
 - `src/stream.ts` — SSE event formatting for terminal output. Handles all event types including MCP tool use, thread events, and session status rescheduled/terminated.

@@ -1,7 +1,7 @@
 import type { CustomTool, TeamRole } from './types.js';
 
 const BASE = 'https://api.anthropic.com';
-const ADVISOR_MODEL = 'claude-opus-4-6';
+const ADVISOR_MODEL = 'claude-opus-4-8';
 
 /**
  * Roles with access to the Opus advisor tool. Restricting this set keeps
