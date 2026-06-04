@@ -97,6 +97,23 @@ describe('translateSdkMessage', () => {
     expect(event!.type).toBe('session.status_idle');
   });
 
+  it('attaches native total_cost_usd from the result onto status_idle', () => {
+    const event = translateSdkMessage(
+      { type: 'result', subtype: 'success', uuid: 'uuid-6b', session_id: 'sess', total_cost_usd: 0.0421 },
+      () => {},
+    );
+    expect(event!.type).toBe('session.status_idle');
+    expect((event as { total_cost_usd?: number }).total_cost_usd).toBe(0.0421);
+  });
+
+  it('omits total_cost_usd when the result has none (managed-agents shape)', () => {
+    const event = translateSdkMessage(
+      { type: 'result', subtype: 'success', uuid: 'uuid-6c', session_id: 'sess' },
+      () => {},
+    );
+    expect((event as { total_cost_usd?: number }).total_cost_usd).toBeUndefined();
+  });
+
   it('produces session.error for result error subtypes with the error message', () => {
     const event = translateSdkMessage(
       {

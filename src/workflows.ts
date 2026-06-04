@@ -9,6 +9,7 @@ import { CODE_GATE_ROLES, DOCS_GATE_ROLES } from './standards.js';
 import { parseGateVerdict, mergeGateVerdicts, parseQualityGrades, compareGrades } from './gate.js';
 import type { GateVerdict, Grade } from './gate.js';
 import { slugForBranch, createBranchIfMissing } from './git.js';
+import { estimateCost } from './pricing.js';
 import { normalizeDelimiters, spotlight } from './guardrails.js';
 
 const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = ['typescript', 'go', 'python', 'rust', 'java', 'kotlin', 'csharp'];
@@ -1093,12 +1094,6 @@ async function runRoleSession(
  * Stream events, handling advisor escalations automatically.
  * When an agent calls consult_advisor, this makes the Opus call and returns the result.
  */
-// Pricing per million tokens
-const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  standard: { input: 3, output: 15 }, // Sonnet
-  fast: { input: 3, output: 15 }, // Sonnet fast
-};
-
 export interface StreamOptions {
   /** Callback for tool confirmation (always_ask policy). Return 'allow' or 'deny'. If absent, auto-allows. */
   onToolConfirm?: (toolName: string, input: Record<string, unknown>) => Promise<'allow' | 'deny'>;
@@ -1160,13 +1155,10 @@ export async function streamSessionWithAdvisor(session: AgentSession, options?: 
       }
     }
 
-    // Track cost from model request spans
+    // Track cost from model request spans (managed-agents transport). Priced
+    // through the shared, model+cache-aware estimator using the role's model.
     if (event.type === 'span.model_request_end' && !event.is_error) {
-      const usage = event.model_usage;
-      const pricing = MODEL_PRICING[usage.speed ?? 'standard'] ?? MODEL_PRICING.standard;
-      const eventCost =
-        (usage.input_tokens / 1_000_000) * pricing.input + (usage.output_tokens / 1_000_000) * pricing.output;
-      sessionCost += eventCost;
+      sessionCost += estimateCost(event.model_usage, options?.model);
 
       // Budget enforcement
       if (budgetLimit !== null && sessionCost > budgetLimit) {
@@ -1184,6 +1176,14 @@ export async function streamSessionWithAdvisor(session: AgentSession, options?: 
         }
         break;
       }
+    }
+
+    // Native run cost from the SDK / claude-cli result message. Those transports
+    // don't emit cost spans; the Agent SDK / Claude Code report a final
+    // total_cost_usd on the result, which sdk-events attaches to status_idle.
+    // managed-agents leaves it unset (cost is accumulated from spans above).
+    if (event.type === 'session.status_idle' && typeof event.total_cost_usd === 'number') {
+      sessionCost = event.total_cost_usd;
     }
 
     // Track tool calls that may need confirmation or custom results
