@@ -5,6 +5,7 @@ import {
   parseTunnelRegistry,
   summarizeToolSurface,
   HEAVY_TOOL_SURFACE,
+  buildHttpMcpServers,
 } from '../src/mcp.js';
 import { TEAM } from '../src/team.js';
 
@@ -164,6 +165,34 @@ describe('mcp', () => {
       const s = summarizeToolSurface(TEAM);
       expect(s.totalRoles).toBeGreaterThan(0);
       expect(s.heavyRoles).toBeGreaterThan(0);
+    });
+  });
+
+  describe('buildHttpMcpServers', () => {
+    it('builds http configs for direct (non-gateway) servers, no bearer', () => {
+      const { servers, skipped } = buildHttpMcpServers(['github', 'linear'], {});
+      expect(skipped).toEqual([]);
+      expect(Object.keys(servers)).toEqual(['github', 'linear']);
+      expect(servers.github.type).toBe('http');
+      expect(servers.github.url).toBeTruthy();
+      expect(servers.github.headers).toBeUndefined();
+    });
+
+    it('injects the gateway bearer for gateway-hosted servers when the token is set', () => {
+      const { servers, skipped } = buildHttpMcpServers(['stripe'], { MCP_GATEWAY_TOKEN: 'tok123' });
+      expect(skipped).toEqual([]);
+      expect(servers.stripe.headers).toEqual({ Authorization: 'Bearer tok123' });
+    });
+
+    it('skips a gateway server (non-strict) when the token is missing, keeps direct servers', () => {
+      const { servers, skipped } = buildHttpMcpServers(['stripe', 'github'], {});
+      expect(skipped).toEqual(['stripe']);
+      expect(servers.stripe).toBeUndefined();
+      expect(servers.github).toBeTruthy();
+    });
+
+    it('throws under FAB_MCP_STRICT when a gateway token is missing', () => {
+      expect(() => buildHttpMcpServers(['stripe'], { FAB_MCP_STRICT: '1' })).toThrow(/MCP_GATEWAY_TOKEN is not set/);
     });
   });
 });

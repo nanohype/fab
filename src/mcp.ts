@@ -223,6 +223,61 @@ export function resolveMcpServers(serverNames: string[]): { servers: McpServer[]
   return { servers, tools };
 }
 
+// ── Shared HTTP MCP config (claude-cli --mcp-config + sdk mcpServers) ──
+//
+// Both the claude-cli runtime (Claude Code's `--mcp-config` JSON) and the sdk
+// runtime (the Agent SDK's `mcpServers` query option) need the same
+// {type:'http', url, headers} map. Built once here so the gateway-bearer
+// injection can't drift between the two transports.
+
+/** Servers that route through the mcp-gateway and need the shared bearer token. */
+const GATEWAY_HOSTED: ReadonlySet<string> = new Set(['hubspot', 'gdrive', 'analytics', 'gcalendar', 'gcse', 'stripe']);
+
+/** An HTTP MCP server config — accepted by both Claude Code's `--mcp-config` and the Agent SDK's `mcpServers`. */
+export interface HttpMcpServer {
+  type: 'http';
+  url: string;
+  headers?: Record<string, string>;
+}
+
+/**
+ * Resolve a role's MCP server names into the HTTP-config map shared by the
+ * claude-cli and sdk runtimes. Injects the gateway bearer for gateway-hosted
+ * servers; on a missing MCP_GATEWAY_TOKEN it throws under FAB_MCP_STRICT, else
+ * drops the server (returned in `skipped` so the caller can warn).
+ */
+export function buildHttpMcpServers(
+  serverNames: string[],
+  env: NodeJS.ProcessEnv,
+): { servers: Record<string, HttpMcpServer>; skipped: string[] } {
+  const { servers: resolved } = resolveMcpServers(serverNames);
+  const gatewayToken = env.MCP_GATEWAY_TOKEN ?? '';
+  const strict = env.FAB_MCP_STRICT === '1';
+  const servers: Record<string, HttpMcpServer> = {};
+  const skipped: string[] = [];
+
+  for (const s of resolved) {
+    const entry: HttpMcpServer = { type: 'http', url: s.url };
+    if (GATEWAY_HOSTED.has(s.name)) {
+      if (!gatewayToken) {
+        if (strict) {
+          throw new Error(
+            `MCP server "${s.name}" routes through the gateway but MCP_GATEWAY_TOKEN is not set. ` +
+              `Set the token, remove the server from the role's mcpServers list, or unset FAB_MCP_STRICT.`,
+          );
+        }
+        skipped.push(s.name);
+        continue;
+      }
+      entry.headers = { Authorization: `Bearer ${gatewayToken}` };
+    }
+    if (s.headers) entry.headers = { ...entry.headers, ...s.headers };
+    servers[s.name] = entry;
+  }
+
+  return { servers, skipped };
+}
+
 /**
  * Get the full registry for display (e.g., help text, config commands).
  */
