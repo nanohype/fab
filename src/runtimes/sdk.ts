@@ -5,6 +5,7 @@ import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getBudgetLimit } from '../state.js';
 import { inferenceEnv, resolveInferenceBackend, resolveModelId, type InferenceBackend } from '../inference.js';
 import { isTerminal, textOf, translateSdkMessage } from './sdk-events.js';
+import { buildHttpMcpServers, type HttpMcpServer } from '../mcp.js';
 
 /**
  * SDK agent runtime backed by `@anthropic-ai/claude-agent-sdk`.
@@ -52,9 +53,17 @@ export class SdkRuntime implements AgentRuntime {
     // accumulation + interrupt in streamSessionWithAdvisor, which never fires
     // here (these transports emit no cost spans).
     const budgetUsd = await getBudgetLimit();
+    // Wire the role's MCP servers into the in-process loop. Without this the sdk
+    // transport ran with NO MCP tools — roles lost github/linear/etc. and could
+    // not push commits — making it a degraded transport. Mirrors claude-cli's
+    // --mcp-config; the same gateway-bearer logic lives in buildHttpMcpServers.
+    const { servers: mcpServers, skipped } = buildHttpMcpServers(member.mcpServers, process.env);
+    if (skipped.length > 0) {
+      process.stderr.write(`[sdk] MCP_GATEWAY_TOKEN not set — dropping gateway server(s): ${skipped.join(', ')}.\n`);
+    }
 
     const sdk = await loadSdk();
-    const session = new SdkAgentSession(sdk, model, systemPrompt, options, backend, budgetUsd);
+    const session = new SdkAgentSession(sdk, model, systemPrompt, options, backend, budgetUsd, mcpServers);
     await session.start(message);
     return session;
   }
@@ -103,6 +112,7 @@ class SdkAgentSession implements AgentSession {
     private readonly options?: RunRoleOptions,
     private readonly backend: InferenceBackend = 'api',
     private readonly budgetUsd: number | null = null,
+    private readonly mcpServers: Record<string, HttpMcpServer> = {},
   ) {}
 
   get id(): string {
@@ -135,6 +145,9 @@ class SdkAgentSession implements AgentSession {
         systemPrompt: this.systemPrompt,
         permissionMode: 'bypassPermissions',
         ...(this.budgetUsd != null && { maxBudgetUsd: this.budgetUsd }),
+        // Role's MCP servers, scoped strictly to fab's set (not the user's
+        // ambient ~/.claude MCP config) — matches claude-cli's --strict-mcp-config.
+        ...(Object.keys(this.mcpServers).length > 0 && { mcpServers: this.mcpServers, strictMcpConfig: true }),
         ...(backendEnv && { env: { ...process.env, ...backendEnv } }),
         // Resources hint: the SDK uses cwd for filesystem-bound tools;
         // workflows.ts pre-creates branches on the cloud-mounted repos

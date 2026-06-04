@@ -10,7 +10,7 @@ import type { AgentEvent, FabState, TeamMember, TeamRole, UserEvent } from '../t
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getPrimaryRepo } from '../state.js';
-import { resolveMcpServers } from '../mcp.js';
+import { buildHttpMcpServers } from '../mcp.js';
 import { isTerminal, translateSdkMessage } from './sdk-events.js';
 
 /**
@@ -389,34 +389,16 @@ export function buildClaudeArgs(opts: BuildClaudeArgsOptions): string[] {
   return args;
 }
 
-interface McpHttpEntry {
-  type: 'http';
-  url: string;
-  headers?: Record<string, string>;
-}
-
-interface McpConfigShape {
-  mcpServers: Record<string, McpHttpEntry>;
-}
-
-/**
- * Servers that route through the mcp-gateway and need the shared bearer
- * token. Matches `src/mcp.ts`'s `switchboardService()` set. Listed
- * explicitly here so authentication injection doesn't
- * depend on URL-prefix matching (which races with env-var resolution).
- */
-const GATEWAY_HOSTED: ReadonlySet<string> = new Set(['hubspot', 'gdrive', 'analytics', 'gcalendar', 'gcse', 'stripe']);
-
 /**
  * Render the role's MCP server list into Claude Code's `--mcp-config` JSON
  * shape. Returns null when the role declares no servers or every server
  * was dropped (caller skips the `--mcp-config` flag entirely).
  *
- * Gateway-routed servers (see {@link GATEWAY_HOSTED}) get
- * `Authorization: Bearer <MCP_GATEWAY_TOKEN>` injected. Third-party direct
- * servers (github, linear, slack, notion, sentry, figma, hunter) pass
- * through without fab-side auth headers — Claude Code handles those
- * via its own credential store.
+ * Thin wrapper over {@link buildHttpMcpServers} (the shared resolver in
+ * `src/mcp.ts`): gateway-routed servers get `Authorization: Bearer
+ * <MCP_GATEWAY_TOKEN>` injected; third-party direct servers (github, linear,
+ * slack, notion, sentry, figma, hunter) pass through without fab-side auth
+ * headers — Claude Code handles those via its own credential store.
  *
  * **Missing gateway token behaviour:**
  *   - Default (`FAB_MCP_STRICT` unset): gateway servers are silently
@@ -429,38 +411,7 @@ const GATEWAY_HOSTED: ReadonlySet<string> = new Set(['hubspot', 'gdrive', 'analy
 export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv): string | null {
   if (serverNames.length === 0) return null;
 
-  const { servers } = resolveMcpServers(serverNames);
-  if (servers.length === 0) return null;
-
-  const gatewayToken = env.MCP_GATEWAY_TOKEN ?? '';
-  const strict = env.FAB_MCP_STRICT === '1';
-  const skipped: string[] = [];
-
-  const mcpServers: Record<string, McpHttpEntry> = {};
-  for (const server of servers) {
-    const entry: McpHttpEntry = { type: 'http', url: server.url };
-
-    if (GATEWAY_HOSTED.has(server.name)) {
-      if (!gatewayToken) {
-        if (strict) {
-          throw new Error(
-            `MCP server "${server.name}" routes through the gateway but MCP_GATEWAY_TOKEN is not set. ` +
-              `Set the token, remove the server from the role's mcpServers list, or unset FAB_MCP_STRICT to fall back to skip-with-warning.`,
-          );
-        }
-        skipped.push(server.name);
-        continue;
-      }
-      entry.headers = { Authorization: `Bearer ${gatewayToken}` };
-    }
-
-    // Static headers declared in the registry (rare) flow through.
-    if (server.headers) {
-      entry.headers = { ...entry.headers, ...server.headers };
-    }
-
-    mcpServers[server.name] = entry;
-  }
+  const { servers, skipped } = buildHttpMcpServers(serverNames, env);
 
   if (skipped.length > 0) {
     process.stderr.write(
@@ -469,10 +420,9 @@ export function buildMcpConfigJson(serverNames: string[], env: NodeJS.ProcessEnv
     );
   }
 
-  if (Object.keys(mcpServers).length === 0) return null;
+  if (Object.keys(servers).length === 0) return null;
 
-  const shape: McpConfigShape = { mcpServers };
-  return JSON.stringify(shape, null, 2);
+  return JSON.stringify({ mcpServers: servers }, null, 2);
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────
