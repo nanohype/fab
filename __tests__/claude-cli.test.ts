@@ -40,6 +40,39 @@ describe('buildClaudeArgs', () => {
     expect(args).not.toContain('--bare');
     expect(args).not.toContain('--resume');
     expect(args).not.toContain('--add-dir');
+    expect(args).not.toContain('--effort'); // unset by default
+  });
+
+  it('adds --effort when a role sets an effort level', () => {
+    const args = buildClaudeArgs({
+      sessionId: '00000000-0000-4000-8000-000000000002',
+      systemPrompt: 'role prompt',
+      model: 'claude-sonnet-4-6',
+      mcpConfigPath: null,
+      bare: false,
+      addDir: null,
+      resumeFrom: null,
+      title: undefined,
+      effort: 'high',
+      env: baseEnv,
+    });
+    expect(args).toContain('--effort');
+    expect(args[args.indexOf('--effort') + 1]).toBe('high');
+  });
+
+  it('omits --effort when effort is unset', () => {
+    const args = buildClaudeArgs({
+      sessionId: '00000000-0000-4000-8000-000000000003',
+      systemPrompt: 'role prompt',
+      model: 'claude-sonnet-4-6',
+      mcpConfigPath: null,
+      bare: false,
+      addDir: null,
+      resumeFrom: null,
+      title: undefined,
+      env: baseEnv,
+    });
+    expect(args).not.toContain('--effort');
   });
 
   it('adds --bare and drops --setting-sources when bare mode is on', () => {

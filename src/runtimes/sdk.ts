@@ -1,5 +1,5 @@
 import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
-import type { AgentEvent, FabState, TeamRole, UserEvent } from '../types.js';
+import type { AgentEvent, EffortLevel, FabState, TeamRole, UserEvent } from '../types.js';
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getBudgetLimit } from '../state.js';
@@ -63,7 +63,16 @@ export class SdkRuntime implements AgentRuntime {
     }
 
     const sdk = await loadSdk();
-    const session = new SdkAgentSession(sdk, model, systemPrompt, options, backend, budgetUsd, mcpServers);
+    const session = new SdkAgentSession(
+      sdk,
+      model,
+      systemPrompt,
+      options,
+      backend,
+      budgetUsd,
+      mcpServers,
+      member.effort,
+    );
     await session.start(message);
     return session;
   }
@@ -113,6 +122,7 @@ class SdkAgentSession implements AgentSession {
     private readonly backend: InferenceBackend = 'api',
     private readonly budgetUsd: number | null = null,
     private readonly mcpServers: Record<string, HttpMcpServer> = {},
+    private readonly effort?: EffortLevel,
   ) {}
 
   get id(): string {
@@ -148,6 +158,7 @@ class SdkAgentSession implements AgentSession {
         // Role's MCP servers, scoped strictly to fab's set (not the user's
         // ambient ~/.claude MCP config) — matches claude-cli's --strict-mcp-config.
         ...(Object.keys(this.mcpServers).length > 0 && { mcpServers: this.mcpServers, strictMcpConfig: true }),
+        ...(this.effort && { effort: this.effort }),
         ...(backendEnv && { env: { ...process.env, ...backendEnv } }),
         // Resources hint: the SDK uses cwd for filesystem-bound tools;
         // workflows.ts pre-creates branches on the cloud-mounted repos
