@@ -136,3 +136,22 @@ $FAB_SKILLS_DIR → ~/.fab/skills/ → <cwd>/.fab/skills/ → bundled fab/skills
 ```
 
 Curators and engineers have bundled baselines at `fab/skills/<def.name>.md`. Override any of them via `~/.fab/skills/<def.name>.md` (replace) or `<def.name>.append.md` (append). The brief-typed roles (`product`, `design-lead`, `sales-lead`, `marketing-lead`) resolve to nanohype brief templates by default.
+
+## Model tiering
+
+Every role declares a `model` in `src/team/<phase>/<area>.ts`. The current spread is deliberate but not yet cost-tuned:
+
+- **82 roles on `claude-sonnet-4-6`** — the default for all factory + firm work.
+- **2 lab roles on Opus** (`external-reviewer`, `prompt-optimizer`) plus the `consult_advisor` escalation (`src/advisor.ts`) — Opus where deep reasoning or cold calibration earns it.
+- **0 roles on `claude-haiku-4-5`** — an open cost opportunity. Haiku is $1/$5 per MTok vs Sonnet's $3/$15 (3× cheaper), a good fit for classification / routing / filter / low-stakes-high-volume work.
+
+**Haiku candidates** (a shape, not a mandate — pilot before promoting): `lead-research-curator`, `lead-outbound`, `lead-events`, `seo-engineer`, and similar firm roles whose output is short-form, templated, or a filter step. Caveat: firm roles do **not** pass the merge gate, so a quality regression there isn't caught automatically — pilot deliberately rather than flipping defaults blind.
+
+**Pilot methodology** (don't change a default on a guess):
+
+1. Override at runtime, no redeploy of defaults: `fab model set <role> claude-haiku-4-5`.
+2. Run the role through representative workflows.
+3. Grade the output — the merge gate + `external-reviewer` calibration for factory roles; a manual read (or `external-reviewer`) for firm roles.
+4. Promote (edit the role's `model` in `src/team/*`) only if quality holds; otherwise `fab model clear <role>` to roll back.
+
+**The `effort` parameter** (GA on the Messages API for Opus 4.6+) is deferred: it would need an `AgentCreateParams` shape change and — like context compaction and the Tool Search tool — is not currently exposed on the Managed Agents agent-create surface fab's default transport uses. Revisit once the Managed Agents API carries it.
