@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { resolveMcpServers, getRegistry, parseTunnelRegistry } from '../src/mcp.js';
+import {
+  resolveMcpServers,
+  getRegistry,
+  parseTunnelRegistry,
+  summarizeToolSurface,
+  HEAVY_TOOL_SURFACE,
+} from '../src/mcp.js';
+import { TEAM } from '../src/team.js';
 
 describe('mcp', () => {
   it('getRegistry returns all servers', () => {
@@ -129,6 +136,34 @@ describe('mcp', () => {
       expect(servers).toHaveLength(1);
       expect(servers[0].url).toBe(getRegistry().github.defaultUrl);
       expect(servers[0].url).not.toBe('https://attacker.example/mcp');
+    });
+  });
+
+  describe('summarizeToolSurface', () => {
+    it('counts roles at or above the heavy threshold and tracks the max', () => {
+      const roles = [
+        { mcpServers: ['github'] },
+        { mcpServers: ['github', 'linear'] },
+        { mcpServers: ['github', 'linear', 'slack', 'sentry'] }, // heavy (4)
+        { mcpServers: ['github', 'linear', 'slack', 'sentry', 'notion'] }, // heavy (5)
+      ];
+      const s = summarizeToolSurface(roles);
+      expect(HEAVY_TOOL_SURFACE).toBe(4);
+      expect(s.totalRoles).toBe(4);
+      expect(s.heavyRoles).toBe(2);
+      expect(s.maxServers).toBe(5);
+    });
+
+    it('reports zero heavy roles when all are light', () => {
+      const s = summarizeToolSurface([{ mcpServers: [] }, { mcpServers: ['github'] }, { mcpServers: ['a', 'b', 'c'] }]);
+      expect(s.heavyRoles).toBe(0);
+      expect(s.maxServers).toBe(3);
+    });
+
+    it('reflects the live roster — TEAM carries heavy roles (the eager tool surface is real, not hypothetical)', () => {
+      const s = summarizeToolSurface(TEAM);
+      expect(s.totalRoles).toBeGreaterThan(0);
+      expect(s.heavyRoles).toBeGreaterThan(0);
     });
   });
 });

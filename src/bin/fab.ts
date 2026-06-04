@@ -36,7 +36,7 @@ import {
   setBudgetLimit,
 } from '../state.js';
 import { getAllSkillDefs, getSkillDef, loadSkillContent, previewSkillContent, resolveNanohypePath } from '../skills.js';
-import { resolveMcpServers } from '../mcp.js';
+import { resolveMcpServers, summarizeToolSurface, HEAVY_TOOL_SURFACE } from '../mcp.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { resolveSandboxMode, environmentConfig } from '../sandbox.js';
 import { getWorkflow, listWorkflows, executeWorkflow, reviseWorkflow, streamWithAdvisor } from '../workflows.js';
@@ -319,6 +319,17 @@ async function deploy(args: ParsedArgs): Promise<void> {
 
   const skillCount = Object.keys(skillRefs).length;
   console.log(`\nDeployed — ${state.agents.length} agents, ${skillCount} skills`);
+
+  // Surface eager-loaded MCP tool-surface pressure (see mcp.ts). Managed Agents
+  // has no defer_loading/Tool Search yet, so heavy rosters pay it in context.
+  const surface = summarizeToolSurface(TEAM);
+  if (surface.heavyRoles > 0) {
+    console.log(
+      `Tool surface — ${surface.heavyRoles}/${surface.totalRoles} roles wire ≥${HEAVY_TOOL_SURFACE} MCP servers ` +
+        `(max ${surface.maxServers}); MCP tool definitions load eagerly. Tool Search/defer_loading (the native ` +
+        `~85% reduction) is not yet available on the Managed Agents transport.`,
+    );
+  }
   if (failedSkills.length > 0) {
     console.error(`\nWARNING: ${failedSkills.length} skills failed to upload: ${failedSkills.join(', ')}`);
     console.error('These agents were deployed without their domain skills.');

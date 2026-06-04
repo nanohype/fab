@@ -229,3 +229,46 @@ export function resolveMcpServers(serverNames: string[]): { servers: McpServer[]
 export function getRegistry(): Record<string, McpServerDef> {
   return fullRegistry();
 }
+
+// ── Tool-surface visibility (P2.c — Tool Search / defer_loading) ───────
+//
+// resolveMcpServers wires every server's tools as an always-on `mcp_toolset`,
+// so all of a role's MCP tools load into context eagerly at session start.
+// A single heavy server (github exposes ~50 tools) means a role wiring 4-5
+// servers can carry well over a hundred tool definitions — tens of thousands
+// of tokens — before it does any work, and tool-selection accuracy degrades
+// past ~30-50 available tools.
+//
+// Anthropic's native fix is the Tool Search Tool + `defer_loading` (tools load
+// on demand; ~85% definition-token reduction). As of 2026-06 that is a
+// Messages-API feature — available on the Claude API, Claude Platform on AWS,
+// and Microsoft Foundry, but NOT exposed by the Managed Agents API (whose
+// mcp_toolset config supports only `enabled`, no `defer_loading`) and NOT on
+// Bedrock. So fab cannot defer tool loading on its default (managed-agents) or
+// regulated (bedrock) paths today. The lever fab DOES have on Managed Agents is
+// per-tool `enabled` via the mcp_toolset `configs` array — a future curation
+// pass could allow-list the tools a heavy role actually uses.
+//
+// summarizeToolSurface makes the current pressure visible at deploy time;
+// revisit defer_loading adoption when the Managed Agents API exposes it.
+
+/** Roles wiring at least this many MCP servers carry a heavy eager-loaded tool surface. */
+export const HEAVY_TOOL_SURFACE = 4;
+
+export interface ToolSurfaceSummary {
+  totalRoles: number;
+  heavyRoles: number; // roles wiring >= HEAVY_TOOL_SURFACE servers
+  maxServers: number;
+}
+
+/** Summarize eager-loaded MCP tool-surface pressure across the roster. */
+export function summarizeToolSurface(roles: ReadonlyArray<{ mcpServers: string[] }>): ToolSurfaceSummary {
+  let heavyRoles = 0;
+  let maxServers = 0;
+  for (const r of roles) {
+    const n = r.mcpServers.length;
+    if (n >= HEAVY_TOOL_SURFACE) heavyRoles++;
+    if (n > maxServers) maxServers = n;
+  }
+  return { totalRoles: roles.length, heavyRoles, maxServers };
+}

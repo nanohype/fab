@@ -1,5 +1,32 @@
 import type { CustomTool, TeamRole } from './types.js';
 
+// ── Senior advisor escalation — fab's own mechanism, deliberately NOT the
+// native advisor tool ──────────────────────────────────────────────────
+//
+// `consult_advisor` is a custom, client-executed tool: a gated role escalates
+// one hard decision to a senior Opus advisor (`callAdvisor` makes a separate
+// `/v1/messages` call). Three invariants make this fab-specific rather than a
+// drop-in for Anthropic's native advisor tool (beta `advisor-tool-2026-03-01`):
+//
+//   1. Role-gating — only `ADVISOR_ROLES` get the tool, applied at deploy time
+//      by `advisorToolsFor` (bin/fab.ts). The native tool is just an entry in a
+//      request/agent toolset and carries no role policy of its own.
+//   2. Per-SESSION call budget — `streamWithAdvisor` caps escalations across a
+//      whole multi-turn session (`maxAdvisorCalls`, default 3). The native
+//      tool's `max_uses` is a per-REQUEST cap only; the docs state it has "no
+//      built-in conversation-level cap", so a per-session budget there means
+//      hand-stripping `advisor_tool_result` blocks from history (fragile).
+//   3. Separate pinned Opus — `callAdvisor` always targets `ADVISOR_MODEL`
+//      regardless of the caller's model, uniformly across all four transports
+//      (the interception lives in the shared stream consumer).
+//
+// Availability also rules out a swap: the native advisor tool is beta on the
+// Claude API and Claude Platform on AWS only — not Bedrock/Vertex/Foundry and
+// not in the Managed Agents toolset, i.e. neither fab's default (managed-agents)
+// nor regulated (Bedrock) path. Verified against platform.claude.com docs,
+// 2026-06. Revisit only if the native tool gains a per-conversation budget AND
+// Managed Agents support.
+
 const BASE = 'https://api.anthropic.com';
 const ADVISOR_MODEL = 'claude-opus-4-8';
 

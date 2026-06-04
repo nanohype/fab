@@ -119,6 +119,15 @@ class SdkAgentSession implements AgentSession {
     });
 
     const backendEnv = inferenceEnv(this.backend);
+    // Context compaction is automatic here, so there is nothing to wire: the
+    // Agent SDK runs the Claude Code agent loop, which auto-compacts when the
+    // window fills (surfaced as a `compacting` status + Pre/PostCompact hooks).
+    // It is NOT a query() option — there is no `context_management` knob, and
+    // the SDK's `betas` option only accepts `context-1m-2025-08-07`, never
+    // `compact-2026-01-12` — so the raw Messages-API compaction config does not
+    // apply to this runtime. managed-agents handles long context via its durable
+    // session log. Verified against the installed @anthropic-ai/claude-agent-sdk
+    // 0.3.x types, 2026-06.
     this.sdkQuery = this.sdk.query({
       prompt: inputs,
       options: {
