@@ -66,7 +66,7 @@ function hasEvidenceBlock(output: string, header: 'TRANSCRIPTS' | 'CITATIONS'): 
  *   auto-downgrade to REJECT (EVIDENCE_CONTRACT enforcement at the pipeline layer).
  * - REJECT may ship without TRANSCRIPTS/CITATIONS — the point there is to fail fast.
  */
-export function parseGateVerdict(role: TeamRole, output: string): GateVerdict {
+export function parseGateVerdict(role: TeamRole, output: string, opts?: { readFile?: FileReader }): GateVerdict {
   const verdictMatch = output.match(VERDICT_RE);
   const feedbackMatch = output.match(FEEDBACK_RE);
   const feedback = feedbackMatch ? feedbackMatch[1].trim() : '';
@@ -104,9 +104,213 @@ export function parseGateVerdict(role: TeamRole, output: string): GateVerdict {
         grades,
       };
     }
+
+    // Verbatim citation verification — only when the caller can read the
+    // cited files (local cwd in sdk/claude-cli, or a GitHub-backed reader).
+    // Without a reader this is a no-op and behavior is unchanged.
+    //
+    // Conservative blocking policy: REJECT only on `fragment-not-found` — the
+    // file WAS read and the cited code is not in it, which is unambiguous
+    // fabrication (EVIDENCE_CONTRACT's "fragment that appears nowhere"). A
+    // `file-unreadable` result (e.g. a 404 from a path-convention mismatch or
+    // a transient fetch failure) and a `malformed`/unparseable citation are
+    // left non-blocking, so verification can only ever strengthen the gate —
+    // it never turns an infra hiccup or parser gap into a false REJECT.
+    if (opts?.readFile) {
+      const fabricated = verifyCitations(parseCitations(output), opts.readFile).filter(
+        (c) => c.status === 'fragment-not-found',
+      );
+      if (fabricated.length > 0) {
+        const detail = fabricated.map((f) => `  - ${f.citation.file}: ${f.reason}`).join('\n');
+        return {
+          role,
+          verdict: 'REJECT',
+          feedback: `${role} emitted ${verdict} but citation verification failed per EVIDENCE_CONTRACT — every quoted_fragment must appear verbatim at the cited file:\n${detail}\nOriginal feedback: ${feedback || '(none)'}`,
+          grades,
+        };
+      }
+    }
   }
 
   return { role, verdict, feedback, grades };
+}
+
+// ── Citation verification (EVIDENCE_CONTRACT) ──────────────────────
+//
+// A CITATIONS block carries {claim, file, line_range, quoted_fragment}
+// tuples; the contract says each quoted_fragment must appear verbatim at the
+// cited file. parseGateVerdict checks block *presence* unconditionally; given
+// a FileReader it also confirms each fragment exists in the file and
+// downgrades to REJECT on a fabricated citation (the "fragment that appears
+// nowhere in the codebase" anti-pattern). The reader is injected so this
+// module stays pure and transport-agnostic — the caller supplies local-fs or
+// GitHub-backed access. Without a reader, verification is skipped.
+
+export interface Citation {
+  claim: string;
+  file: string;
+  lineRange: string;
+  quotedFragment: string;
+}
+
+/** Returns the cited file's full text, or null when it cannot be read. */
+export type FileReader = (file: string) => string | null;
+
+export type CitationStatus = 'ok' | 'fragment-not-found' | 'file-unreadable' | 'malformed';
+
+export interface CitationCheck {
+  citation: Citation;
+  ok: boolean; // true only when the fragment was found verbatim
+  status: CitationStatus;
+  reason?: string;
+}
+
+function isBlockScalar(value: string): boolean {
+  const t = value.trim();
+  return t === '' || t === '|' || t === '|-' || t === '>';
+}
+
+function dedent(lines: string[]): string {
+  const out = [...lines];
+  while (out.length && out[0].trim() === '') out.shift();
+  while (out.length && out[out.length - 1].trim() === '') out.pop();
+  const indents = out.filter((l) => l.trim() !== '').map((l) => l.length - l.trimStart().length);
+  const min = indents.length ? Math.min(...indents) : 0;
+  return out.map((l) => l.slice(min)).join('\n');
+}
+
+/**
+ * Parse the CITATIONS block into structured tuples. Hand-rolled (no YAML
+ * dependency, matching fab's zero-dep style) and tolerant: it reads the
+ * `- claim/file/line_range` scalars and the `quoted_fragment: |` block scalar,
+ * dedenting the fragment body. Returns [] when no parseable entries are found
+ * — verification then no-ops rather than risk a false REJECT from a format
+ * this parser doesn't recognize.
+ */
+export function parseCitations(output: string): Citation[] {
+  const headerMatch = output.match(/^[ \t]*CITATIONS:[ \t]*$/im);
+  if (!headerMatch || headerMatch.index === undefined) return [];
+  const rest = output.slice(headerMatch.index + headerMatch[0].length);
+  const nextHeader = rest.match(/^\s*(?:GATE_[A-Z]+|TRANSCRIPTS|CITATIONS|QUALITY_GRADES):/m);
+  const block = nextHeader && nextHeader.index !== undefined ? rest.slice(0, nextHeader.index) : rest;
+
+  const indentOf = (s: string) => s.length - s.trimStart().length;
+  const stripQuotes = (s: string) => s.trim().replace(/^["']|["']$/g, '');
+
+  const citations: Citation[] = [];
+  let cur: Citation | null = null;
+  let collecting = false;
+  let keyIndent = 0;
+  let fragment: string[] = [];
+
+  const flush = () => {
+    if (cur && cur.file) {
+      cur.quotedFragment = dedent(fragment);
+      citations.push(cur);
+    }
+    cur = null;
+    collecting = false;
+    fragment = [];
+  };
+
+  for (const line of block.split('\n')) {
+    if (collecting) {
+      if (line.trim() === '' || indentOf(line) > keyIndent) {
+        fragment.push(line);
+        continue;
+      }
+      collecting = false; // dedented — reparse this line as a key/entry
+    }
+
+    const m = line.match(/^(\s*)(?:-\s+)?(claim|file|line_range|quoted_fragment):\s*(.*)$/);
+    if (!m) continue;
+    const [, indent, key, valueRaw] = m;
+
+    if (/^\s*-\s/.test(line)) {
+      flush();
+      cur = { claim: '', file: '', lineRange: '', quotedFragment: '' };
+    }
+    if (!cur) continue;
+
+    if (key === 'claim') cur.claim = stripQuotes(valueRaw);
+    else if (key === 'file') cur.file = stripQuotes(valueRaw);
+    else if (key === 'line_range') cur.lineRange = stripQuotes(valueRaw);
+    else if (key === 'quoted_fragment') {
+      if (isBlockScalar(valueRaw)) {
+        collecting = true;
+        keyIndent = indent.length;
+        fragment = [];
+      } else {
+        fragment = [stripQuotes(valueRaw)];
+      }
+    }
+  }
+  flush();
+  return citations;
+}
+
+function normalizeLines(text: string): string[] {
+  return text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+}
+
+function containsRun(haystack: string[], needle: string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false;
+  for (let i = 0; i + needle.length <= haystack.length; i++) {
+    let match = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
+  }
+  return false;
+}
+
+/**
+ * Verify each citation's quoted_fragment appears verbatim in the cited file.
+ * Comparison is line-based and whitespace-tolerant (each line trimmed, blank
+ * lines dropped) so YAML block-scalar dedenting and indentation differences
+ * don't cause false negatives — it requires the actual cited lines to be
+ * present, in order, as a contiguous run. Catches fabricated fragments and
+ * citations pointing at files that don't exist in the tree.
+ */
+export function verifyCitations(citations: Citation[], readFile: FileReader): CitationCheck[] {
+  return citations.map((citation): CitationCheck => {
+    if (!citation.file) return { citation, ok: false, status: 'malformed', reason: 'citation has no file path' };
+    if (!citation.quotedFragment.trim())
+      return { citation, ok: false, status: 'malformed', reason: 'citation has no quoted_fragment' };
+    let content: string | null;
+    try {
+      content = readFile(citation.file);
+    } catch (err) {
+      return {
+        citation,
+        ok: false,
+        status: 'file-unreadable',
+        reason: `could not read ${citation.file}: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (content === null)
+      return { citation, ok: false, status: 'file-unreadable', reason: `cited file not found: ${citation.file}` };
+    const needle = normalizeLines(citation.quotedFragment);
+    if (needle.length === 0)
+      return { citation, ok: false, status: 'malformed', reason: 'quoted_fragment is empty after normalization' };
+    const ok = containsRun(normalizeLines(content), needle);
+    return ok
+      ? { citation, ok: true, status: 'ok' }
+      : {
+          citation,
+          ok: false,
+          status: 'fragment-not-found',
+          reason: `quoted_fragment not found verbatim in ${citation.file}`,
+        };
+  });
 }
 
 /**

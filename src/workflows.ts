@@ -6,9 +6,9 @@ import { formatEvent } from './stream.js';
 import { callAdvisor } from './advisor.js';
 import { getAgentByRole, getBudgetLimit, getPrimaryRepo, setProjectLanguage, setSourceDirs } from './state.js';
 import { CODE_GATE_ROLES, DOCS_GATE_ROLES } from './standards.js';
-import { parseGateVerdict, mergeGateVerdicts, parseQualityGrades, compareGrades } from './gate.js';
-import type { GateVerdict, Grade } from './gate.js';
-import { slugForBranch, createBranchIfMissing } from './git.js';
+import { parseGateVerdict, mergeGateVerdicts, parseQualityGrades, compareGrades, parseCitations } from './gate.js';
+import type { GateVerdict, Grade, FileReader } from './gate.js';
+import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
 import { normalizeDelimiters, spotlight } from './guardrails.js';
 
@@ -693,6 +693,11 @@ export async function executeWorkflow(
   // sessions where the coordinator invents a repo, pushes to the wrong
   // place, or fabricates success — the cost of that failure mode is
   // much higher than the cost of a clear error here.
+  //
+  // The resolved repo + branch are captured in `citationSource` so the merge
+  // gate can read the feature branch and verify CITATIONS fragments (see
+  // buildCitationReader + runMergeGate).
+  let citationSource: CitationSource | null = null;
   if (workflow.gateProfile === 'code') {
     const intake = parseIntakeJson(userPrompt);
     const lang = intake?.constraints?.language;
@@ -708,8 +713,8 @@ export async function executeWorkflow(
     await setSourceDirs(intakeDirs);
     if (intakeDirs.length) console.log(`${DIM}Source dirs: ${intakeDirs.join(', ')}${RESET}`);
 
-    const branchContext = await preCreateFeatureBranch(workflow, userPrompt);
-    if (!branchContext) {
+    const branchInfo = await preCreateFeatureBranch(workflow, userPrompt);
+    if (!branchInfo) {
       console.log(
         `${RED}${BOLD}Halted: code-producing workflow "${workflow.name}" requires a pre-created feature branch.${RESET}`,
       );
@@ -719,7 +724,8 @@ export async function executeWorkflow(
       console.log(`${DIM}If no primary repo is configured: fab repo add <github-url> --token <github-pat>${RESET}`);
       return;
     }
-    context = `${branchContext}\n\n${context}`;
+    context = `${branchInfo.context}\n\n${context}`;
+    citationSource = branchInfo.source;
   }
 
   for (const batch of batches) {
@@ -790,7 +796,7 @@ ${step.instruction}`,
 
   // ── Merge Gate (workflow-level, runs after main loop) ─────────
   if (workflow.gateProfile) {
-    const gateResult = await runMergeGate(runtime, workflow.name, workflow.gateProfile, context);
+    const gateResult = await runMergeGate(runtime, workflow.name, workflow.gateProfile, context, citationSource);
     if (gateResult.decision === 'reject') {
       console.log(`${RED}${BOLD}Merge gate REJECTED: ${workflow.name}${RESET}`);
       if (gateResult.feedback) console.log(`${DIM}${gateResult.feedback}${RESET}`);
@@ -855,7 +861,10 @@ function parseIntakeJson(userPrompt: string): {
   }
 }
 
-async function preCreateFeatureBranch(workflow: Workflow, userPrompt: string): Promise<string | null> {
+async function preCreateFeatureBranch(
+  workflow: Workflow,
+  userPrompt: string,
+): Promise<{ context: string; source: CitationSource } | null> {
   const intake = parseIntakeJson(userPrompt);
   if (!intake) {
     console.log(`${DIM}Branch hook: no JSON intake detected — skipping branch pre-creation.${RESET}`);
@@ -895,7 +904,7 @@ async function preCreateFeatureBranch(workflow: Workflow, userPrompt: string): P
   }
 
   // Prepend a clear instruction block for every downstream delegation.
-  return [
+  const context = [
     `TARGET REPO: ${primary.owner}/${primary.repo}`,
     `BRANCH: ${branch} (already created — do NOT create, do NOT search, do NOT fork)`,
     `PROJECT SLUG: ${slug}`,
@@ -903,6 +912,51 @@ async function preCreateFeatureBranch(workflow: Workflow, userPrompt: string): P
     `PR CREATION: release-manager opens the consolidated PR at workflow end — never open one yourself.`,
     `Workflow: ${workflow.name}`,
   ].join('\n');
+  return { context, source: { token: primary.token, owner: primary.owner, repo: primary.repo, branch } };
+}
+
+interface CitationSource {
+  token: string;
+  owner: string;
+  repo: string;
+  branch: string;
+}
+
+/**
+ * Build a synchronous FileReader for a verdict by prefetching every file it
+ * cites from the feature branch via the GitHub Contents API. This is what
+ * lets CITATIONS verification run in the default managed-agents transport,
+ * where the work tree lives in the cloud sandbox, not on fab's disk.
+ *
+ * Fail-open: if the prefetch hits an auth/network/rate-limit error (we cannot
+ * read the repo at all), returns undefined so parseGateVerdict skips
+ * verification rather than mistake an infra failure for fabrication. A clean
+ * 404 on a cited path is NOT an error — it maps to null in the cache, which
+ * parseGateVerdict treats as non-blocking `file-unreadable`, so a
+ * path-convention mismatch can't produce a false REJECT either.
+ */
+async function buildCitationReader(source: CitationSource, output: string): Promise<FileReader | undefined> {
+  const files = [
+    ...new Set(
+      parseCitations(output)
+        .map((c) => c.file)
+        .filter((f) => f.length > 0),
+    ),
+  ];
+  if (files.length === 0) return undefined;
+  const cache = new Map<string, string | null>();
+  try {
+    await Promise.all(
+      files.map(async (file) => {
+        cache.set(file, await fetchRepoFile(source.token, source.owner, source.repo, file, source.branch));
+      }),
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`${DIM}Citation verification skipped (could not read ${source.owner}/${source.repo}): ${msg}${RESET}`);
+    return undefined;
+  }
+  return (file) => cache.get(file) ?? null;
 }
 
 /**
@@ -911,12 +965,17 @@ async function preCreateFeatureBranch(workflow: Workflow, userPrompt: string): P
  *
  * On 'revise', loops up to 3 attempts with feedback appended to context.
  * On 'reject' or after 3 unsuccessful attempts, returns the final verdict.
+ *
+ * When `citationSource` is set (a configured primary repo + feature branch),
+ * each verdict's CITATIONS fragments are verified against the branch via the
+ * GitHub Contents API — fabricated fragments downgrade the verdict to REJECT.
  */
 async function runMergeGate(
   runtime: AgentRuntime,
   workflowName: string,
   profile: GateProfile,
   initialContext: string,
+  citationSource?: CitationSource | null,
 ): Promise<GateResult> {
   const gateRoles = profile === 'code' ? CODE_GATE_ROLES : DOCS_GATE_ROLES;
   let context = initialContext;
@@ -941,7 +1000,8 @@ Your task:
 Review the PR candidate against your role's merge-gate criteria per FACTORY_PREAMBLE. End your response with the full block: GATE_VERDICT, GATE_FEEDBACK, TRANSCRIPTS, CITATIONS, QUALITY_GRADES — EVIDENCE_CONTRACT auto-downgrades APPROVE/REQUEST_CHANGES without transcripts + citations to REJECT.`,
         workflowName,
       );
-      verdicts.push(parseGateVerdict(role, roleOutput));
+      const readFile = citationSource ? await buildCitationReader(citationSource, roleOutput) : undefined;
+      verdicts.push(parseGateVerdict(role, roleOutput, readFile ? { readFile } : undefined));
     }
 
     lastResult = mergeGateVerdicts(verdicts);

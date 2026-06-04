@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { parseGitHubUrl, slugForBranch, createBranchIfMissing } from '../src/git.js';
+import { parseGitHubUrl, slugForBranch, createBranchIfMissing, fetchRepoFile } from '../src/git.js';
 
 describe('parseGitHubUrl', () => {
   it('parses canonical https URL', () => {
@@ -127,5 +127,64 @@ describe('createBranchIfMissing', () => {
     );
     await createBranchIfMissing('my-token', 'nanohype', 'protohype', 'feat/x');
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer my-token');
+  });
+});
+
+describe('fetchRepoFile', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('decodes base64 file content on 200', async () => {
+    const body = 'const x = 1;\nconst y = 2;\n';
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from(body).toString('base64') }),
+        { status: 200 },
+      ),
+    );
+    expect(await fetchRepoFile('tok', 'nanohype', 'protohype', 'src/x.ts', 'feat/almanac')).toBe(body);
+  });
+
+  it('returns null on 404 (file does not exist — a clean signal, not an error)', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('not found', { status: 404 }));
+    expect(await fetchRepoFile('tok', 'o', 'r', 'missing.ts', 'feat/x')).toBeNull();
+  });
+
+  it('throws on a non-404 error (auth / rate-limit)', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
+    await expect(fetchRepoFile('tok', 'o', 'r', 'a.ts', 'feat/x')).rejects.toThrow(/GET contents a.ts failed \(403\)/);
+  });
+
+  it('throws on unsupported encoding (>1MB file returns encoding "none")', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ type: 'file', encoding: 'none', content: '' }), { status: 200 }),
+    );
+    await expect(fetchRepoFile('tok', 'o', 'r', 'big.bin', 'feat/x')).rejects.toThrow(/unsupported encoding/);
+  });
+
+  it('returns null when the path is a directory (array response, no type:"file")', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([{ type: 'file', name: 'a.ts' }]), { status: 200 }));
+    expect(await fetchRepoFile('tok', 'o', 'r', 'src', 'feat/x')).toBeNull();
+  });
+
+  it('url-encodes path segments + ref and sends the auth header', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from('x').toString('base64') }), {
+        status: 200,
+      }),
+    );
+    await fetchRepoFile('my-token', 'nanohype', 'protohype', 'src/a b.ts', 'feat/almanac');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain('/repos/nanohype/protohype/contents/src/a%20b.ts');
+    expect(url).toContain('?ref=feat%2Falmanac');
+    expect(init.headers.Authorization).toBe('Bearer my-token');
   });
 });
