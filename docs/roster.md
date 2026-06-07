@@ -46,9 +46,9 @@ Workflow code (src/workflows.ts) — top-level routing
 │       eks-agent-platform-curator · kagent-curator ·
 │       agentgateway-curator · kubebuilder-engineer
 │
-├── Verify (5)
-│   pr-reviewer · qa-security · build-verifier · artifact-auditor ·
-│   compliance-curator
+├── Verify (6)
+│   fidelity-engineer · pr-reviewer · qa-security · build-verifier ·
+│   artifact-auditor · compliance-curator
 │
 ├── Ship (3)
 │   release-manager · deploy-engineer · migration-engineer
