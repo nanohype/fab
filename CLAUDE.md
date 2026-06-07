@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A TypeScript CLI that deploys and orchestrates a team of 83 Claude managed agents via the Anthropic Managed Agents API. The roster is organized around factory phases — workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions. There is no top-level coordinator agent; Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
+A TypeScript CLI that deploys and orchestrates a team of 84 Claude managed agents via the Anthropic Managed Agents API. The roster is organized around factory phases — workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions. There is no top-level coordinator agent; Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
 
 Naming convention (see [`docs/roster.md`](docs/roster.md)):
 
@@ -50,7 +50,7 @@ Groups (`group` field):
 
 ## Factory Production Standards
 
-Every factory agent (30 roles with `group: 'factory'`) receives `FACTORY_PREAMBLE` as a system-prompt section via `buildSystemPrompt`. The preamble defines the non-negotiable policies every factory deliverable must obey. Source of truth: `src/standards.ts`. Never inline these policies in role prompts — reference by name ("see PRODUCTION_BAR") so there's one place to edit.
+Every factory agent (54 roles with `group: 'factory'`) receives `FACTORY_PREAMBLE` as a system-prompt section via `buildSystemPrompt`. The preamble defines the non-negotiable policies every factory deliverable must obey. Source of truth: `src/standards.ts`. Never inline these policies in role prompts — reference by name ("see PRODUCTION_BAR") so there's one place to edit.
 
 - **Language dispatch** — `LANGUAGE_TOOLCHAIN` maps each supported language (typescript, go, python, rust, java, kotlin, csharp) to `install / build / lint / test / docs` commands + manifest + lockfile + `versionLookup` + registry. Every factory command is dispatched through this map — no `npm run X` baked in. `constraints.language` in the intake brief drives the resolution; `buildSystemPrompt` reads `state.projectLanguage` and emits the right commands in the Build Verification Protocol.
 - **Four-phase contract** (`FOUR_PHASE_CONTRACT`) — every project exposes **build, lint, test, docs** as distinct executable phases that exit 0 from a clean checkout. CI runs all four as separate jobs. `build-verifier` runs all four plus `install` and a version-currency check, captures per-command stdout/stderr/exit as `TRANSCRIPTS:` evidence, and REJECTs on any failure.

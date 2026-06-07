@@ -1,6 +1,6 @@
 # Fab Roster
 
-The roster is 83 specialists organized around factory phases. Workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions; there is no top-level coordinator agent. Anthropic's Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
+The roster is 84 specialists organized around factory phases. Workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions; there is no top-level coordinator agent. Anthropic's Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
 
 ## Naming convention
 
