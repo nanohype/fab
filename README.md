@@ -2,7 +2,7 @@
 
 Open-source reference factory for orchestrating Claude agents into a production-grade software pipeline. Clone it, configure your skills overlay, and run your factory — the system is the recipe.
 
-A TypeScript CLI orchestrating 83 Claude agents organized around factory phases:
+A TypeScript CLI orchestrating 84 Claude agents organized around factory phases:
 
 - **Discovery → Design → Build → Verify → Ship** — the factory pipeline.
 - **Operate → Customer → Business → Staff → Lab** — runs the firm + meta work.
