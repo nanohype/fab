@@ -72,6 +72,26 @@ describe('buildAgentSandboxManifest', () => {
     expect(manifest.spec.env).toContainEqual({ name: 'AWS_REGION', value: 'us-east-1' });
   });
 
+  it('forwards the per-session attribution vars onto the session pod env', () => {
+    vi.stubEnv('FAB_OPERATOR', 'alice@acme.com');
+    vi.stubEnv('FAB_SESSION_ROLE_ARN', 'arn:aws:iam::351619759866:role/fab-session');
+    vi.stubEnv('FAB_SESSION_DURATION', '7200');
+    const manifest = buildAgentSandboxManifest('go-engineer', 'x', cfg);
+    expect(manifest.spec.env).toContainEqual({ name: 'FAB_OPERATOR', value: 'alice@acme.com' });
+    expect(manifest.spec.env).toContainEqual({
+      name: 'FAB_SESSION_ROLE_ARN',
+      value: 'arn:aws:iam::351619759866:role/fab-session',
+    });
+    expect(manifest.spec.env).toContainEqual({ name: 'FAB_SESSION_DURATION', value: '7200' });
+  });
+
+  it('omits attribution vars when unset (unattributed default)', () => {
+    vi.stubEnv('FAB_OPERATOR', undefined);
+    vi.stubEnv('FAB_SESSION_ROLE_ARN', undefined);
+    const manifest = buildAgentSandboxManifest('go-engineer', 'x', cfg);
+    expect((manifest.spec.env ?? []).some((e) => e.name === 'FAB_OPERATOR')).toBe(false);
+  });
+
   it('sets runtimeClassName when the config carries one', () => {
     vi.stubEnv('FAB_INFERENCE', undefined);
     vi.stubEnv('AWS_REGION', undefined);
