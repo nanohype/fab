@@ -131,6 +131,8 @@ export FAB_K8S_RUNTIME_CLASS=gvisor           # optional isolation dial
 
 Full details in [`docs/transports.md`](docs/transports.md#per-session-pod-isolation-sdk-k8s).
 
+Set `FAB_OPERATOR=<human>` to bind each dispatched session's AWS and Kubernetes actions to a named human (STS `SourceIdentity` + apiserver impersonation), instead of the anonymous tenant IRSA role — see [`docs/attribution.md`](docs/attribution.md).
+
 ## Configuration
 
 ```sh

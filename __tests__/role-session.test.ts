@@ -2,6 +2,8 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { AgentEvent } from '../src/types.js';
 import type { ParsedArgs } from '../src/args.js';
 import { executeRoleSession, serializeEvent, streamEventsToJsonl } from '../src/runtimes/role-session.js';
+import { SdkRuntime } from '../src/runtimes/sdk.js';
+import { TEAM } from '../src/team.js';
 
 function args(overrides: Partial<ParsedArgs> = {}): ParsedArgs {
   return { command: 'role-session', sub: '', positional: [], flags: {}, ...overrides };
@@ -103,5 +105,33 @@ describe('executeRoleSession', () => {
     vi.stubEnv('FAB_ROLE', 'also-not-real');
     vi.stubEnv('FAB_MESSAGE', 'ship the thing');
     await expect(executeRoleSession(args())).rejects.toThrow(/also-not-real/);
+  });
+
+  it('fails closed — exit 1, runtime never invoked — when attribution setup throws', async () => {
+    vi.stubEnv('FAB_ROLE', TEAM[0].role);
+    vi.stubEnv('FAB_MESSAGE', 'ship it');
+    // An invalid operator throws in resolveSessionIdentity, before any aws call,
+    // so the failure is deterministic and offline.
+    vi.stubEnv('FAB_OPERATOR', 'not a valid sts identity');
+    vi.stubEnv('FAB_SESSION_ROLE_ARN', 'arn:aws:iam::000000000000:role/fab-session');
+    const runRoleSession = vi.spyOn(SdkRuntime.prototype, 'runRoleSession');
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const code = await executeRoleSession(args());
+    expect(code).toBe(1);
+    expect(runRoleSession).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/attribution setup failed/));
+  });
+
+  it('runs the role session through the runtime when unattributed', async () => {
+    vi.stubEnv('FAB_ROLE', TEAM[0].role);
+    vi.stubEnv('FAB_MESSAGE', 'ship it');
+    vi.stubEnv('FAB_OPERATOR', undefined);
+    const runRoleSession = vi
+      .spyOn(SdkRuntime.prototype, 'runRoleSession')
+      .mockResolvedValue({ events: asStream([idle]) } as never);
+    vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const code = await executeRoleSession(args());
+    expect(code).toBe(0);
+    expect(runRoleSession).toHaveBeenCalledTimes(1);
   });
 });

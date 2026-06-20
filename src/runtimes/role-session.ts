@@ -1,6 +1,8 @@
 import type { ParsedArgs } from '../args.js';
 import type { AgentEvent, TeamRole } from '../types.js';
 import { SdkRuntime } from './sdk.js';
+import { TEAM } from '../team.js';
+import { applySessionIdentity } from '../attribution.js';
 
 /**
  * The in-pod role-session entrypoint.
@@ -76,6 +78,33 @@ export async function executeRoleSession(args: ParsedArgs): Promise<number> {
         '  env:  FAB_ROLE=<role> FAB_MESSAGE=<message> fab role-session\n' +
         '  args: fab role-session --role <role> <message...>\n',
     );
+    return 1;
+  }
+
+  // Validate the role before attribution — a cheap check that avoids issuing a
+  // real STS assume-role (network + CloudTrail noise + a wasted SourceIdentity
+  // session) for a typo'd role only to fail in runRoleSession. Throws to
+  // preserve runRoleSession's existing unknown-role contract.
+  if (!TEAM.some((m) => m.role === role)) {
+    throw new Error(`Unknown role: "${role}"`);
+  }
+
+  // Per-session human attribution. A no-op unless FAB_OPERATOR is set; when it
+  // is, assume a role carrying the operator as STS SourceIdentity and point
+  // kubectl at an impersonating kubeconfig, so this session's AWS + K8s actions
+  // bind to a named human. Fail closed: if attribution was requested but the
+  // setup fails, abort rather than run unattributed and silently lose the
+  // binding the evidence depends on. (Notes go to stderr; stdout is the JSONL
+  // event wire.)
+  try {
+    const identity = await applySessionIdentity(`fab-${role}`);
+    if (identity) {
+      process.stderr.write(
+        `fab role-session: acting on behalf of ${identity.operator} (STS SourceIdentity + k8s impersonation)\n`,
+      );
+    }
+  } catch (err) {
+    process.stderr.write(`fab role-session: attribution setup failed: ${(err as Error).message}\n`);
     return 1;
   }
 

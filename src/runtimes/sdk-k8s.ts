@@ -34,7 +34,16 @@ const ENV_RUNTIME_CLASS = 'FAB_K8S_RUNTIME_CLASS';
  * Dispatcher env vars forwarded onto the session pod so the in-pod `sdk`
  * runtime infers against the same backend the dispatcher was configured for.
  */
-const FORWARDED_ENV = ['FAB_INFERENCE', 'AWS_REGION', 'ANTHROPIC_AWS_WORKSPACE_ID'] as const;
+const FORWARDED_ENV = [
+  'FAB_INFERENCE',
+  'AWS_REGION',
+  'ANTHROPIC_AWS_WORKSPACE_ID',
+  // Per-session human attribution (src/attribution.ts) — forwarded so the
+  // in-pod session can assume the operator's SourceIdentity. Unset = unattributed.
+  'FAB_OPERATOR',
+  'FAB_SESSION_ROLE_ARN',
+  'FAB_SESSION_DURATION',
+] as const;
 
 /** The session pod runs the in-pod role-session entrypoint. */
 const SESSION_COMMAND = ['node', 'dist/bin/fab.js', 'role-session'];
