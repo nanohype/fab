@@ -44,9 +44,8 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string } {
 export function slugForBranch(s: string): string {
   return s
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-');
+    .replace(/[^a-z0-9]+/g, '-') // runs of non-alphanumerics collapse to a single '-'
+    .replace(/^-|-$/g, ''); // strip the lone leading/trailing '-' that can leave
 }
 
 interface GitHubRef {
