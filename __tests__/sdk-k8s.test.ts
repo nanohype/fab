@@ -74,13 +74,13 @@ describe('buildAgentSandboxManifest', () => {
 
   it('forwards the per-session attribution vars onto the session pod env', () => {
     vi.stubEnv('FAB_OPERATOR', 'alice@acme.com');
-    vi.stubEnv('FAB_SESSION_ROLE_ARN', 'arn:aws:iam::351619759866:role/fab-session');
+    vi.stubEnv('FAB_SESSION_ROLE_ARN', 'arn:aws:iam::111111111111:role/fab-session');
     vi.stubEnv('FAB_SESSION_DURATION', '7200');
     const manifest = buildAgentSandboxManifest('go-engineer', 'x', cfg);
     expect(manifest.spec.env).toContainEqual({ name: 'FAB_OPERATOR', value: 'alice@acme.com' });
     expect(manifest.spec.env).toContainEqual({
       name: 'FAB_SESSION_ROLE_ARN',
-      value: 'arn:aws:iam::351619759866:role/fab-session',
+      value: 'arn:aws:iam::111111111111:role/fab-session',
     });
     expect(manifest.spec.env).toContainEqual({ name: 'FAB_SESSION_DURATION', value: '7200' });
   });

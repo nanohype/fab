@@ -10,7 +10,7 @@ import {
   type SessionIdentity,
 } from '../src/attribution.js';
 
-const ROLE = 'arn:aws:iam::351619759866:role/fab-session';
+const ROLE = 'arn:aws:iam::111111111111:role/fab-session';
 
 /** A CliRunner that returns canned assume-role creds and records its args. */
 function fakeRunner(calls: string[][]): CliRunner {
@@ -85,9 +85,9 @@ describe('resolveSessionIdentity', () => {
     expect(
       resolveSessionIdentity({
         FAB_OPERATOR: 'alice@acme.com',
-        FAB_SESSION_ROLE_ARN: 'arn:aws-us-gov:iam::351619759866:role/fab-session',
+        FAB_SESSION_ROLE_ARN: 'arn:aws-us-gov:iam::111111111111:role/fab-session',
       })?.roleArn,
-    ).toBe('arn:aws-us-gov:iam::351619759866:role/fab-session');
+    ).toBe('arn:aws-us-gov:iam::111111111111:role/fab-session');
   });
 
   it('rejects an operator that is not STS-clean (so AWS == K8s binding)', () => {
