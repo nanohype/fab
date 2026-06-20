@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import {
   resolveSessionIdentity,
   sanitizeForSts,
@@ -65,6 +65,31 @@ describe('resolveSessionIdentity', () => {
     ).toThrow(/900–43200/);
   });
 
+  it('rejects a non-decimal duration (hex / float / garbage), not just out-of-range', () => {
+    for (const bad of ['soon', '3600.5', '0x384', '3600abc']) {
+      expect(() =>
+        resolveSessionIdentity({
+          FAB_OPERATOR: 'alice@acme.com',
+          FAB_SESSION_ROLE_ARN: ROLE,
+          FAB_SESSION_DURATION: bad,
+        }),
+      ).toThrow(/900–43200/);
+    }
+  });
+
+  it('rejects a session role that is not an IAM role ARN', () => {
+    expect(() =>
+      resolveSessionIdentity({ FAB_OPERATOR: 'alice@acme.com', FAB_SESSION_ROLE_ARN: 'not-an-arn' }),
+    ).toThrow(/not an IAM role ARN/);
+    // a role ARN from another partition (GovCloud) is still accepted
+    expect(
+      resolveSessionIdentity({
+        FAB_OPERATOR: 'alice@acme.com',
+        FAB_SESSION_ROLE_ARN: 'arn:aws-us-gov:iam::351619759866:role/fab-session',
+      })?.roleArn,
+    ).toBe('arn:aws-us-gov:iam::351619759866:role/fab-session');
+  });
+
   it('rejects an operator that is not STS-clean (so AWS == K8s binding)', () => {
     expect(() => resolveSessionIdentity({ FAB_OPERATOR: 'alice smith', FAB_SESSION_ROLE_ARN: ROLE })).toThrow(
       /A-Za-z0-9/,
@@ -122,6 +147,11 @@ describe('writeImpersonationKubeconfig', () => {
     expect(body).toContain('tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token');
     expect(body).toContain('server: https://kubernetes.default.svc');
   });
+
+  it('writes the kubeconfig owner-only (0600), not group/world readable', () => {
+    const path = writeImpersonationKubeconfig('alice@acme.com');
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
 });
 
 describe('applySessionIdentity', () => {
@@ -143,7 +173,39 @@ describe('applySessionIdentity', () => {
     expect(readFileSync(env.KUBECONFIG as string, 'utf8')).toContain('as: "alice@acme.com"');
   });
 
-  it('drops the pod IRSA env so only the assumed creds remain', async () => {
+  it('drops every other credential-source env var so only the assumed creds remain', async () => {
+    const env: NodeJS.ProcessEnv = {
+      FAB_OPERATOR: 'alice@acme.com',
+      FAB_SESSION_ROLE_ARN: ROLE,
+      AWS_ROLE_ARN: 'arn:aws:iam::1:role/tenant',
+      AWS_WEB_IDENTITY_TOKEN_FILE: '/var/run/secrets/eks.amazonaws.com/serviceaccount/token',
+      AWS_ROLE_SESSION_NAME: 'botocore-session',
+      AWS_CONTAINER_CREDENTIALS_FULL_URI: 'http://169.254.170.23/v1/credentials',
+      AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: '/v2/credentials',
+      AWS_PROFILE: 'default',
+      AWS_SHARED_CREDENTIALS_FILE: '/root/.aws/credentials',
+      AWS_CONFIG_FILE: '/root/.aws/config',
+    };
+    await applySessionIdentity('fab-build', env, fakeRunner([]));
+    for (const key of [
+      'AWS_ROLE_ARN',
+      'AWS_WEB_IDENTITY_TOKEN_FILE',
+      'AWS_ROLE_SESSION_NAME',
+      'AWS_CONTAINER_CREDENTIALS_FULL_URI',
+      'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI',
+      'AWS_PROFILE',
+      'AWS_SHARED_CREDENTIALS_FILE',
+      'AWS_CONFIG_FILE',
+    ]) {
+      expect(env[key]).toBeUndefined();
+    }
+    expect(env.AWS_ACCESS_KEY_ID).toBe('AKIAFAKE');
+  });
+
+  it('leaves env untouched when the assume-role fails (no half-attributed state)', async () => {
+    const failing: CliRunner = async () => {
+      throw new Error('sts unavailable');
+    };
     const env: NodeJS.ProcessEnv = {
       FAB_OPERATOR: 'alice@acme.com',
       FAB_SESSION_ROLE_ARN: ROLE,
@@ -151,10 +213,13 @@ describe('applySessionIdentity', () => {
       AWS_WEB_IDENTITY_TOKEN_FILE: '/var/run/secrets/eks.amazonaws.com/serviceaccount/token',
       AWS_ROLE_SESSION_NAME: 'botocore-session',
     };
-    await applySessionIdentity('fab-build', env, fakeRunner([]));
-    expect(env.AWS_ROLE_ARN).toBeUndefined();
-    expect(env.AWS_WEB_IDENTITY_TOKEN_FILE).toBeUndefined();
-    expect(env.AWS_ROLE_SESSION_NAME).toBeUndefined();
-    expect(env.AWS_ACCESS_KEY_ID).toBe('AKIAFAKE');
+    await expect(applySessionIdentity('fab-build', env, failing)).rejects.toThrow(/sts unavailable/);
+    // Both bindings are computed before any env mutation, so a throw leaves env
+    // pristine: no assumed creds, no kubeconfig, and the pod IRSA vars survive.
+    expect(env.AWS_ACCESS_KEY_ID).toBeUndefined();
+    expect(env.KUBECONFIG).toBeUndefined();
+    expect(env.AWS_ROLE_ARN).toBe('arn:aws:iam::1:role/tenant');
+    expect(env.AWS_WEB_IDENTITY_TOKEN_FILE).toBe('/var/run/secrets/eks.amazonaws.com/serviceaccount/token');
+    expect(env.AWS_ROLE_SESSION_NAME).toBe('botocore-session');
   });
 });

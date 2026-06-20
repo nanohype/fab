@@ -36,6 +36,14 @@
  * No new dependency: like the `claude-cli` runtime, this shells to a CLI
  * already in the agent image (`aws`) via `node:child_process`.
  *
+ * Scope: this attributes a *cooperating* session's actions on the normal path;
+ * it is an attribution mechanism, not a containment control. An agent that
+ * controls its own tool subprocesses can step outside both bindings (drop
+ * `KUBECONFIG`; re-auth with the still-mounted web-identity token), so genuine
+ * tamper-resistance needs the platform to withhold direct RBAC from the session
+ * ServiceAccount and broad `sts:AssumeRole` from the session role. See the
+ * "Threat model" section of `docs/attribution.md`.
+ *
  * The required IAM (a session role whose trust policy lets the tenant IRSA role
  * `sts:AssumeRole` + `sts:SetSourceIdentity`) and the K8s `impersonate` RBAC
  * the session ServiceAccount needs are documented in `docs/attribution.md` —
@@ -60,6 +68,12 @@ const SA_CA_PATH = '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt';
 
 const DEFAULT_DURATION_SECONDS = 3600;
 const MIN_DURATION_SECONDS = 900;
+// STS's absolute ceiling for assume-role. Note: in the shipped path the caller
+// is the pod's own IRSA-assumed role, so this is STS *role chaining* — AWS caps
+// a chained session at 1 hour regardless of the target role's
+// MaxSessionDuration, and STS rejects any --duration-seconds above 3600. A value
+// in (3600, 43200] therefore fails closed at assume-role time. See
+// docs/attribution.md ("Duration and the role-chaining cap").
 const MAX_DURATION_SECONDS = 43200;
 
 /** The resolved human a session acts on behalf of, and how long for. */
@@ -68,7 +82,8 @@ export interface SessionIdentity {
   operator: string;
   /** the role assumed to carry the operator as STS SourceIdentity */
   roleArn: string;
-  /** seconds the assumed credentials live (capped by the role's MaxSessionDuration) */
+  /** seconds the assumed credentials live; STS rejects a value above the role's
+   *  MaxSessionDuration (or 3600 under role chaining) server-side. */
   durationSeconds: number;
 }
 
@@ -108,9 +123,19 @@ export function resolveSessionIdentity(env: NodeJS.ProcessEnv = process.env): Se
         `set ${ENV_SESSION_ROLE} to that role's ARN, or unset ${ENV_OPERATOR} to run unattributed.`,
     );
   }
+  // Validate the ARN shape up front, matching the operator's rigor — a typo'd
+  // role should fail here with a clear message, not after a network round-trip
+  // as an opaque STS error.
+  if (!ROLE_ARN_RE.test(roleArn)) {
+    throw new Error(
+      `${ENV_SESSION_ROLE}="${roleArn}" is not an IAM role ARN ` + `(expected arn:aws:iam::<account-id>:role/<name>).`,
+    );
+  }
 
   const raw = env[ENV_SESSION_DURATION]?.trim();
-  const durationSeconds = raw ? Number(raw) : DEFAULT_DURATION_SECONDS;
+  // Decimal integers only — Number() would otherwise quietly accept hex/float
+  // forms ("0x384", "3600.5") and parseInt would accept "3600abc".
+  const durationSeconds = raw ? (/^\d+$/.test(raw) ? Number(raw) : NaN) : DEFAULT_DURATION_SECONDS;
   if (
     !Number.isInteger(durationSeconds) ||
     durationSeconds < MIN_DURATION_SECONDS ||
@@ -126,6 +151,9 @@ export function resolveSessionIdentity(env: NodeJS.ProcessEnv = process.env): Se
 
 /** STS SourceIdentity / RoleSessionName rules: 2–64 chars from [A-Za-z0-9+=,.@_-]. */
 const STS_IDENTITY_RE = /^[A-Za-z0-9+=,.@_-]{2,64}$/;
+
+/** An IAM role ARN: arn:<partition>:iam::<12-digit account>:role/<path?><name>. */
+const ROLE_ARN_RE = /^arn:aws[a-z-]*:iam::\d{12}:role\/.+/;
 
 /** Whether a value already satisfies the STS SourceIdentity / RoleSessionName rules. */
 export function isStsValid(value: string): boolean {
@@ -253,12 +281,21 @@ export async function applySessionIdentity(
 
   Object.assign(env, creds);
   env.KUBECONFIG = kubeconfig;
-  // Drop the pod's IRSA web-identity vars so exactly one credential mechanism
-  // remains — the assumed SourceIdentity creds. Static keys already outrank the
-  // web-identity provider; removing these makes that structural rather than a
-  // matter of provider precedence, on a security-critical boundary.
+  // Drop every other credential-source env var so the default provider chain
+  // resolves the assumed SourceIdentity creds and nothing else. The static keys
+  // already outrank these in the chain; deleting them makes the assumed creds
+  // the *only* source the default chain can resolve, regardless of pod env
+  // shape, on a security-critical boundary. This governs the default chain only:
+  // it does not (and cannot) stop an agent from explicitly re-authenticating
+  // with the still-mounted web-identity token — see docs/attribution.md
+  // ("Threat model").
   delete env.AWS_ROLE_ARN;
   delete env.AWS_WEB_IDENTITY_TOKEN_FILE;
   delete env.AWS_ROLE_SESSION_NAME;
+  delete env.AWS_CONTAINER_CREDENTIALS_FULL_URI;
+  delete env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI;
+  delete env.AWS_PROFILE;
+  delete env.AWS_SHARED_CREDENTIALS_FILE;
+  delete env.AWS_CONFIG_FILE;
   return id;
 }

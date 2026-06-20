@@ -127,7 +127,7 @@ Paired with `FAB_INFERENCE=bedrock` this is the regulated-enterprise end state: 
 | `FAB_K8S_PLATFORM`      | —       | The Platform the role-sessions run under; its tenant IRSA role scopes their Bedrock access |
 | `FAB_K8S_RUNTIME_CLASS` | unset   | RuntimeClass for the session pod — `gvisor` or `kata` for kernel-level isolation           |
 
-`FAB_INFERENCE` and `AWS_REGION` are forwarded onto each session pod so the in-pod loop infers against the same backend as the dispatcher.
+`FAB_INFERENCE` and `AWS_REGION` are forwarded onto each session pod so the in-pod loop infers against the same backend as the dispatcher. The per-session human-attribution vars `FAB_OPERATOR`, `FAB_SESSION_ROLE_ARN`, and `FAB_SESSION_DURATION` are forwarded too — set `FAB_OPERATOR` on the dispatcher and every dispatched session binds its AWS + Kubernetes actions to that named human. Unset = unattributed (the default). See [`docs/attribution.md`](attribution.md) for the mechanism and the platform IAM/RBAC it requires.
 
 The operator runs the session pods in the Platform's tenant namespace (`tenants-<platform>`), distinct from the namespace the `AgentSandbox` CRs live in. `deploy/rbac.yaml` grants fab's ServiceAccount both — the AgentSandbox + Platform reads in the management namespace, the pod-log reads in the tenant namespace. fab also needs to trust the cluster's API-server CA: set `NODE_EXTRA_CA_CERTS` to `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` on its pod.
 
