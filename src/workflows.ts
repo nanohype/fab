@@ -852,10 +852,14 @@ function parseIntakeJson(userPrompt: string): {
   context?: { product?: string };
   source_dirs?: string[];
 } | null {
-  const jsonMatch = userPrompt.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
+  // Slice from the first '{' to the last '}'. A greedy /\{[\s\S]*\}/ is
+  // polynomial (ReDoS) on library input full of unmatched braces; indexOf /
+  // lastIndexOf give the same first-brace-to-last-brace span in linear time.
+  const start = userPrompt.indexOf('{');
+  const end = userPrompt.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
   try {
-    return JSON.parse(jsonMatch[0]);
+    return JSON.parse(userPrompt.slice(start, end + 1));
   } catch {
     return null;
   }
