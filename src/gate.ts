@@ -465,6 +465,23 @@ export interface GradeDrift {
 }
 
 /**
+ * Aggregate per-dimension QUALITY_GRADES across a set of gate verdicts into
+ * a single map. Advisory verdicts (self-review downgrades) carry no weight
+ * and are skipped. The gate roles own disjoint dimensions, so collisions are
+ * rare; when they do occur the later verdict wins.
+ */
+export function aggregateGrades(verdicts: GateVerdict[]): Record<string, Grade> {
+  const grades: Record<string, Grade> = {};
+  for (const v of verdicts) {
+    if (v.advisory) continue;
+    for (const [dim, grade] of Object.entries(v.grades ?? {})) {
+      grades[dim] = grade;
+    }
+  }
+  return grades;
+}
+
+/**
  * Compare internal gate grades against external-reviewer grades.
  *
  * Drift is measured at the letter level (A/B/C/D/F), ignoring +/-.

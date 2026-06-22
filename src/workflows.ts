@@ -6,8 +6,16 @@ import { formatEvent } from './stream.js';
 import { callAdvisor } from './advisor.js';
 import { getAgentByRole, getBudgetLimit, getPrimaryRepo, setProjectLanguage, setSourceDirs } from './state.js';
 import { CODE_GATE_ROLES, DOCS_GATE_ROLES } from './standards.js';
-import { parseGateVerdict, mergeGateVerdicts, parseQualityGrades, compareGrades, parseCitations } from './gate.js';
-import type { GateVerdict, Grade, FileReader } from './gate.js';
+import {
+  parseGateVerdict,
+  mergeGateVerdicts,
+  parseQualityGrades,
+  compareGrades,
+  parseCitations,
+  aggregateGrades,
+} from './gate.js';
+import type { GateVerdict, Grade, GradeDrift, FileReader } from './gate.js';
+import { appendQualityRun } from './quality.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
 import { normalizeDelimiters, spotlight } from './guardrails.js';
@@ -984,6 +992,7 @@ async function runMergeGate(
   const gateRoles = profile === 'code' ? CODE_GATE_ROLES : DOCS_GATE_ROLES;
   let context = initialContext;
   let lastResult: GateResult = { decision: 'reject', feedback: 'Gate did not run.' };
+  let lastInternal: Record<string, Grade> = {};
 
   for (let attempt = 0; attempt < 3; attempt++) {
     console.log(
@@ -1009,24 +1018,80 @@ Review the PR candidate against your role's merge-gate criteria per FACTORY_PREA
     }
 
     lastResult = mergeGateVerdicts(verdicts);
+    lastInternal = aggregateGrades(verdicts);
 
     if (lastResult.decision === 'approve') {
       // External-reviewer calibration runs only for code profile — it's
       // a heavy step and docs workflows don't grade enough dimensions
       // to need cold triangulation.
+      let external: Record<string, Grade> | undefined;
+      let drift: GradeDrift | undefined;
       if (profile === 'code') {
         const calibration = await runExternalCalibration(runtime, workflowName, verdicts, context);
-        if (calibration) return calibration; // blocking REJECT from drift
+        if (calibration) {
+          external = calibration.external;
+          drift = calibration.drift;
+          if (calibration.block) {
+            // Blocking REJECT from drift — record the graded run, then fail.
+            await recordQuality(
+              workflowName,
+              profile,
+              calibration.block.decision,
+              attempt + 1,
+              lastInternal,
+              external,
+              drift,
+            );
+            return calibration.block;
+          }
+        }
       }
+      await recordQuality(workflowName, profile, 'approve', attempt + 1, lastInternal, external, drift);
       return lastResult;
     }
-    if (lastResult.decision === 'reject') return lastResult;
+    if (lastResult.decision === 'reject') {
+      await recordQuality(workflowName, profile, 'reject', attempt + 1, lastInternal);
+      return lastResult;
+    }
 
     // revise — append feedback and retry
     context += `\n\nMERGE GATE REVISION REQUESTED:\n${lastResult.feedback ?? ''}`;
   }
 
+  // Exhausted the revision attempts still asking for changes.
+  await recordQuality(workflowName, profile, lastResult.decision, 3, lastInternal);
   return lastResult;
+}
+
+/**
+ * Append one record of a gated run to the cross-engagement quality log.
+ * Persistence is best-effort — a metrics write must never break the gate,
+ * so failures are logged and swallowed.
+ */
+async function recordQuality(
+  workflow: string,
+  profile: GateProfile,
+  decision: GateResult['decision'],
+  attempts: number,
+  internal: Record<string, Grade>,
+  external?: Record<string, Grade>,
+  drift?: GradeDrift,
+): Promise<void> {
+  try {
+    await appendQualityRun({
+      ts: new Date().toISOString(),
+      workflow,
+      profile,
+      decision,
+      attempts,
+      internal,
+      ...(external ? { external } : {}),
+      ...(drift ? { drift } : {}),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`${DIM}Quality run not recorded (${msg}).${RESET}`);
+  }
 }
 
 /**
@@ -1036,17 +1101,25 @@ Review the PR candidate against your role's merge-gate criteria per FACTORY_PREA
  * verdicts. The pipeline compares its grades against the aggregate of
  * internal grades; >1-letter drift on any dimension blocks release.
  *
- * Returns null if calibration passes. Returns a blocking GateResult
- * (decision: 'reject') if drift is detected — the feedback names which
- * dimension(s) diverged so the next attempt can re-invoke the right
- * role.
+ * Returns null only when the external-reviewer produced no parseable
+ * grades. Otherwise returns the internal + external grades and the drift,
+ * with `block` set to a blocking GateResult (decision: 'reject') when drift
+ * is detected — the feedback names which dimension(s) diverged so the next
+ * attempt can re-invoke the right role, and the grades feed the quality log.
  */
+interface CalibrationResult {
+  block: GateResult | null; // blocking REJECT when drift detected, else null
+  internal: Record<string, Grade>;
+  external: Record<string, Grade>;
+  drift: GradeDrift;
+}
+
 async function runExternalCalibration(
   runtime: AgentRuntime,
   workflowName: string,
   internalVerdicts: GateVerdict[],
   context: string,
-): Promise<GateResult | null> {
+): Promise<CalibrationResult | null> {
   console.log(`${CYAN}── External-reviewer calibration ──${RESET}\n`);
 
   const output = await runRoleSession(
@@ -1070,18 +1143,12 @@ Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_
     return null;
   }
 
-  const internalGrades: Record<string, Grade> = {};
-  for (const v of internalVerdicts) {
-    if (v.advisory) continue;
-    for (const [dim, grade] of Object.entries(v.grades ?? {})) {
-      internalGrades[dim] = grade;
-    }
-  }
+  const internalGrades = aggregateGrades(internalVerdicts);
 
   const drift = compareGrades(internalGrades, externalGrades);
   if (drift.drifted.length === 0) {
     console.log(`${GREEN}External calibration aligned (max drift ${drift.maxDrift} letter).${RESET}\n`);
-    return null;
+    return { block: null, internal: internalGrades, external: externalGrades, drift };
   }
 
   const fmt = (g: Record<string, Grade>) =>
@@ -1090,8 +1157,13 @@ Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_
       .join('\n');
 
   return {
-    decision: 'reject',
-    feedback: `External-reviewer calibration flagged ${drift.drifted.length} dimension(s) with >1-letter drift: ${drift.drifted.join(', ')}. Max drift: ${drift.maxDrift} letter(s). Re-invoke the diverged role(s) with the external-reviewer's citations.\n\nInternal grades:\n${fmt(internalGrades)}\n\nExternal grades:\n${fmt(externalGrades)}`,
+    block: {
+      decision: 'reject',
+      feedback: `External-reviewer calibration flagged ${drift.drifted.length} dimension(s) with >1-letter drift: ${drift.drifted.join(', ')}. Max drift: ${drift.maxDrift} letter(s). Re-invoke the diverged role(s) with the external-reviewer's citations.\n\nInternal grades:\n${fmt(internalGrades)}\n\nExternal grades:\n${fmt(externalGrades)}`,
+    },
+    internal: internalGrades,
+    external: externalGrades,
+    drift,
   };
 }
 

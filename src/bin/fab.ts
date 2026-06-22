@@ -45,6 +45,7 @@ import { executeRoleSession } from '../runtimes/role-session.js';
 import { ADVISOR_TOOL, hasAdvisorAccess } from '../advisor.js';
 import { aggregateUsage, formatUsageReport } from '../usage.js';
 import { loadPerf, formatPerfReport } from '../perf.js';
+import { loadQualityRuns, formatQualityTrend } from '../quality.js';
 import { deliverResult } from '../webhook.js';
 import { parseArgs, type ParsedArgs } from '../args.js';
 import type {
@@ -1159,6 +1160,8 @@ async function model(args: ParsedArgs): Promise<void> {
 async function perf(): Promise<void> {
   const data = await loadPerf();
   console.log(formatPerfReport(data));
+  const runs = await loadQualityRuns();
+  console.log('\n' + formatQualityTrend(runs));
 }
 
 // ── Budget command ──────────────────────────────────────────────────
@@ -1447,7 +1450,7 @@ USAGE
   fab usage [--since <date>]        Token usage and cost report
   fab budget [set|clear] <dollars>  Per-session cost limit
   fab export <session-id>           Extract artifacts to local disk
-  fab perf                          Agent performance metrics
+  fab perf                          Agent performance metrics + quality trend
 
   fab scaffold <description...>     Full product scaffold [--deploy] [--timeline] [--client] [--webhook <url>]
 

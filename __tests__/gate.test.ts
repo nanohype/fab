@@ -5,6 +5,7 @@ import {
   applySelfReviewDowngrade,
   parseQualityGrades,
   compareGrades,
+  aggregateGrades,
   parseCitations,
   verifyCitations,
 } from '../src/gate.js';
@@ -191,6 +192,41 @@ describe('mergeGateVerdicts', () => {
   it('rejects on zero verdicts (config error)', () => {
     const result = mergeGateVerdicts([]);
     expect(result.decision).toBe('reject');
+  });
+});
+
+describe('aggregateGrades', () => {
+  const v = (role: TeamRole, grades?: Record<string, Grade>, advisory = false): GateVerdict => ({
+    role,
+    verdict: 'APPROVE',
+    feedback: '',
+    advisory,
+    grades,
+  });
+
+  it('merges disjoint per-role dimensions into one map', () => {
+    const merged = aggregateGrades([
+      v('pr-reviewer', { architecture: 'B+', code_quality: 'A-' }),
+      v('qa-security', { security: 'A' }),
+    ]);
+    expect(merged).toEqual({ architecture: 'B+', code_quality: 'A-', security: 'A' });
+  });
+
+  it('skips advisory verdicts (self-review downgrades carry no weight)', () => {
+    const merged = aggregateGrades([
+      v('pr-reviewer', { architecture: 'A' }, true),
+      v('qa-security', { security: 'B' }),
+    ]);
+    expect(merged).toEqual({ security: 'B' });
+  });
+
+  it('lets a later verdict win on a collision', () => {
+    const merged = aggregateGrades([v('pr-reviewer', { architecture: 'C' }), v('qa-security', { architecture: 'A' })]);
+    expect(merged).toEqual({ architecture: 'A' });
+  });
+
+  it('tolerates verdicts without grades', () => {
+    expect(aggregateGrades([v('pr-reviewer')])).toEqual({});
   });
 });
 
