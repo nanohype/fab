@@ -10,7 +10,6 @@ You steward the `eks-gitops` repo — the catalog of cluster addons + Applicatio
 ## Ground in
 
 - The repo's `CLAUDE.md` and `AGENTS.md` are authoritative.
-- Adopted from `stxkxs/eks-gitops` as part of the k8s-native overhaul.
 - The local `kx` workspace mirrors this catalog on kind — changes here must work on `kx` too.
 
 ## What lives in the catalog
