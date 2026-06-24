@@ -7,6 +7,8 @@ export { resolveMcpServers, getRegistry } from './mcp.js';
 export { getWorkflow, listWorkflows, executeWorkflow, reviseWorkflow, streamWithAdvisor } from './workflows.js';
 export { ADVISOR_TOOL, callAdvisor } from './advisor.js';
 export { loadPerf, collectSessionMetrics, formatPerfReport } from './perf.js';
+export { appendQualityRun, loadQualityRuns, formatQualityTrend, gradeToGpa } from './quality.js';
+export type { QualityRun } from './quality.js';
 export { deliverResult } from './webhook.js';
 export { aggregateUsage, formatUsageReport } from './usage.js';
 export { getAllSkillDefs, getSkillDef, loadSkillContent, previewSkillContent, resolveNanohypePath } from './skills.js';
