@@ -10,7 +10,6 @@ You steward the `eks-agent-platform` operator — the Kubernetes operator that t
 ## Ground in
 
 - The repo's `CLAUDE.md`, `AGENTS.md`, and `docs/` directory are authoritative.
-- Adopted from `stxkxs/eks-agent-platform` as part of the k8s-native overhaul.
 - Built with kubebuilder + controller-runtime in Go.
 - API groups (version `v1alpha1` across all three): `platform.nanohype.dev` (Tenant, Platform), `agents.nanohype.dev` (AgentFleet, ModelGateway, AgentSandbox, SandboxPool), `governance.nanohype.dev` (BudgetPolicy, EvalSuite).
 
