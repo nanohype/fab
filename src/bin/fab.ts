@@ -996,7 +996,7 @@ async function vaultSetup(): Promise<void> {
   // Only third-party MCP servers (direct URLs). Gateway-routed services
   // (hubspot, gdrive, analytics, gcalendar, gcse, stripe) authenticate via
   // the gateway bearer in mcp.ts headers — their service-level credentials
-  // live in the mcp-gateway's Secrets Manager, not in this vault.
+  // live behind the operator's gateway, not in this vault.
   const credentials: { name: string; serverName: string; token: string }[] = [];
 
   if (env.GITHUB_TOKEN) credentials.push({ name: 'GitHub', serverName: 'github', token: env.GITHUB_TOKEN });
@@ -1088,7 +1088,7 @@ async function vaultSetup(): Promise<void> {
     }
   }
 
-  // ── MCP Gateway (shared bearer across switchboard + memory) ───
+  // ── MCP Gateway (shared bearer across switchboard services) ───
   // Same token authorizes every gateway-hosted MCP URL. We create one
   // static_bearer credential per service URL so the vault can inject
   // Authorization: Bearer <token> when agents call each server.
@@ -1102,7 +1102,6 @@ async function vaultSetup(): Promise<void> {
       { label: 'Gateway gcal', url: `${gatewayBase}/mcp/gcal` },
       { label: 'Gateway gcse', url: `${gatewayBase}/mcp/gcse` },
       { label: 'Gateway stripe', url: `${gatewayBase}/mcp/stripe` },
-      { label: 'Gateway memory', url: `${gatewayBase}/memory` },
     ];
     for (const svc of services) {
       try {

@@ -87,8 +87,8 @@ Required:
 
 Required if using the gateway (switchboard services):
 
-- `MCP_GATEWAY_BASE_URL` — API Gateway endpoint from `cdk deploy` output
-- `MCP_GATEWAY_TOKEN` — bearer from `/mcp-gateway/gateway-bearer-token` in Secrets Manager
+- `MCP_GATEWAY_BASE_URL` — base URL of the HTTP MCP gateway you operate for the switchboard services
+- `MCP_GATEWAY_TOKEN` — the shared bearer token that gateway authenticates with
 
 Optional per-server URL overrides: `MCP_GITHUB_URL`, `MCP_LINEAR_URL`, `MCP_SLACK_URL`, `MCP_NOTION_URL`, `MCP_SENTRY_URL`, `MCP_FIGMA_URL`, `MCP_HUNTER_URL`, `MCP_HUBSPOT_URL`, `MCP_GDRIVE_URL`, `MCP_GCALENDAR_URL`, `MCP_ANALYTICS_URL`, `MCP_GCSE_URL`, `MCP_STRIPE_URL`.
 
