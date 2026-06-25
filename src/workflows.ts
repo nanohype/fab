@@ -50,10 +50,24 @@ interface Workflow {
   gateProfile?: GateProfile;
 }
 
+/** Runs one role in its own session and returns its text output. */
+export type RoleRunner = (
+  runtime: AgentRuntime,
+  role: TeamRole,
+  message: string,
+  workflowName: string,
+) => Promise<string>;
+
 export interface WorkflowOptions {
   onGate?: (step: WorkflowStep, stepIndex: number, output: string) => Promise<GateResult>;
   noGates?: boolean;
   sequential?: boolean;
+  /**
+   * Override the per-role session runner. Production uses {@link runRoleSession};
+   * tests inject a fake to exercise the orchestration (revision loop, merge gate,
+   * failure degradation) without spinning real sessions.
+   */
+  runRole?: RoleRunner;
 }
 
 // ── Built-in workflows ──────────────────────────────────────────────
@@ -674,6 +688,7 @@ export async function executeWorkflow(
   console.log(`${DIM}${workflow.description}${RESET}\n`);
 
   const runtime: AgentRuntime = createRuntime(api);
+  const runRole = options?.runRole ?? runRoleSession;
 
   const batches = groupSteps(workflow.steps, options?.sequential);
 
@@ -747,9 +762,12 @@ export async function executeWorkflow(
 
       if (isParallel) {
         console.log(`${CYAN}── Parallel: ${roleNames}${attempt > 0 ? ` (revision ${attempt})` : ''} ──${RESET}\n`);
-        const perRole = await Promise.all(
+        // allSettled, not all: one role's transient blip degrades to a gap in the
+        // joined output instead of rejecting the whole workflow. A gate or the
+        // revision loop then re-runs the batch.
+        const settled = await Promise.allSettled(
           steps.map((s) =>
-            runRoleSession(
+            runRole(
               runtime,
               s.role,
               `Context from prior steps:
@@ -761,6 +779,13 @@ ${s.instruction}`,
             ).then((out) => ({ role: s.role, out })),
           ),
         );
+        const perRole = settled.map((result, i) => {
+          if (result.status === 'fulfilled') return result.value;
+          const role = steps[i].role;
+          const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          console.log(`${RED}Role ${role} failed: ${msg} — continuing with a gap${RESET}`);
+          return { role, out: roleSessionGap(role, result.reason) };
+        });
         output = perRole.map((r) => `--- ${r.role} ---\n${r.out}`).join('\n\n');
       } else {
         const step = steps[0];
@@ -768,16 +793,22 @@ ${s.instruction}`,
         console.log(
           `${CYAN}── Step ${globalStepNum}/${workflow.steps.length}: ${step.role}${attempt > 0 ? ` (revision ${attempt})` : ''} ──${RESET}\n`,
         );
-        output = await runRoleSession(
-          runtime,
-          step.role,
-          `Context from prior steps:
+        try {
+          output = await runRole(
+            runtime,
+            step.role,
+            `Context from prior steps:
 ${context}
 
 Your task:
 ${step.instruction}`,
-          workflow.name,
-        );
+            workflow.name,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.log(`${RED}Role ${step.role} failed: ${msg} — continuing with a gap${RESET}`);
+          output = roleSessionGap(step.role, err);
+        }
       }
 
       context += `\n\n--- ${roleNames}${attempt > 0 ? ` revision ${attempt}` : ''} output ---\n${output}`;
@@ -804,7 +835,14 @@ ${step.instruction}`,
 
   // ── Merge Gate (workflow-level, runs after main loop) ─────────
   if (workflow.gateProfile) {
-    const gateResult = await runMergeGate(runtime, workflow.name, workflow.gateProfile, context, citationSource);
+    const gateResult = await runMergeGate(
+      runtime,
+      workflow.name,
+      workflow.gateProfile,
+      context,
+      citationSource,
+      runRole,
+    );
     if (gateResult.decision === 'reject') {
       console.log(`${RED}${BOLD}Merge gate REJECTED: ${workflow.name}${RESET}`);
       if (gateResult.feedback) console.log(`${DIM}${gateResult.feedback}${RESET}`);
@@ -820,10 +858,11 @@ ${step.instruction}`,
     // ── release-manager opens the PR with gate verdicts in the body ──
     if (workflow.gateProfile === 'code') {
       console.log(`${CYAN}── Release: release-manager ──${RESET}\n`);
-      await runRoleSession(
-        runtime,
-        'release-manager',
-        `Release for ${workflow.name}.
+      try {
+        await runRole(
+          runtime,
+          'release-manager',
+          `Release for ${workflow.name}.
 
 Context from the workflow above (including all producer outputs and gate verdicts):
 ${context}
@@ -838,8 +877,13 @@ All four merge-gate roles have APPROVED. Open the PR now.
 5. Report: the PR URL, the branch name, and the commit SHA.
 
 Return the PR URL prominently in your response.`,
-        workflow.name,
-      );
+          workflow.name,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(`${RED}${BOLD}release-manager failed to open the PR: ${msg}${RESET}`);
+        console.log(`${DIM}The gate approved; open the PR by hand or re-run the release step.${RESET}`);
+      }
     }
   }
 
@@ -982,12 +1026,13 @@ async function buildCitationReader(source: CitationSource, output: string): Prom
  * each verdict's CITATIONS fragments are verified against the branch via the
  * GitHub Contents API — fabricated fragments downgrade the verdict to REJECT.
  */
-async function runMergeGate(
+export async function runMergeGate(
   runtime: AgentRuntime,
   workflowName: string,
   profile: GateProfile,
   initialContext: string,
   citationSource?: CitationSource | null,
+  runRole: RoleRunner = runRoleSession,
 ): Promise<GateResult> {
   const gateRoles = profile === 'code' ? CODE_GATE_ROLES : DOCS_GATE_ROLES;
   let context = initialContext;
@@ -1001,18 +1046,28 @@ async function runMergeGate(
 
     const verdicts: GateVerdict[] = [];
     for (const role of gateRoles) {
-      const roleOutput = await runRoleSession(
-        runtime,
-        role,
-        `Merge-gate review for ${workflowName}.
+      let roleOutput: string;
+      try {
+        roleOutput = await runRole(
+          runtime,
+          role,
+          `Merge-gate review for ${workflowName}.
 
 Context from the workflow above:
 ${context}
 
 Your task:
 Review the PR candidate against your role's merge-gate criteria per FACTORY_PREAMBLE. End your response with the full block: GATE_VERDICT, GATE_FEEDBACK, TRANSCRIPTS, CITATIONS, QUALITY_GRADES — EVIDENCE_CONTRACT auto-downgrades APPROVE/REQUEST_CHANGES without transcripts + citations to REJECT.`,
-        workflowName,
-      );
+          workflowName,
+        );
+      } catch (err) {
+        // A gate role that can't run yields no verdict, which parseGateVerdict
+        // treats as a REJECT — the gate fails safe (never silently approves) and
+        // the workflow keeps going instead of crashing.
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(`${RED}Gate role ${role} failed: ${msg} — recording no verdict (fails safe)${RESET}`);
+        roleOutput = roleSessionGap(role, err);
+      }
       const readFile = citationSource ? await buildCitationReader(citationSource, roleOutput) : undefined;
       verdicts.push(parseGateVerdict(role, roleOutput, readFile ? { readFile } : undefined));
     }
@@ -1027,7 +1082,7 @@ Review the PR candidate against your role's merge-gate criteria per FACTORY_PREA
       let external: Record<string, Grade> | undefined;
       let drift: GradeDrift | undefined;
       if (profile === 'code') {
-        const calibration = await runExternalCalibration(runtime, workflowName, verdicts, context);
+        const calibration = await runExternalCalibration(runtime, workflowName, verdicts, context, runRole);
         if (calibration) {
           external = calibration.external;
           drift = calibration.drift;
@@ -1119,21 +1174,31 @@ async function runExternalCalibration(
   workflowName: string,
   internalVerdicts: GateVerdict[],
   context: string,
+  runRole: RoleRunner = runRoleSession,
 ): Promise<CalibrationResult | null> {
   console.log(`${CYAN}── External-reviewer calibration ──${RESET}\n`);
 
-  const output = await runRoleSession(
-    runtime,
-    'external-reviewer',
-    `Cold-context calibration review for ${workflowName}.
+  let output: string;
+  try {
+    output = await runRole(
+      runtime,
+      'external-reviewer',
+      `Cold-context calibration review for ${workflowName}.
 
 Context (intake brief + feature branch reference — internal gate verdicts intentionally omitted):
 ${context}
 
 Your task:
 Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_GRADES block with all 9 dimensions (N/A where a dimension doesn't apply). Include per-dimension key findings with file:line CITATIONS. Do not emit GATE_VERDICT — you are advisory.`,
-    workflowName,
-  );
+      workflowName,
+    );
+  } catch (err) {
+    // Calibration is advisory; a failed session fails open (skip it) rather than
+    // block an already-approved gate.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`${YELLOW}External-reviewer calibration failed: ${msg} — skipping calibration${RESET}`);
+    return null;
+  }
 
   const externalGrades = parseQualityGrades(output);
   if (Object.keys(externalGrades).length === 0) {
@@ -1208,6 +1273,17 @@ async function sendAndStream(session: AgentSession, message: string): Promise<st
  * advisor budget apply — and cold sessions are naturally cold for the
  * external-reviewer calibration step.
  */
+/**
+ * Marker recorded in place of a role's output when its session fails. The run
+ * degrades to a visible gap instead of aborting: a failed producer leaves its
+ * slot annotated, a failed gate role surfaces no verdict and fails safe, and the
+ * revision loop can re-run the batch.
+ */
+function roleSessionGap(role: TeamRole, err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  return `[ROLE SESSION FAILED: ${role} — ${msg}]`;
+}
+
 async function runRoleSession(
   runtime: AgentRuntime,
   role: TeamRole,
