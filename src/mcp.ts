@@ -14,12 +14,12 @@ interface McpServerDef {
   headers?: Record<string, string>;
 }
 
-// ── Gateway helpers (mcp-gateway — /mcp/{service} routes) ──────
+// ── Gateway helpers (switchboard — /mcp/{service} routes) ──────
 //
-// The mcp-gateway deployment (protohype/mcp-gateway) hosts MCP services
-// behind a single API Gateway at /mcp/{service}/{proxy+} with a shared
-// bearer token authorizer. Switchboard services: hubspot, gdrive, analytics,
-// gcal, gcse, stripe.
+// The switchboard services (hubspot, gdrive, analytics, gcal, gcse, stripe) are
+// reached through an HTTP MCP gateway the operator runs: one endpoint fronting
+// all of them at /mcp/{service} behind a shared bearer-token authorizer. fab
+// doesn't ship the gateway — MCP_GATEWAY_BASE_URL points at the operator's.
 //
 // Auth: the gateway bearer lives in the vault as one static_bearer credential
 // per gateway URL. The managed-agents runtime injects the Authorization header
@@ -77,7 +77,7 @@ const REGISTRY: Record<string, McpServerDef> = {
     defaultUrl: 'https://mcp.hunter.io/mcp',
     envOverride: 'MCP_HUNTER_URL',
   },
-  // ── mcp-gateway switchboard ────────────────────────────────────
+  // ── switchboard (gateway-hosted) ───────────────────────────────
   // Routes at /mcp/{service} with Authorization: Bearer <token>.
   hubspot: {
     name: 'hubspot',
@@ -230,7 +230,7 @@ export function resolveMcpServers(serverNames: string[]): { servers: McpServer[]
 // {type:'http', url, headers} map. Built once here so the gateway-bearer
 // injection can't drift between the two transports.
 
-/** Servers that route through the mcp-gateway and need the shared bearer token. */
+/** Servers that route through the switchboard gateway and need the shared bearer token. */
 const GATEWAY_HOSTED: ReadonlySet<string> = new Set(['hubspot', 'gdrive', 'analytics', 'gcalendar', 'gcse', 'stripe']);
 
 /** An HTTP MCP server config — accepted by both Claude Code's `--mcp-config` and the Agent SDK's `mcpServers`. */

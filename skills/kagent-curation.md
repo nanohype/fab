@@ -72,7 +72,7 @@ kind: AgentTool
 metadata: { name: github-mcp, namespace: marshal }
 spec:
   kind: mcp
-  endpoint: http://mcp-gateway.shared:8080/mcp/github
+  endpoint: https://api.githubcopilot.com/mcp/
   auth:
     type: vault
     vaultRef: { name: github-vault, key: token }

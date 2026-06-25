@@ -30,16 +30,14 @@ npm run build
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-If you'll use any switchboard service (HubSpot, Drive, Calendar, Analytics, CSE, Stripe), the semantic memory server, or the cost dashboard, also point at the `mcp-gateway` deployment in protohype:
+The switchboard services (HubSpot, Drive, Calendar, Analytics, CSE, Stripe) route through an HTTP MCP gateway you operate — one endpoint fronting those services behind a shared bearer token. fab doesn't ship the gateway; if you run one, point fab at it:
 
 ```sh
-export MCP_GATEWAY_BASE_URL=https://<api-id>.execute-api.us-west-2.amazonaws.com
-export MCP_GATEWAY_TOKEN=$(aws secretsmanager get-secret-value \
-  --secret-id /mcp-gateway/gateway-bearer-token \
-  --query SecretString --output text)
+export MCP_GATEWAY_BASE_URL=https://<your-gateway-host>
+export MCP_GATEWAY_TOKEN=<shared-bearer-token>
 ```
 
-The vault holds per-agent credentials that the gateway injects at session creation time:
+Without these, the switchboard services are skipped. The third-party servers (GitHub, Linear, Slack, Notion, Sentry, Figma, Hunter) hit their public endpoints directly and need no gateway. The vault holds per-agent credentials that the gateway injects at session creation time:
 
 ```sh
 fab vault setup            # walks through credential capture
