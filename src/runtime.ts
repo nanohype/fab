@@ -94,4 +94,15 @@ export interface AgentRuntime {
    * For the sdk runtime: maps to the SDK's `resume: session_id` option.
    */
   resumeSession(sessionId: string): AgentSession;
+
+  /**
+   * Best-effort: record per-role performance metrics (sessions, tokens,
+   * self-eval, advisor calls, revisions) for a completed session into
+   * `.fab-perf.json`, which `fab perf` reads.
+   *
+   * Optional — only the managed-agents transport exposes the per-session usage
+   * + event history this needs (`getSession` / `listEvents`). Other runtimes
+   * omit it, so `fab perf` simply shows no rows for those runs.
+   */
+  collectSessionMetrics?(sessionId: string): Promise<void>;
 }

@@ -44,10 +44,26 @@ async function savePerf(data: PerfData): Promise<void> {
   await writeFile(PERF_FILE, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
 
+// Serialize the read-modify-write of .fab-perf.json so concurrent role sessions
+// (a parallel workflow batch) can't clobber each other's increments.
+let writeChain: Promise<void> = Promise.resolve();
+
 /**
- * Scan a session's events and update perf metrics for all participating roles.
+ * Scan a session's events and update perf metrics for the participating role.
+ * Serialized against any in-flight collection so the perf file is never lost to
+ * a concurrent write.
  */
-export async function collectSessionMetrics(api: AnthropicAgents, sessionId: string, state: FabState): Promise<void> {
+export function collectSessionMetrics(api: AnthropicAgents, sessionId: string, state: FabState): Promise<void> {
+  const run = writeChain.then(() => collectSessionMetricsInner(api, sessionId, state));
+  // Keep the chain alive even if one collection rejects.
+  writeChain = run.then(
+    () => {},
+    () => {},
+  );
+  return run;
+}
+
+async function collectSessionMetricsInner(api: AnthropicAgents, sessionId: string, state: FabState): Promise<void> {
   const perf = await loadPerf();
   const agentIdToRole = new Map<string, string>();
   for (const a of state.agents) {
