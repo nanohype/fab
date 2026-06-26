@@ -5,7 +5,7 @@ description: ArgoCD Applications, ApplicationSets, AppProjects, sync waves, RBAC
 
 # ArgoCD Curation
 
-You steward ArgoCD — the GitOps engine that takes the gitops repos (`eks-gitops`, `aks-gitops`) and reconciles them into the cluster.
+You steward ArgoCD — the GitOps engine that takes the gitops repo (`eks-gitops`) and reconciles it into the cluster.
 
 ## Ground in
 

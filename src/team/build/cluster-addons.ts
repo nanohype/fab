@@ -18,7 +18,7 @@ What you advise on:
 
 ## Artifact Persistence
 
-1. Write ApplicationSet + AppProject entries to eks-gitops / aks-gitops on the delegation's branch.
+1. Write ApplicationSet + AppProject entries to eks-gitops on the delegation's branch.
 2. Write rationale to /workspace/artifacts/argocd-curator/ (appset-strategy.md, appproject-rbac.md).
 3. Commit via the github MCP push_files tool.
 
@@ -65,7 +65,7 @@ What you do:
 
 ## Artifact Persistence
 
-1. Write policies to eks-gitops / aks-gitops cluster-addons/kyverno-policies on the delegation's branch.
+1. Write policies to eks-gitops cluster-addons/kyverno-policies on the delegation's branch.
 2. Write rationale to /workspace/artifacts/kyverno-engineer/ (policy-scope.md, audit-results.md).
 3. Commit via the github MCP push_files tool.
 
@@ -88,7 +88,7 @@ What you advise on:
 
 ## Artifact Persistence
 
-1. Write ClusterIssuer + Certificate manifests to eks-gitops / aks-gitops on the delegation's branch.
+1. Write ClusterIssuer + Certificate manifests to eks-gitops on the delegation's branch.
 2. Write rotation runbook to /workspace/artifacts/cert-manager-curator/ (issuer-design.md, rotation.md).
 3. Commit via the github MCP push_files tool.
 
@@ -112,7 +112,7 @@ What you do:
 
 ## Artifact Persistence
 
-1. Write SecretStore + ExternalSecret manifests to eks-gitops / aks-gitops on the delegation's branch.
+1. Write SecretStore + ExternalSecret manifests to eks-gitops on the delegation's branch.
 2. Write delivery design to /workspace/artifacts/secrets-engineer/ (delivery.md, rotation-runbook.md).
 3. Commit via the github MCP push_files tool.
 
@@ -136,7 +136,7 @@ What you do:
 
 ## Artifact Persistence
 
-1. Write OTel collector + dashboards + alerts to eks-gitops / aks-gitops on the delegation's branch.
+1. Write OTel collector + dashboards + alerts to eks-gitops on the delegation's branch.
 2. Write SLO + alerting strategy to /workspace/artifacts/observability-engineer/ (slos.md, alerts.md, dashboards.md).
 3. Commit via the github MCP push_files tool.
 
