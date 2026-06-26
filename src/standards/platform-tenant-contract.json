@@ -36,7 +36,7 @@
       },
       {
         "path": "<app>/gitops/applicationset-entry.yaml",
-        "description": "ApplicationSet entry to be registered with `nanohype/eks-gitops` or `nanohype/aks-gitops`."
+        "description": "ApplicationSet entry to be registered with `nanohype/eks-gitops`."
       },
       {
         "path": "<app>/platform.yaml",
@@ -97,7 +97,7 @@
     "do_not": [
       "Do NOT scaffold IAM roles inside the chart. The IRSA role is provisioned by the corresponding landing-zone <app>-platform component; the chart's ServiceAccount annotates with its ARN via `aws.platformRoleArn`.",
       "Do NOT add cloud-substrate tofu (VPCs, base IAM, KMS keys) inside the app. Substrate lives in `nanohype/landing-zone` as a per-app `<app>-platform` component.",
-      "Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability stack). Those are gitops-repo concerns in `nanohype/eks-gitops` or `aks-gitops`.",
+      "Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability stack). Those are gitops-repo concerns in `nanohype/eks-gitops`.",
       "Do NOT skip per-env `values-{dev,staging,production}.yaml` — every chart has three deltas even if some are empty.",
       "Do NOT hardcode AWS account IDs, region names, or KMS key ARNs in chart values. Per-env values plumb them in from landing-zone outputs at deploy time."
     ]

@@ -213,13 +213,13 @@ The factory ships k8s-native by default. Every app lands as a Platform tenant un
 **Default path (deploy_target: k8s)** — Helm chart + ApplicationSet entry + Platform CR. See PLATFORM_TENANT_CONTRACT for the shape contract.
 
 - Application chart in \`<app>/chart/\` (Helm, with per-env values files)
-- ApplicationSet entry registered with \`nanohype/eks-gitops\` (EKS) or \`nanohype/aks-gitops\` (AKS)
+- ApplicationSet entry registered with \`nanohype/eks-gitops\`
 - \`Platform\` CR (\`platform.nanohype.dev/v1alpha1\`) declaring the tenant boundary; the eks-agent-platform operator reconciles Namespace, ResourceQuota, NetworkPolicy, IRSA, S3 + KMS grants
 - Optional \`AgentFleet\` CR (\`agents.nanohype.dev/v1alpha1\`, AI workloads) composing kagent + KEDA
 
 **Cloud substrate** (shared, slow-moving) — OpenTofu/Terragrunt against \`nanohype/landing-zone\`. VPC, base IAM, KMS keys, cost pipeline, EventBridge buses, Bedrock guardrail templates, WAF. Per-app substrate gaps land as new \`landing-zone\` components, NOT in-app tofu.
 
-**Cluster addons** (shared, slow-moving) — \`nanohype/eks-gitops\` / \`nanohype/aks-gitops\`. cert-manager, external-secrets, ingress controllers, observability, Kyverno policies. New addons land in the gitops repo, NOT in-app charts.
+**Cluster addons** (shared, slow-moving) — \`nanohype/eks-gitops\`. cert-manager, external-secrets, ingress controllers, observability, Kyverno policies. New addons land in the gitops repo, NOT in-app charts.
 
 **Escape hatches** (opt-in, require architecture-artifact justification):
 
@@ -257,7 +257,7 @@ Every k8s-native factory deliverable lands as a Platform tenant — a self-conta
       networkpolicy.yaml           # default-deny + explicit egress allow-list
       <other resources>            # cronjob, ingress, hpa, etc. as needed
   gitops/
-    applicationset-entry.yaml      # entry for nanohype/eks-gitops or nanohype/aks-gitops
+    applicationset-entry.yaml      # entry for nanohype/eks-gitops
   platform.yaml                    # Platform CR (platform.nanohype.dev/v1alpha1)
 \`\`\`
 

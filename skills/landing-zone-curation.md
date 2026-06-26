@@ -12,7 +12,7 @@ You steward the `landing-zone` repo. The substrate layer: slow-moving cloud infr
 Read `nanohype/CLAUDE.md` for the org-level boundary. Quick reference:
 
 - **landing-zone** — VPC, base IAM, KMS, EKS cluster control plane, cost pipeline, EventBridge buses, WAF. OpenTofu + Terragrunt only.
-- **eks-gitops / aks-gitops** — Cluster addons (cert-manager, external-secrets, Kyverno, observability stack). ArgoCD ApplicationSets.
+- **eks-gitops** — Cluster addons (cert-manager, external-secrets, Kyverno, observability stack). ArgoCD ApplicationSets.
 - **eks-agent-platform** — The Go operator that reconciles Platform CRs into per-tenant IRSA, ResourceQuota, NetworkPolicy, AppProject.
 - **protohype/\<app\>/** — Application Helm chart + Platform CR. App-level work.
 
