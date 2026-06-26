@@ -1295,11 +1295,20 @@ async function runRoleSession(
   // SdkRuntime builds the system prompt inline).
   const entry = await getAgentByRole(role);
   const session = await runtime.runRoleSession(role, message, { title: `${workflowName}: ${role}` });
-  return streamSessionWithAdvisor(session, {
+  const output = await streamSessionWithAdvisor(session, {
     agentId: entry?.agentId ?? `sdk:${role}`,
     agentRole: role,
     workflow: workflowName,
   });
+  // Best-effort per-role perf metrics — managed-agents only (a no-op on the
+  // other transports). A metrics write must never break the role session.
+  try {
+    await runtime.collectSessionMetrics?.(session.id);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`${DIM}Perf metrics not recorded for ${role} (${msg}).${RESET}`);
+  }
+  return output;
 }
 
 /**

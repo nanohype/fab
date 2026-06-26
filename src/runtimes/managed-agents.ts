@@ -1,7 +1,8 @@
 import type { AnthropicAgents } from '../api.js';
 import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
 import type { AgentEvent, SessionResource, TeamRole, UserEvent } from '../types.js';
-import { getAgentByRole, getEnvironmentId, getMemoryResource, getRepos, getVaultIds } from '../state.js';
+import { getAgentByRole, getEnvironmentId, getMemoryResource, getRepos, getVaultIds, loadState } from '../state.js';
+import { collectSessionMetrics } from '../perf.js';
 
 /**
  * Agent runtime implementation against the Anthropic Managed Agents REST API.
@@ -52,6 +53,17 @@ export class ManagedAgentsRuntime implements AgentRuntime {
 
   resumeSession(sessionId: string): AgentSession {
     return new ManagedAgentSession(this.api, sessionId);
+  }
+
+  /**
+   * The managed-agents transport exposes the per-session usage + event history
+   * (`getSession` / `listEvents`) that the per-role perf table needs. Loads the
+   * workspace state to map the session's agent back to its role, then folds the
+   * session into `.fab-perf.json`.
+   */
+  async collectSessionMetrics(sessionId: string): Promise<void> {
+    const state = await loadState();
+    await collectSessionMetrics(this.api, sessionId, state);
   }
 }
 
