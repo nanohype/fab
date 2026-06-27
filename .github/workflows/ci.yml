@@ -24,6 +24,9 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+      # The factory enforces build/lint/test/docs as four distinct phases that
+      # exit 0 — eat our own dogfood and generate the SDK API docs here too.
+      - run: npm run docs
 
   docker:
     runs-on: ubuntu-latest
