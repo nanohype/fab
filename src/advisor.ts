@@ -99,6 +99,9 @@ export async function callAdvisor(
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
+    // Bound the advisor (Opus) completion generously — a hung call here stalls
+    // the streamSessionWithAdvisor loop holding the session.
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {

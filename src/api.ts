@@ -107,6 +107,7 @@ export class AnthropicAgents {
       method: 'POST',
       headers: headersWithoutCT,
       body: form,
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {
@@ -129,6 +130,7 @@ export class AnthropicAgents {
       method: 'POST',
       headers: headersWithoutCT,
       body: versionForm,
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!vRes.ok) {
@@ -154,6 +156,7 @@ export class AnthropicAgents {
       method: 'POST',
       headers: headersWithoutCT,
       body: form,
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {
@@ -347,7 +350,9 @@ export class AnthropicAgents {
           const body = await res.text();
           const status = res.status;
           if ((status === 429 || status >= 500) && attempt < maxRetries) {
-            const delay = Math.min(1000 * 2 ** attempt, 10_000);
+            // Equal jitter on the capped exponential backoff so retrying clients
+            // don't reconnect in lockstep (thundering herd).
+            const delay = Math.round(Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5));
             await new Promise((r) => setTimeout(r, delay));
             continue;
           }
@@ -392,7 +397,9 @@ export class AnthropicAgents {
 
         // Network error — retry if attempts remain
         if (attempt < maxRetries) {
-          const delay = Math.min(1000 * 2 ** attempt, 10_000);
+          // Equal jitter on the capped exponential backoff so retrying clients
+          // don't reconnect in lockstep (thundering herd).
+          const delay = Math.round(Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5));
           process.stderr.write(
             `warning: stream disconnected, reconnecting in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...\n`,
           );
@@ -463,7 +470,7 @@ export class AnthropicAgents {
         const status = err instanceof HttpError ? err.status : 0;
         const retryable = status === 429 || status >= 500;
         if (!retryable || attempt === maxRetries) throw err;
-        const delay = Math.min(1000 * 2 ** attempt, 10_000);
+        const delay = Math.round(Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5));
         await new Promise((r) => setTimeout(r, delay));
       }
     }

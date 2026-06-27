@@ -10,3 +10,4 @@ service-account.json
 *.pem
 *.key
 .DS_Store
+docs/api/
