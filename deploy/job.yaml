@@ -32,8 +32,12 @@ spec:
               value: sdk
             - name: FAB_INFERENCE
               value: bedrock
+            # Load-bearing for bedrock: roles resolve to this region's
+            # cross-region inference profile (e.g. us-west-2 -> us.anthropic.*).
+            # Set it to where your Bedrock model access + cluster live, in a
+            # region the profiles cover (us-*, eu-*, ap-*, us-gov-*).
             - name: AWS_REGION
-              value: us-east-1
+              value: us-west-2
             - name: FAB_STATE_FILE
               value: /work/.fab-state.json
             # FAB_INFERENCE=bedrock authenticates via IRSA. The advisor

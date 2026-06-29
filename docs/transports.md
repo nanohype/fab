@@ -86,7 +86,7 @@ export AWS_REGION=us-east-1
 fab workflow feature-build '<intake-json>'
 ```
 
-Under `bedrock` the `sdk` runtime sets `CLAUDE_CODE_USE_BEDROCK` for the Agent SDK and resolves AWS credentials through the standard chain — environment variables, shared config, IRSA, or instance role. Role model ids map to their Bedrock equivalents automatically (`claude-sonnet-4-6` → `anthropic.claude-sonnet-4-6`); a role pointed at a full Bedrock id, including a cross-region inference-profile id, passes through untouched. The AWS account must have [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) granted for the Claude models in use.
+Under `bedrock` the `sdk` runtime sets `CLAUDE_CODE_USE_BEDROCK` for the Agent SDK and resolves AWS credentials through the standard chain — environment variables, shared config, IRSA, or EKS Pod Identity. Role model ids map to the calling region's **cross-region inference-profile id** automatically (`claude-sonnet-4-6` in `us-west-2` → `us.anthropic.claude-sonnet-4-6`; the geo prefix is `us.`/`eu.`/`apac.`/`us-gov.` per the region) — the current Claude models are served *only* through these profiles, so `AWS_REGION` is load-bearing for the model id itself, not just for routing. A role pointed at a full Bedrock id — a bare `anthropic.` id or a `<geo>.anthropic.` profile id — passes through untouched. The AWS account must have [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) granted for the Claude models in use, and `AWS_REGION` set to a region the profiles cover (`us-*`, `eu-*`, `ap-*`, `us-gov-*`).
 
 ```sh
 export FAB_RUNTIME=sdk

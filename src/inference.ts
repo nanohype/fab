@@ -36,13 +36,16 @@ export function resolveInferenceBackend(): InferenceBackend {
 }
 
 /**
- * fab's canonical model ids -> AWS Bedrock model ids.
+ * fab's canonical model ids -> the AWS Bedrock base id.
  *
- * Roles declare canonical Anthropic ids (`claude-sonnet-4-6`); the
- * Anthropic API accepts those directly, but Bedrock requires its own
- * `anthropic.`-prefixed ids. Values are the "AWS Bedrock ID" column of the
- * Claude models overview — https://platform.claude.com/docs/en/about-claude/models/overview —
- * pinned snapshots that turn over between model generations.
+ * Roles declare canonical Anthropic ids (`claude-sonnet-4-6`); the Anthropic
+ * API accepts those directly, but Bedrock requires its own `anthropic.`-prefixed
+ * ids. Values are the "AWS Bedrock ID" column of the Claude models overview —
+ * https://platform.claude.com/docs/en/about-claude/models/overview — pinned
+ * snapshots that turn over between model generations. `resolveModelId` prefixes
+ * these with the calling region's cross-region inference-profile geography
+ * (`us.` / `eu.` / `apac.`) at resolve time, so the values here are the
+ * un-prefixed base ids.
  */
 const BEDROCK_MODEL_IDS: Readonly<Record<string, string>> = {
   'claude-opus-4-8': 'anthropic.claude-opus-4-8',
@@ -52,21 +55,50 @@ const BEDROCK_MODEL_IDS: Readonly<Record<string, string>> = {
   'claude-haiku-4-5': 'anthropic.claude-haiku-4-5-20251001-v1:0',
 };
 
-/** A Bedrock model id, optionally carrying a cross-region inference-profile prefix (`us.`, `eu.`, ...). */
+/** A Bedrock model id, optionally carrying a cross-region inference-profile geo prefix (`us.`, `eu.`, `apac.`, `us-gov.`). */
 function isBedrockModelId(model: string): boolean {
-  return /^(?:[a-z]{2}\.)?anthropic\./.test(model);
+  return /^(?:(?:us|eu|apac|us-gov)\.)?anthropic\./.test(model);
+}
+
+/**
+ * The Bedrock cross-region inference-profile geography for an AWS region.
+ *
+ * Bedrock groups regions into us / eu / apac / us-gov, and a model is invoked
+ * through a `<geo>.`-prefixed profile id. The current Claude models are served
+ * ONLY through these profiles — the bare on-demand id returns "on-demand
+ * throughput isn't supported" — so the bedrock backend resolves to the region's
+ * profile id rather than the base id.
+ */
+function bedrockGeoPrefix(region: string): string {
+  if (region.startsWith('us-gov-')) return 'us-gov';
+  if (region.startsWith('us-')) return 'us';
+  if (region.startsWith('eu-')) return 'eu';
+  if (region.startsWith('ap-')) return 'apac';
+  throw new Error(
+    `No AWS Bedrock cross-region inference-profile geography for region "${region}". ` +
+      `Profiles cover us-*, eu-*, ap-*, and us-gov-* regions — set AWS_REGION to one of those, ` +
+      `or set the role's model to a full inference-profile id (e.g. us.anthropic.claude-sonnet-4-6).`,
+  );
 }
 
 /**
  * Resolve a role's model id for the active inference backend.
  *
- * `api` passes through — the Anthropic API takes fab's canonical ids
- * directly. `bedrock` maps to the Bedrock id; an id that is already a
- * Bedrock id (e.g. a cross-region inference-profile id set straight on a
- * role) passes through untouched. An unmapped model fails fast rather than
- * sending an id Bedrock will reject.
+ * `api` and `anthropic-aws` pass through — both take fab's canonical ids
+ * directly. `bedrock` maps the canonical id to its Bedrock base id AND prefixes
+ * it with the calling region's cross-region inference-profile geography
+ * (`claude-sonnet-4-6` + `us-west-2` -> `us.anthropic.claude-sonnet-4-6`),
+ * because the current Claude models are invoked only through those profiles. An
+ * id that is already a Bedrock id — a bare `anthropic.` id or a full
+ * `<geo>.anthropic.` profile id set straight on a role — passes through
+ * untouched. An unmapped model, or a missing/unsupported region, fails fast
+ * rather than sending an id Bedrock will reject.
  */
-export function resolveModelId(model: string, backend: InferenceBackend): string {
+export function resolveModelId(
+  model: string,
+  backend: InferenceBackend,
+  region: string = (process.env.AWS_REGION ?? '').trim(),
+): string {
   if (backend !== 'bedrock') return model;
   if (isBedrockModelId(model)) return model;
   const bedrockId = BEDROCK_MODEL_IDS[model];
@@ -77,7 +109,13 @@ export function resolveModelId(model: string, backend: InferenceBackend): string
         `Add the mapping to BEDROCK_MODEL_IDS in src/inference.ts, or set the role's model to a full Bedrock id.`,
     );
   }
-  return bedrockId;
+  if (!region) {
+    throw new Error(
+      `FAB_INFERENCE=bedrock needs AWS_REGION set to resolve "${model}" to a cross-region ` +
+        `inference-profile id. Set AWS_REGION (e.g. us-west-2), or set the role's model to a full profile id.`,
+    );
+  }
+  return `${bedrockGeoPrefix(region)}.${bedrockId}`;
 }
 
 /**

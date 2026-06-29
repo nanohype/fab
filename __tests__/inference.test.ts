@@ -51,21 +51,47 @@ describe('model id resolution', () => {
     expect(resolveModelId('claude-opus-4-6', 'api')).toBe('claude-opus-4-6');
   });
 
-  it('maps canonical ids to Bedrock ids for the bedrock backend', () => {
-    expect(resolveModelId('claude-sonnet-4-6', 'bedrock')).toBe('anthropic.claude-sonnet-4-6');
-    expect(resolveModelId('claude-opus-4-8', 'bedrock')).toBe('anthropic.claude-opus-4-8');
-    expect(resolveModelId('claude-opus-4-7', 'bedrock')).toBe('anthropic.claude-opus-4-7');
-    expect(resolveModelId('claude-opus-4-6', 'bedrock')).toBe('anthropic.claude-opus-4-6-v1');
-    expect(resolveModelId('claude-haiku-4-5', 'bedrock')).toBe('anthropic.claude-haiku-4-5-20251001-v1:0');
+  it("maps canonical ids to the calling region's Bedrock inference-profile id", () => {
+    expect(resolveModelId('claude-sonnet-4-6', 'bedrock', 'us-west-2')).toBe('us.anthropic.claude-sonnet-4-6');
+    expect(resolveModelId('claude-opus-4-8', 'bedrock', 'us-east-1')).toBe('us.anthropic.claude-opus-4-8');
+    expect(resolveModelId('claude-opus-4-6', 'bedrock', 'eu-west-1')).toBe('eu.anthropic.claude-opus-4-6-v1');
+    expect(resolveModelId('claude-haiku-4-5', 'bedrock', 'ap-southeast-1')).toBe(
+      'apac.anthropic.claude-haiku-4-5-20251001-v1:0',
+    );
+    expect(resolveModelId('claude-opus-4-7', 'bedrock', 'us-gov-west-1')).toBe('us-gov.anthropic.claude-opus-4-7');
   });
 
-  it('passes an already-Bedrock id through unchanged on the bedrock backend', () => {
-    expect(resolveModelId('anthropic.claude-opus-4-7', 'bedrock')).toBe('anthropic.claude-opus-4-7');
+  it('reads AWS_REGION when no region arg is passed', () => {
+    const saved = process.env.AWS_REGION;
+    process.env.AWS_REGION = 'us-west-2';
+    try {
+      expect(resolveModelId('claude-sonnet-4-6', 'bedrock')).toBe('us.anthropic.claude-sonnet-4-6');
+    } finally {
+      if (saved === undefined) delete process.env.AWS_REGION;
+      else process.env.AWS_REGION = saved;
+    }
   });
 
-  it('passes a cross-region inference-profile id through unchanged', () => {
-    expect(resolveModelId('us.anthropic.claude-sonnet-4-6', 'bedrock')).toBe('us.anthropic.claude-sonnet-4-6');
-    expect(resolveModelId('eu.anthropic.claude-opus-4-7', 'bedrock')).toBe('eu.anthropic.claude-opus-4-7');
+  it('fails fast when no region is set for a canonical id on bedrock', () => {
+    expect(() => resolveModelId('claude-sonnet-4-6', 'bedrock', '')).toThrow(/AWS_REGION/);
+  });
+
+  it('fails fast on a region with no Bedrock inference-profile geography', () => {
+    expect(() => resolveModelId('claude-sonnet-4-6', 'bedrock', 'sa-east-1')).toThrow(/geography/);
+  });
+
+  it('passes an already-Bedrock id through unchanged on the bedrock backend (no region needed)', () => {
+    expect(resolveModelId('anthropic.claude-opus-4-7', 'bedrock', '')).toBe('anthropic.claude-opus-4-7');
+  });
+
+  it('passes a full cross-region inference-profile id through unchanged, any geo', () => {
+    expect(resolveModelId('us.anthropic.claude-sonnet-4-6', 'bedrock', 'us-west-2')).toBe(
+      'us.anthropic.claude-sonnet-4-6',
+    );
+    expect(resolveModelId('eu.anthropic.claude-opus-4-7', 'bedrock', 'eu-west-1')).toBe('eu.anthropic.claude-opus-4-7');
+    expect(resolveModelId('apac.anthropic.claude-haiku-4-5-20251001-v1:0', 'bedrock', 'ap-south-1')).toBe(
+      'apac.anthropic.claude-haiku-4-5-20251001-v1:0',
+    );
   });
 
   it('fails fast on a model with no Bedrock mapping', () => {
