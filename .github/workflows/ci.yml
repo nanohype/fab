@@ -33,6 +33,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -59,6 +60,7 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
       - name: Build (and push on main / tags)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -66,3 +68,22 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      # Keyless cosign signature + SBOM attestation on the pushed multi-arch
+      # image, by digest (immutable, covers the manifest list). Push-only — PRs
+      # build but never publish, so there's nothing to sign. Matches the
+      # eks-agent-platform operator release so cluster verify-images policies
+      # (Kyverno) accept the fab image too.
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v3
+      - name: Install syft
+        if: github.event_name == 'push'
+        uses: anchore/sbom-action/download-syft@v0
+      - name: Sign + SBOM-attest the image (keyless, by digest)
+        if: github.event_name == 'push'
+        env:
+          IMAGE_DIGEST: ghcr.io/nanohype/fab@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "${IMAGE_DIGEST}"
+          syft "${IMAGE_DIGEST}" -o spdx-json > sbom.spdx.json
+          cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE_DIGEST}"
