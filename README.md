@@ -109,7 +109,7 @@ kubectl apply -f deploy/serviceaccount.yaml
 kubectl apply -f deploy/job.yaml
 ```
 
-The IRSA role is an AWS resource: provision it in your cloud-infra layer with `bedrock:InvokeModel` permission on the Claude models you use, and put its ARN in `deploy/serviceaccount.yaml`. See [`docs/transports.md`](docs/transports.md#inference-backend) for the inference backend.
+The IRSA role is an AWS resource: provision it in your cloud-infra layer with `bedrock:InvokeModel` permission on the Claude models you use, and put its ARN in `deploy/serviceaccount.yaml`. See [`docs/transports.md`](docs/transports.md#inference-backend) for the inference backend, and [`docs/runbook.md`](docs/runbook.md) for the operator guide — state seeding, cost controls, log retrieval, and what the common failure modes look like.
 
 That path runs every role-session in one fab pod. For per-session pod isolation, see below.
 
@@ -138,7 +138,7 @@ fab memory                                 # company memory (MCP-backed)
 fab journal                                # per-agent journals
 fab repo add https://github.com/org/repo --branch main --token <pat>
 fab model set <role> <model-id>
-fab budget set <usd>                       # per-session advisor budget
+fab budget set <usd>                       # per-session cost kill-switch (see docs/runbook.md)
 ```
 
 ## Sprint mode

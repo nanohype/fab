@@ -3,25 +3,31 @@ import type { AgentEvent, GitRepoResource, TeamRole, UserEvent } from './types.j
 /**
  * Transport-agnostic agent runtime.
  *
- * Fab supports two transports:
+ * Fab ships four transports, picked via `FAB_RUNTIME` (see
+ * `src/runtimes/index.ts` and `docs/transports.md`):
  *
- *   - **ManagedAgentsRuntime** — the Anthropic Managed Agents REST API. Agents
- *     are deployed cloud-side, sessions persist on Anthropic's infrastructure,
- *     multiagent coordination runs natively via the `multiagent: { type:
- *     "coordinator" }` agent config.
- *   - **SdkRuntime** — the Claude Agent SDK in-process. Sessions live in
- *     fab's process; subagents use the SDK's Task surface.
+ *   - **ManagedAgentsRuntime** (`managed-agents`, default) — the Anthropic
+ *     Managed Agents REST API. Agents are deployed cloud-side; sessions
+ *     persist on Anthropic's infrastructure.
+ *   - **SdkRuntime** (`sdk`) — the Claude Agent SDK in-process. Sessions live
+ *     in fab's process; the inference seam (`src/inference.ts`) can point it
+ *     at Bedrock or Claude Platform on AWS.
+ *   - **SdkK8sRuntime** (`sdk-k8s`) — dispatches each role-session as its own
+ *     isolated pod on the eks-agent-platform substrate; the pod runs the
+ *     unmodified `sdk` loop via `fab role-session`.
+ *   - **ClaudeCliRuntime** (`claude-cli`) — drives a `claude -p` subprocess
+ *     per role session (subscription-billable via an existing Claude Code
+ *     login).
  *
- * Both transports expose the same `AgentSession` shape: events flow out via an
+ * All four expose the same `AgentSession` shape: events flow out via an
  * async iterable; follow-up inputs (tool confirmations, custom tool results,
  * interrupts) flow in via `sendInput`. The workflow layer in `workflows.ts`
  * doesn't know which transport it's running on.
  *
- * One coordinator session caps at 20 unique agents in its roster and 25
- * concurrent threads per [the Managed Agents multiagent docs](https://platform.claude.com/docs/en/managed-agents/multi-agent).
- * Hierarchical coordinators (coordinator-of-coordinators) are not supported —
- * the workflow layer in `workflows.ts` does top-level routing across multiple
- * coordinator sessions instead.
+ * There is no coordinator agent on any transport — Managed Agents caps a
+ * multiagent roster at 20 unique agents and does not nest coordinators, so
+ * each role runs in its own session and workflow code in `workflows.ts`
+ * routes between sessions.
  */
 
 /**

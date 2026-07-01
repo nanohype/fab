@@ -98,11 +98,12 @@ Optional per-server URL overrides: `MCP_GITHUB_URL`, `MCP_LINEAR_URL`, `MCP_SLAC
 npm install
 npm run build        # tsc
 npm test             # vitest
+npm run test:coverage # vitest + v8 coverage floors (vitest.config.ts thresholds)
 npm run lint         # tsc --noEmit + eslint
 npm run format:check # prettier
 ```
 
-`Dockerfile` builds a runtime image (entrypoint `node dist/bin/fab.js`); `deploy/` holds example k8s manifests for running workflows as Jobs with Bedrock inference via an IRSA ServiceAccount. CI builds the image on every PR.
+`Dockerfile` builds a runtime image (entrypoint `node dist/bin/fab.js`); `deploy/` holds example k8s manifests for running workflows as Jobs with Bedrock inference via an IRSA ServiceAccount — operator guide in [`docs/runbook.md`](docs/runbook.md). CI builds the image on every PR.
 
 ## Style
 
