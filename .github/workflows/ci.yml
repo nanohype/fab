@@ -9,8 +9,71 @@ on:
 permissions:
   contents: read
 
+# The factory's FOUR_PHASE_CONTRACT wants build / lint / test / docs as
+# distinct executable phases that exit 0 from a clean checkout — eat our own
+# dogfood and run each as its own job, plus the format check and the npm
+# audit hard gate. Every job is required; none is advisory.
 jobs:
-  check:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Coverage floors are enforced by vitest.config.ts thresholds — a drop
+      # below the floor fails this job.
+      - run: npm run test:coverage
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run docs
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+
+  # Hard gate: any high-severity advisory in the production dependency tree
+  # fails CI — no allowlist, no continue-on-error.
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,13 +83,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high --omit=dev
-      - run: npm run build
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
-      # The factory enforces build/lint/test/docs as four distinct phases that
-      # exit 0 — eat our own dogfood and generate the SDK API docs here too.
-      - run: npm run docs
 
   docker:
     runs-on: ubuntu-latest
