@@ -1,7 +1,14 @@
 import type { AnthropicAgents } from '../api.js';
 import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
 import type { AgentEvent, SessionResource, TeamRole, UserEvent } from '../types.js';
-import { getAgentByRole, getEnvironmentId, getMemoryResource, getRepos, getVaultIds, loadState } from '../state.js';
+import {
+  getAgentByRole,
+  getEnvironmentId,
+  getMemoryResource,
+  getRepos,
+  getVaultIds,
+  loadState,
+} from '../state.js';
 import { collectSessionMetrics } from '../perf.js';
 
 /**
@@ -20,7 +27,11 @@ import { collectSessionMetrics } from '../perf.js';
 export class ManagedAgentsRuntime implements AgentRuntime {
   constructor(private readonly api: AnthropicAgents) {}
 
-  async runRoleSession(role: TeamRole, message: string, options?: RunRoleOptions): Promise<AgentSession> {
+  async runRoleSession(
+    role: TeamRole,
+    message: string,
+    options?: RunRoleOptions,
+  ): Promise<AgentSession> {
     const entry = await getAgentByRole(role);
     if (!entry) {
       throw new Error(`Role "${role}" is not deployed. Run: fab deploy`);
@@ -105,7 +116,9 @@ class ManagedAgentSession implements AgentSession {
         await this.api.interrupt(this.id);
         return;
       default:
-        throw new Error(`ManagedAgentsRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`);
+        throw new Error(
+          `ManagedAgentsRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`,
+        );
     }
   }
 

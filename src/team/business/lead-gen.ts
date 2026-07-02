@@ -6,7 +6,8 @@ export const LEAD_GEN: TeamMember[] = [
     group: 'firm',
     name: 'Lead Research Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards account research — ICP matching, technographic profiling, intent signals, partner mapping.',
+    description:
+      'Stewards account research — ICP matching, technographic profiling, intent signals, partner mapping.',
     system: `You steward account research. ICP matching, technographic profiling, intent signals.
 
 What you do:
@@ -28,7 +29,8 @@ Report: file paths, HubSpot account IDs.`,
     group: 'firm',
     name: 'Outbound Lead',
     model: 'claude-sonnet-4-6',
-    description: 'Runs cold outreach: email sequences, LinkedIn, multi-touch cadences, partnerships outreach.',
+    description:
+      'Runs cold outreach: email sequences, LinkedIn, multi-touch cadences, partnerships outreach.',
     system: `You run outbound. Cold email, LinkedIn, multi-touch cadences, partnerships.
 
 What you do:
@@ -50,7 +52,8 @@ Report: file paths, HubSpot sequence IDs, meeting bookings.`,
     group: 'firm',
     name: 'Events Lead',
     model: 'claude-sonnet-4-6',
-    description: 'Owns webinars, conferences, dinners, demo days — attendee acquisition + follow-up.',
+    description:
+      'Owns webinars, conferences, dinners, demo days — attendee acquisition + follow-up.',
     system: `You run events. Webinars, conferences, intimate dinners, demo days.
 
 What you do:

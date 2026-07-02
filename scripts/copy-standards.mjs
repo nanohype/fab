@@ -22,12 +22,16 @@ async function main() {
   try {
     entries = await readdir(SRC);
   } catch (err) {
-    throw new Error(`Cannot read vendored standards directory at ${SRC}. Underlying error: ${err.message}`);
+    throw new Error(
+      `Cannot read vendored standards directory at ${SRC}. Underlying error: ${err.message}`,
+    );
   }
 
   const jsonFiles = entries.filter((e) => e.endsWith('.json'));
   if (jsonFiles.length === 0) {
-    throw new Error(`No JSON files found in ${SRC} — refusing to build a package with no bundled standards.`);
+    throw new Error(
+      `No JSON files found in ${SRC} — refusing to build a package with no bundled standards.`,
+    );
   }
 
   await mkdir(DEST, { recursive: true });

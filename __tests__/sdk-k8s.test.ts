@@ -17,7 +17,9 @@ describe('resolveK8sDispatchConfig', () => {
     vi.stubEnv('FAB_K8S_NAMESPACE', undefined);
     vi.stubEnv('FAB_K8S_SESSION_IMAGE', undefined);
     vi.stubEnv('FAB_K8S_PLATFORM', undefined);
-    expect(() => resolveK8sDispatchConfig()).toThrow(/FAB_K8S_NAMESPACE.*FAB_K8S_SESSION_IMAGE.*FAB_K8S_PLATFORM/s);
+    expect(() => resolveK8sDispatchConfig()).toThrow(
+      /FAB_K8S_NAMESPACE.*FAB_K8S_SESSION_IMAGE.*FAB_K8S_PLATFORM/s,
+    );
   });
 
   it('resolves the config when the required env vars are set', () => {
@@ -95,7 +97,10 @@ describe('buildAgentSandboxManifest', () => {
   it('sets runtimeClassName when the config carries one', () => {
     vi.stubEnv('FAB_INFERENCE', undefined);
     vi.stubEnv('AWS_REGION', undefined);
-    const manifest = buildAgentSandboxManifest('go-engineer', 'x', { ...cfg, runtimeClassName: 'gvisor' });
+    const manifest = buildAgentSandboxManifest('go-engineer', 'x', {
+      ...cfg,
+      runtimeClassName: 'gvisor',
+    });
     expect(manifest.spec.runtimeClassName).toBe('gvisor');
   });
 });

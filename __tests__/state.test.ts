@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, unlink } from 'node:fs/promises';
-import { loadState, saveState, clearState, getMemoryResource, setMemoryConfig } from '../src/state.js';
+import {
+  loadState,
+  saveState,
+  clearState,
+  getMemoryResource,
+  setMemoryConfig,
+} from '../src/state.js';
 import type { FabState } from '../src/types.js';
 
 const STATE_FILE = process.env.FAB_STATE_FILE!;

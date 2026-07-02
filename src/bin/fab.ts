@@ -35,11 +35,23 @@ import {
   getBudgetLimit,
   setBudgetLimit,
 } from '../state.js';
-import { getAllSkillDefs, getSkillDef, loadSkillContent, previewSkillContent, resolveNanohypePath } from '../skills.js';
+import {
+  getAllSkillDefs,
+  getSkillDef,
+  loadSkillContent,
+  previewSkillContent,
+  resolveNanohypePath,
+} from '../skills.js';
 import { resolveMcpServers, summarizeToolSurface, HEAVY_TOOL_SURFACE } from '../mcp.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { resolveSandboxMode, environmentConfig } from '../sandbox.js';
-import { getWorkflow, listWorkflows, executeWorkflow, reviseWorkflow, streamWithAdvisor } from '../workflows.js';
+import {
+  getWorkflow,
+  listWorkflows,
+  executeWorkflow,
+  reviseWorkflow,
+  streamWithAdvisor,
+} from '../workflows.js';
 import { resolveRuntimeKind } from '../runtimes/index.js';
 import { executeRoleSession } from '../runtimes/role-session.js';
 import { ADVISOR_TOOL, hasAdvisorAccess } from '../advisor.js';
@@ -87,7 +99,11 @@ function client(): AnthropicAgents {
   return new AnthropicAgents(key);
 }
 
-async function createSession(api: AnthropicAgents, agentId: string, title?: string): Promise<Session> {
+async function createSession(
+  api: AnthropicAgents,
+  agentId: string,
+  title?: string,
+): Promise<Session> {
   const envId = await getEnvironmentId();
   if (!envId) {
     console.error('No environment configured. Run: fab deploy');
@@ -128,7 +144,9 @@ async function deployAgent(
 
   // No existing agent in state — require --allow-create flag
   if (!deployAllowCreate) {
-    console.error(`  ${padRole(role)} NOT FOUND in state — skipping (use --allow-create to create new agents)`);
+    console.error(
+      `  ${padRole(role)} NOT FOUND in state — skipping (use --allow-create to create new agents)`,
+    );
     throw new Error(`Agent ${role} not in state. Use --allow-create to create.`);
   }
   const agent = await api.createAgent(params);
@@ -210,7 +228,8 @@ async function deploy(args: ParsedArgs): Promise<void> {
     if (!exists) {
       const store = await api!.createMemoryStore({
         name: MEMORY_STORE_NAME,
-        description: 'Shared cross-session memory for the fab factory — agents read and write durable learnings here.',
+        description:
+          'Shared cross-session memory for the fab factory — agents read and write durable learnings here.',
       });
       state.memory.storeId = store.id;
       console.log(`  memory store:   ${store.id} (created)\n`);
@@ -256,7 +275,9 @@ async function deploy(args: ParsedArgs): Promise<void> {
           }
         } catch (err) {
           failedSkills.push(role);
-          console.error(`  ${padRole(role)} skill failed: ${err instanceof Error ? err.message : String(err)}`);
+          console.error(
+            `  ${padRole(role)} skill failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
     }
@@ -295,7 +316,9 @@ async function deploy(args: ParsedArgs): Promise<void> {
 
     if (dryRun) {
       const existing = state.agents.find((a) => a.role === member.role);
-      console.log(`${member.role}:${existing ? ` (update ${existing.agentId} v${existing.version})` : ' (create)'}`);
+      console.log(
+        `${member.role}:${existing ? ` (update ${existing.agentId} v${existing.version})` : ' (create)'}`,
+      );
       console.log(JSON.stringify(params, null, 2));
       console.log('');
     } else {
@@ -332,7 +355,9 @@ async function deploy(args: ParsedArgs): Promise<void> {
     );
   }
   if (failedSkills.length > 0) {
-    console.error(`\nWARNING: ${failedSkills.length} skills failed to upload: ${failedSkills.join(', ')}`);
+    console.error(
+      `\nWARNING: ${failedSkills.length} skills failed to upload: ${failedSkills.join(', ')}`,
+    );
     console.error('These agents were deployed without their domain skills.');
     process.exit(1);
   }
@@ -483,7 +508,9 @@ async function listSessions(): Promise<void> {
   const idW = Math.max(10, ...result.data.map((s) => s.id.length));
   console.log(`${'SESSION ID'.padEnd(idW)}  ${'STATUS'.padEnd(12)}  ${'AGENT'.padEnd(20)}  TITLE`);
   for (const s of result.data) {
-    console.log(`${s.id.padEnd(idW)}  ${s.status.padEnd(12)}  ${(s.agent?.name ?? '?').padEnd(20)}  ${s.title ?? ''}`);
+    console.log(
+      `${s.id.padEnd(idW)}  ${s.status.padEnd(12)}  ${(s.agent?.name ?? '?').padEnd(20)}  ${s.title ?? ''}`,
+    );
   }
 }
 
@@ -500,7 +527,9 @@ async function listAgents(): Promise<void> {
   const nameW = Math.max(4, ...result.data.map((a) => a.name.length));
   console.log(`${'AGENT ID'.padEnd(idW)}  ${'NAME'.padEnd(nameW)}  ${'MODEL'.padEnd(20)}  VER`);
   for (const a of result.data) {
-    console.log(`${a.id.padEnd(idW)}  ${a.name.padEnd(nameW)}  ${a.model.id.padEnd(20)}  ${a.version}`);
+    console.log(
+      `${a.id.padEnd(idW)}  ${a.name.padEnd(nameW)}  ${a.model.id.padEnd(20)}  ${a.version}`,
+    );
   }
 }
 
@@ -647,7 +676,11 @@ async function workflow(args: ParsedArgs): Promise<void> {
 
   const onGate = noGates
     ? undefined
-    : async (_step: import('../workflows.js').WorkflowStep, _idx: number, _output: string): Promise<GateResult> => {
+    : async (
+        _step: import('../workflows.js').WorkflowStep,
+        _idx: number,
+        _output: string,
+      ): Promise<GateResult> => {
         const rl = await import('node:readline');
         const iface = rl.createInterface({ input: process.stdin, output: process.stderr });
         return new Promise((resolve) => {
@@ -669,7 +702,11 @@ async function workflow(args: ParsedArgs): Promise<void> {
         });
       };
 
-  await executeWorkflow(client(), sessionId ?? '', wf, enrichedPrompt, { onGate, noGates, sequential });
+  await executeWorkflow(client(), sessionId ?? '', wf, enrichedPrompt, {
+    onGate,
+    noGates,
+    sequential,
+  });
   if (sessionId) console.log(`\nSession: ${sessionId}`);
 }
 
@@ -767,7 +804,9 @@ async function skillsUpload(args: ParsedArgs): Promise<void> {
   const all = !!args.flags.all;
 
   if (!target && !all) {
-    console.error('Usage: fab skills upload <role> [--nanohype-path ...]\n       fab skills upload --all');
+    console.error(
+      'Usage: fab skills upload <role> [--nanohype-path ...]\n       fab skills upload --all',
+    );
     process.exit(1);
   }
 
@@ -878,9 +917,12 @@ async function repo(args: ParsedArgs): Promise<void> {
 
   if (sub === 'add') {
     const url = args.positional[0];
-    const token = typeof args.flags.token === 'string' ? args.flags.token : process.env.GITHUB_TOKEN;
+    const token =
+      typeof args.flags.token === 'string' ? args.flags.token : process.env.GITHUB_TOKEN;
     if (!url || !token) {
-      console.error('Usage: fab repo add <github-url> --token <github-pat> [--branch <branch>] [--path <mount-path>]');
+      console.error(
+        'Usage: fab repo add <github-url> --token <github-pat> [--branch <branch>] [--path <mount-path>]',
+      );
       console.error('Or set GITHUB_TOKEN env var.');
       process.exit(1);
     }
@@ -894,7 +936,9 @@ async function repo(args: ParsedArgs): Promise<void> {
       ...(branch && { checkout: { type: 'branch', name: branch } }),
     };
     await addRepo(resource);
-    console.log(`Added: ${url}${mountPath ? ` → ${mountPath}` : ''}${branch ? ` (${branch})` : ''}`);
+    console.log(
+      `Added: ${url}${mountPath ? ` → ${mountPath}` : ''}${branch ? ` (${branch})` : ''}`,
+    );
   } else if (sub === 'remove') {
     const url = args.positional[0];
     if (!url) {
@@ -961,7 +1005,9 @@ async function vaultSetup(): Promise<void> {
   try {
     envContent = await readFile(envPath, 'utf-8');
   } catch {
-    console.error('No .env.vault.local found. Copy .env.vault to .env.vault.local and fill in your tokens.');
+    console.error(
+      'No .env.vault.local found. Copy .env.vault to .env.vault.local and fill in your tokens.',
+    );
     console.error('See docs/VAULT_SETUP.md for instructions.');
     process.exit(1);
     return;
@@ -999,11 +1045,16 @@ async function vaultSetup(): Promise<void> {
   // live behind the operator's gateway, not in this vault.
   const credentials: { name: string; serverName: string; token: string }[] = [];
 
-  if (env.GITHUB_TOKEN) credentials.push({ name: 'GitHub', serverName: 'github', token: env.GITHUB_TOKEN });
-  if (env.LINEAR_API_KEY) credentials.push({ name: 'Linear', serverName: 'linear', token: env.LINEAR_API_KEY });
-  if (env.SENTRY_AUTH_TOKEN) credentials.push({ name: 'Sentry', serverName: 'sentry', token: env.SENTRY_AUTH_TOKEN });
-  if (env.FIGMA_TOKEN) credentials.push({ name: 'Figma', serverName: 'figma', token: env.FIGMA_TOKEN });
-  if (env.HUNTER_API_KEY) credentials.push({ name: 'Hunter', serverName: 'hunter', token: env.HUNTER_API_KEY });
+  if (env.GITHUB_TOKEN)
+    credentials.push({ name: 'GitHub', serverName: 'github', token: env.GITHUB_TOKEN });
+  if (env.LINEAR_API_KEY)
+    credentials.push({ name: 'Linear', serverName: 'linear', token: env.LINEAR_API_KEY });
+  if (env.SENTRY_AUTH_TOKEN)
+    credentials.push({ name: 'Sentry', serverName: 'sentry', token: env.SENTRY_AUTH_TOKEN });
+  if (env.FIGMA_TOKEN)
+    credentials.push({ name: 'Figma', serverName: 'figma', token: env.FIGMA_TOKEN });
+  if (env.HUNTER_API_KEY)
+    credentials.push({ name: 'Hunter', serverName: 'hunter', token: env.HUNTER_API_KEY });
 
   for (const cred of credentials) {
     const serverDef = registry[cred.serverName];
@@ -1016,7 +1067,9 @@ async function vaultSetup(): Promise<void> {
       });
       console.log(`  ${cred.name.padEnd(15)} ${result.id}`);
     } catch (err) {
-      console.error(`  ${cred.name.padEnd(15)} failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(
+        `  ${cred.name.padEnd(15)} failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -1025,7 +1078,11 @@ async function vaultSetup(): Promise<void> {
     const notionDef = registry.notion;
     if (notionDef) {
       try {
-        if (env.NOTION_OAUTH_REFRESH_TOKEN && env.NOTION_OAUTH_CLIENT_ID && env.NOTION_OAUTH_CLIENT_SECRET) {
+        if (
+          env.NOTION_OAUTH_REFRESH_TOKEN &&
+          env.NOTION_OAUTH_CLIENT_ID &&
+          env.NOTION_OAUTH_CLIENT_SECRET
+        ) {
           const result = await api.createCredential(vault.id, 'Notion', {
             type: 'mcp_oauth',
             mcp_server_url: notionDef.defaultUrl,
@@ -1035,7 +1092,10 @@ async function vaultSetup(): Promise<void> {
               client_id: env.NOTION_OAUTH_CLIENT_ID,
               scope: env.NOTION_OAUTH_SCOPES || 'notion',
               refresh_token: env.NOTION_OAUTH_REFRESH_TOKEN,
-              token_endpoint_auth: { type: 'client_secret_basic', client_secret: env.NOTION_OAUTH_CLIENT_SECRET },
+              token_endpoint_auth: {
+                type: 'client_secret_basic',
+                client_secret: env.NOTION_OAUTH_CLIENT_SECRET,
+              },
             },
           });
           console.log(`  ${'Notion (OAuth)'.padEnd(15)} ${result.id}`);
@@ -1048,7 +1108,9 @@ async function vaultSetup(): Promise<void> {
           console.log(`  ${'Notion'.padEnd(15)} ${result.id}`);
         }
       } catch (err) {
-        console.error(`  ${'Notion'.padEnd(15)} failed: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `  ${'Notion'.padEnd(15)} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
   }
@@ -1070,7 +1132,10 @@ async function vaultSetup(): Promise<void> {
                 env.SLACK_SCOPES ||
                 'identify,users:read,channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,search:read,chat:write,files:read,files:write',
               refresh_token: env.SLACK_REFRESH_TOKEN,
-              token_endpoint_auth: { type: 'client_secret_post', client_secret: env.SLACK_CLIENT_SECRET },
+              token_endpoint_auth: {
+                type: 'client_secret_post',
+                client_secret: env.SLACK_CLIENT_SECRET,
+              },
             },
           });
           console.log(`  ${'Slack (OAuth)'.padEnd(15)} ${result.id}`);
@@ -1083,7 +1148,9 @@ async function vaultSetup(): Promise<void> {
           console.log(`  ${'Slack'.padEnd(15)} ${result.id}`);
         }
       } catch (err) {
-        console.error(`  ${'Slack'.padEnd(15)} failed: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `  ${'Slack'.padEnd(15)} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
   }
@@ -1112,7 +1179,9 @@ async function vaultSetup(): Promise<void> {
         });
         console.log(`  ${svc.label.padEnd(20)} ${result.id}`);
       } catch (err) {
-        console.error(`  ${svc.label.padEnd(20)} failed: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `  ${svc.label.padEnd(20)} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
   }
@@ -1181,7 +1250,9 @@ async function budget(args: ParsedArgs): Promise<void> {
     console.log('Budget limit: unlimited');
   } else {
     const limit = await getBudgetLimit();
-    console.log(`Budget limit: ${limit !== null ? '$' + limit.toFixed(2) + ' per session' : 'unlimited'}`);
+    console.log(
+      `Budget limit: ${limit !== null ? '$' + limit.toFixed(2) + ' per session' : 'unlimited'}`,
+    );
   }
 }
 
@@ -1198,7 +1269,8 @@ async function exportSession(args: ParsedArgs): Promise<void> {
   const { join, dirname } = await import('node:path');
 
   const api = client();
-  const outputDir = typeof args.flags.output === 'string' ? args.flags.output : `./export-${sessionId.slice(-8)}`;
+  const outputDir =
+    typeof args.flags.output === 'string' ? args.flags.output : `./export-${sessionId.slice(-8)}`;
 
   // Paginate through all events
   let page: string | null = null;
@@ -1235,7 +1307,9 @@ async function exportSession(args: ParsedArgs): Promise<void> {
   // Write files locally
   for (const file of files) {
     // Normalize: /workspace/artifacts/product/prd.md → product/prd.md
-    const relativePath = file.path.replace(/^\/workspace\/artifacts\//, '').replace(/^\/workspace\//, '');
+    const relativePath = file.path
+      .replace(/^\/workspace\/artifacts\//, '')
+      .replace(/^\/workspace\//, '');
     const dest = join(outputDir, relativePath);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, file.content, 'utf-8');
@@ -1361,7 +1435,9 @@ async function sprint(args: ParsedArgs): Promise<void> {
       const api = client();
       const backlogSummary =
         config.backlog.length > 0
-          ? config.backlog.map((i) => `- [${i.status}] ${i.description} (${i.assignedTo})`).join('\n')
+          ? config.backlog
+              .map((i) => `- [${i.status}] ${i.description} (${i.assignedTo})`)
+              .join('\n')
           : '(empty backlog)';
 
       const prompt = `Sprint ${config.currentSprint} standup (${config.cadence}).
@@ -1377,7 +1453,9 @@ Run a team standup. Query each agent for status. Report blocked items and recomm
     }
     case 'add': {
       const desc = args.positional.join(' ');
-      const role = (typeof args.flags.role === 'string' ? args.flags.role : 'engineering') as TeamRole;
+      const role = (
+        typeof args.flags.role === 'string' ? args.flags.role : 'engineering'
+      ) as TeamRole;
       if (!desc) {
         console.error('Usage: fab sprint add <description> [--role <role>]');
         process.exit(1);

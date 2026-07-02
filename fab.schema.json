@@ -263,7 +263,14 @@
           "Cross-workspace federation (single Slack workspace only)"
         ]
       },
-      "artifacts": ["prd", "architecture", "test-plan", "runbook", "onboarding-playbook", "compliance-checklist"],
+      "artifacts": [
+        "prd",
+        "architecture",
+        "test-plan",
+        "runbook",
+        "onboarding-playbook",
+        "compliance-checklist"
+      ],
       "roles": [
         "product",
         "product-research",

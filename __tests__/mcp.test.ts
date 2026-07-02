@@ -79,7 +79,9 @@ describe('mcp', () => {
     });
 
     it('parseTunnelRegistry parses comma-separated name=url pairs', () => {
-      const registry = parseTunnelRegistry('wiki=https://wiki.tnl.example/mcp,kb=https://kb.tnl.example/mcp');
+      const registry = parseTunnelRegistry(
+        'wiki=https://wiki.tnl.example/mcp,kb=https://kb.tnl.example/mcp',
+      );
       expect(Object.keys(registry)).toEqual(['wiki', 'kb']);
       expect(registry.wiki.defaultUrl).toBe('https://wiki.tnl.example/mcp');
       expect(registry.kb.name).toBe('kb');
@@ -88,7 +90,9 @@ describe('mcp', () => {
 
     it('parseTunnelRegistry skips malformed entries', () => {
       const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-      const registry = parseTunnelRegistry('ok=https://ok.tnl.example/mcp,no-equals,=https://noname.example,empty=');
+      const registry = parseTunnelRegistry(
+        'ok=https://ok.tnl.example/mcp,no-equals,=https://noname.example,empty=',
+      );
       expect(Object.keys(registry)).toEqual(['ok']);
       expect(stderr).toHaveBeenCalled();
     });
@@ -97,7 +101,11 @@ describe('mcp', () => {
       vi.stubEnv('FAB_MCP_TUNNEL', 'wiki=https://wiki.tnl.example/mcp');
       const { servers, tools } = resolveMcpServers(['wiki']);
       expect(servers).toHaveLength(1);
-      expect(servers[0]).toMatchObject({ type: 'url', name: 'wiki', url: 'https://wiki.tnl.example/mcp' });
+      expect(servers[0]).toMatchObject({
+        type: 'url',
+        name: 'wiki',
+        url: 'https://wiki.tnl.example/mcp',
+      });
       expect(tools[0]).toMatchObject({ type: 'mcp_toolset', mcp_server_name: 'wiki' });
     });
 
@@ -156,7 +164,11 @@ describe('mcp', () => {
     });
 
     it('reports zero heavy roles when all are light', () => {
-      const s = summarizeToolSurface([{ mcpServers: [] }, { mcpServers: ['github'] }, { mcpServers: ['a', 'b', 'c'] }]);
+      const s = summarizeToolSurface([
+        { mcpServers: [] },
+        { mcpServers: ['github'] },
+        { mcpServers: ['a', 'b', 'c'] },
+      ]);
       expect(s.heavyRoles).toBe(0);
       expect(s.maxServers).toBe(3);
     });
@@ -192,7 +204,9 @@ describe('mcp', () => {
     });
 
     it('throws under FAB_MCP_STRICT when a gateway token is missing', () => {
-      expect(() => buildHttpMcpServers(['stripe'], { FAB_MCP_STRICT: '1' })).toThrow(/MCP_GATEWAY_TOKEN is not set/);
+      expect(() => buildHttpMcpServers(['stripe'], { FAB_MCP_STRICT: '1' })).toThrow(
+        /MCP_GATEWAY_TOKEN is not set/,
+      );
     });
   });
 });

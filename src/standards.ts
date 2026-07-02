@@ -62,12 +62,14 @@ function loadPublicStandard<T>(name: string): T {
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
 }
 
-const PUBLIC_LANGUAGE_TOOLCHAIN = loadPublicStandard<LanguageToolchainStandard>('language-toolchain');
+const PUBLIC_LANGUAGE_TOOLCHAIN =
+  loadPublicStandard<LanguageToolchainStandard>('language-toolchain');
 
 // Re-exported so existing call sites (prompts.ts, build verification dispatch)
 // keep working unchanged. The `Toolchain` shape mirrors the public JSON.
 export type Toolchain = PublicToolchain;
-export const LANGUAGE_TOOLCHAIN: Record<Language, Toolchain> = PUBLIC_LANGUAGE_TOOLCHAIN.content.toolchains;
+export const LANGUAGE_TOOLCHAIN: Record<Language, Toolchain> =
+  PUBLIC_LANGUAGE_TOOLCHAIN.content.toolchains;
 
 // ── Four-phase contract ────────────────────────────────────────────
 
@@ -468,7 +470,12 @@ After the four gate roles approve, \`external-reviewer\` runs in a fresh session
 
 // ── Workflow gate profiles ─────────────────────────────────────────
 
-export const CODE_GATE_ROLES: TeamRole[] = ['pr-reviewer', 'qa-security', 'build-verifier', 'artifact-auditor'];
+export const CODE_GATE_ROLES: TeamRole[] = [
+  'pr-reviewer',
+  'qa-security',
+  'build-verifier',
+  'artifact-auditor',
+];
 
 export const DOCS_GATE_ROLES: TeamRole[] = ['artifact-auditor', 'qa-security'];
 

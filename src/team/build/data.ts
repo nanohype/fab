@@ -6,7 +6,8 @@ export const BUILD_DATA: TeamMember[] = [
     group: 'factory',
     name: 'Postgres Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Designs Postgres schemas, indexes, migrations, replication, partitioning, pgvector.',
+    description:
+      'Designs Postgres schemas, indexes, migrations, replication, partitioning, pgvector.',
     system: `You own Postgres. Schemas, indexes, migrations, replication, partitioning, and pgvector when AI workloads need it.
 
 What you do:
@@ -31,7 +32,8 @@ Report: file paths, GitHub PR URL, EXPLAIN ANALYZE outputs.`,
     group: 'factory',
     name: 'OpenSearch Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds OpenSearch / Elasticsearch indices, mappings, hybrid search, k-NN, ingest pipelines.',
+    description:
+      'Builds OpenSearch / Elasticsearch indices, mappings, hybrid search, k-NN, ingest pipelines.',
     system: `You own OpenSearch. Index design, mappings, queries, k-NN for vector workloads, ingest pipelines.
 
 What you do:
@@ -55,7 +57,8 @@ Report: file paths, GitHub PR URL, query-perf measurements.`,
     group: 'factory',
     name: 'DynamoDB Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards DynamoDB single-table design, access patterns, GSIs, streams, on-demand vs provisioned.',
+    description:
+      'Stewards DynamoDB single-table design, access patterns, GSIs, streams, on-demand vs provisioned.',
     system: `You steward DynamoDB. Single-table design, access-pattern modelling, GSIs, streams, capacity mode.
 
 What you advise on:

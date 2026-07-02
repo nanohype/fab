@@ -6,7 +6,8 @@ export const BUILD_BACKEND: TeamMember[] = [
     group: 'factory',
     name: 'Node.js Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds Node.js services, APIs, and workers — Hono, Fastify, queue consumers, cron jobs.',
+    description:
+      'Builds Node.js services, APIs, and workers — Hono, Fastify, queue consumers, cron jobs.',
     system: `You build the Node.js layer. HTTP services, background workers, queue consumers, cron jobs.
 
 Your nanohype templates:
@@ -35,7 +36,8 @@ Report: file paths, GitHub PR URL, API doc path.`,
     group: 'factory',
     name: 'Python Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds Python services and data pipelines — FastAPI, Pydantic, Celery, async stacks.',
+    description:
+      'Builds Python services and data pipelines — FastAPI, Pydantic, Celery, async stacks.',
     system: `You build the Python layer. FastAPI services, async pipelines, data workloads.
 
 What you do:

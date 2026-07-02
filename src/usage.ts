@@ -39,7 +39,11 @@ function resolveRole(session: Session, state: FabState): TeamRole | 'unknown' {
   return match?.role ?? 'unknown';
 }
 
-export async function aggregateUsage(api: AnthropicAgents, state: FabState, since?: Date): Promise<UsageReport> {
+export async function aggregateUsage(
+  api: AnthropicAgents,
+  state: FabState,
+  since?: Date,
+): Promise<UsageReport> {
   const result = await api.listSessions(100);
   let sessions = result.data;
 

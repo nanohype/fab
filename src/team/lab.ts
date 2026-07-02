@@ -55,7 +55,8 @@ Report: file paths, Linear issue IDs.`,
     group: 'lab',
     name: 'Learner',
     model: 'claude-sonnet-4-6',
-    description: "Cross-project pattern extraction. Curates company memory — what worked, what didn't, why.",
+    description:
+      "Cross-project pattern extraction. Curates company memory — what worked, what didn't, why.",
     system: `You extract patterns across projects. What worked, what didn't, why. The company's institutional memory.
 
 What you do:

@@ -72,9 +72,15 @@ describe('createBranchIfMissing', () => {
 
   it('returns created:false when branch already exists', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ref: 'refs/heads/feat/almanac', object: { sha: 'abc123', type: 'commit' } }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({
+          ref: 'refs/heads/feat/almanac',
+          object: { sha: 'abc123', type: 'commit' },
+        }),
+        {
+          status: 200,
+        },
+      ),
     );
     const result = await createBranchIfMissing('tok', 'nanohype', 'protohype', 'feat/almanac');
     expect(result).toEqual({ created: false, sha: 'abc123' });
@@ -85,14 +91,23 @@ describe('createBranchIfMissing', () => {
     fetchMock
       .mockResolvedValueOnce(new Response('not found', { status: 404 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ ref: 'refs/heads/main', object: { sha: 'mainsha', type: 'commit' } }), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify({ ref: 'refs/heads/main', object: { sha: 'mainsha', type: 'commit' } }),
+          {
+            status: 200,
+          },
+        ),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ ref: 'refs/heads/feat/almanac', object: { sha: 'newsha', type: 'commit' } }), {
-          status: 201,
-        }),
+        new Response(
+          JSON.stringify({
+            ref: 'refs/heads/feat/almanac',
+            object: { sha: 'newsha', type: 'commit' },
+          }),
+          {
+            status: 201,
+          },
+        ),
       );
 
     const result = await createBranchIfMissing('tok', 'nanohype', 'protohype', 'feat/almanac');
@@ -102,28 +117,33 @@ describe('createBranchIfMissing', () => {
     const postCall = fetchMock.mock.calls[2];
     expect(postCall[0]).toContain('/repos/nanohype/protohype/git/refs');
     expect(postCall[1].method).toBe('POST');
-    expect(JSON.parse(postCall[1].body)).toEqual({ ref: 'refs/heads/feat/almanac', sha: 'mainsha' });
+    expect(JSON.parse(postCall[1].body)).toEqual({
+      ref: 'refs/heads/feat/almanac',
+      sha: 'mainsha',
+    });
   });
 
   it('throws on non-404 error during existence check', async () => {
     fetchMock.mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
-    await expect(createBranchIfMissing('tok', 'nanohype', 'protohype', 'feat/almanac')).rejects.toThrow(
-      /GET branch ref failed \(403\)/,
-    );
+    await expect(
+      createBranchIfMissing('tok', 'nanohype', 'protohype', 'feat/almanac'),
+    ).rejects.toThrow(/GET branch ref failed \(403\)/);
   });
 
   it('throws when base branch lookup fails', async () => {
     fetchMock
       .mockResolvedValueOnce(new Response('not found', { status: 404 }))
       .mockResolvedValueOnce(new Response('base gone', { status: 404 }));
-    await expect(createBranchIfMissing('tok', 'nanohype', 'protohype', 'feat/almanac', 'main')).rejects.toThrow(
-      /GET base branch main failed \(404\)/,
-    );
+    await expect(
+      createBranchIfMissing('tok', 'nanohype', 'protohype', 'feat/almanac', 'main'),
+    ).rejects.toThrow(/GET base branch main failed \(404\)/);
   });
 
   it('includes auth header on all calls', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ref: 'x', object: { sha: 'x', type: 'commit' } }), { status: 200 }),
+      new Response(JSON.stringify({ ref: 'x', object: { sha: 'x', type: 'commit' } }), {
+        status: 200,
+      }),
     );
     await createBranchIfMissing('my-token', 'nanohype', 'protohype', 'feat/x');
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer my-token');
@@ -146,11 +166,17 @@ describe('fetchRepoFile', () => {
     const body = 'const x = 1;\nconst y = 2;\n';
     fetchMock.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from(body).toString('base64') }),
+        JSON.stringify({
+          type: 'file',
+          encoding: 'base64',
+          content: Buffer.from(body).toString('base64'),
+        }),
         { status: 200 },
       ),
     );
-    expect(await fetchRepoFile('tok', 'nanohype', 'protohype', 'src/x.ts', 'feat/almanac')).toBe(body);
+    expect(await fetchRepoFile('tok', 'nanohype', 'protohype', 'src/x.ts', 'feat/almanac')).toBe(
+      body,
+    );
   });
 
   it('returns null on 404 (file does not exist — a clean signal, not an error)', async () => {
@@ -160,26 +186,41 @@ describe('fetchRepoFile', () => {
 
   it('throws on a non-404 error (auth / rate-limit)', async () => {
     fetchMock.mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
-    await expect(fetchRepoFile('tok', 'o', 'r', 'a.ts', 'feat/x')).rejects.toThrow(/GET contents a.ts failed \(403\)/);
+    await expect(fetchRepoFile('tok', 'o', 'r', 'a.ts', 'feat/x')).rejects.toThrow(
+      /GET contents a.ts failed \(403\)/,
+    );
   });
 
   it('throws on unsupported encoding (>1MB file returns encoding "none")', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ type: 'file', encoding: 'none', content: '' }), { status: 200 }),
+      new Response(JSON.stringify({ type: 'file', encoding: 'none', content: '' }), {
+        status: 200,
+      }),
     );
-    await expect(fetchRepoFile('tok', 'o', 'r', 'big.bin', 'feat/x')).rejects.toThrow(/unsupported encoding/);
+    await expect(fetchRepoFile('tok', 'o', 'r', 'big.bin', 'feat/x')).rejects.toThrow(
+      /unsupported encoding/,
+    );
   });
 
   it('returns null when the path is a directory (array response, no type:"file")', async () => {
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([{ type: 'file', name: 'a.ts' }]), { status: 200 }));
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify([{ type: 'file', name: 'a.ts' }]), { status: 200 }),
+    );
     expect(await fetchRepoFile('tok', 'o', 'r', 'src', 'feat/x')).toBeNull();
   });
 
   it('url-encodes path segments + ref and sends the auth header', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from('x').toString('base64') }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({
+          type: 'file',
+          encoding: 'base64',
+          content: Buffer.from('x').toString('base64'),
+        }),
+        {
+          status: 200,
+        },
+      ),
     );
     await fetchRepoFile('my-token', 'nanohype', 'protohype', 'src/a b.ts', 'feat/almanac');
     const [url, init] = fetchMock.mock.calls[0];

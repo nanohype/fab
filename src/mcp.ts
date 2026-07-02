@@ -152,13 +152,17 @@ export function parseTunnelRegistry(spec: string | undefined): Record<string, Mc
     const name = eq === -1 ? '' : trimmed.slice(0, eq).trim();
     const url = eq === -1 ? '' : trimmed.slice(eq + 1).trim();
     if (!name || !url) {
-      process.stderr.write(`[mcp] ignoring malformed ${TUNNEL_ENV} entry (expected name=url): ${trimmed}\n`);
+      process.stderr.write(
+        `[mcp] ignoring malformed ${TUNNEL_ENV} entry (expected name=url): ${trimmed}\n`,
+      );
       continue;
     }
     // A tunnel must never shadow a built-in server — that would redirect a
     // role's `github`/`linear`/etc. to an operator-supplied URL.
     if (Object.hasOwn(REGISTRY, name)) {
-      process.stderr.write(`[mcp] ignoring ${TUNNEL_ENV} entry "${name}": name collides with a built-in server\n`);
+      process.stderr.write(
+        `[mcp] ignoring ${TUNNEL_ENV} entry "${name}": name collides with a built-in server\n`,
+      );
       continue;
     }
     // The tunnel hands out an ordinary https URL; reject anything that isn't a
@@ -167,7 +171,9 @@ export function parseTunnelRegistry(spec: string | undefined): Record<string, Mc
     try {
       parsed = new URL(url);
     } catch {
-      process.stderr.write(`[mcp] ignoring ${TUNNEL_ENV} entry "${name}": not a valid URL: ${url}\n`);
+      process.stderr.write(
+        `[mcp] ignoring ${TUNNEL_ENV} entry "${name}": not a valid URL: ${url}\n`,
+      );
       continue;
     }
     if (parsed.protocol !== 'https:') {
@@ -231,7 +237,14 @@ export function resolveMcpServers(serverNames: string[]): { servers: McpServer[]
 // injection can't drift between the two transports.
 
 /** Servers that route through the switchboard gateway and need the shared bearer token. */
-const GATEWAY_HOSTED: ReadonlySet<string> = new Set(['hubspot', 'gdrive', 'analytics', 'gcalendar', 'gcse', 'stripe']);
+const GATEWAY_HOSTED: ReadonlySet<string> = new Set([
+  'hubspot',
+  'gdrive',
+  'analytics',
+  'gcalendar',
+  'gcse',
+  'stripe',
+]);
 
 /** An HTTP MCP server config — accepted by both Claude Code's `--mcp-config` and the Agent SDK's `mcpServers`. */
 export interface HttpMcpServer {
@@ -317,7 +330,9 @@ export interface ToolSurfaceSummary {
 }
 
 /** Summarize eager-loaded MCP tool-surface pressure across the roster. */
-export function summarizeToolSurface(roles: ReadonlyArray<{ mcpServers: string[] }>): ToolSurfaceSummary {
+export function summarizeToolSurface(
+  roles: ReadonlyArray<{ mcpServers: string[] }>,
+): ToolSurfaceSummary {
   let heavyRoles = 0;
   let maxServers = 0;
   for (const r of roles) {

@@ -7,7 +7,12 @@ import { SdkK8sRuntime } from './sdk-k8s.js';
 
 export type RuntimeKind = 'managed-agents' | 'sdk' | 'sdk-k8s' | 'claude-cli';
 
-const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set(['managed-agents', 'sdk', 'sdk-k8s', 'claude-cli']);
+const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set([
+  'managed-agents',
+  'sdk',
+  'sdk-k8s',
+  'claude-cli',
+]);
 
 /**
  * Resolve the configured runtime from the `FAB_RUNTIME` env var.

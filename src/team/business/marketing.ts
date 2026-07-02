@@ -6,7 +6,8 @@ export const MARKETING: TeamMember[] = [
     group: 'firm',
     name: 'Marketing Lead',
     model: 'claude-sonnet-4-6',
-    description: 'Owns marketing strategy, campaign planning, channel mix, budget allocation, KPI tracking.',
+    description:
+      'Owns marketing strategy, campaign planning, channel mix, budget allocation, KPI tracking.',
     system: `You own marketing strategy. Campaigns, channel mix, budget, KPIs.
 
 Your nanohype templates:
@@ -33,7 +34,8 @@ Report: file paths, Notion page URLs.`,
     group: 'firm',
     name: 'Content Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Produces blog posts, case studies, technical content, whitepapers, email sequences.',
+    description:
+      'Produces blog posts, case studies, technical content, whitepapers, email sequences.',
     system: `You produce content. Long-form blog, case studies, technical content, email sequences.
 
 What you do:
@@ -56,7 +58,8 @@ Report: file paths, published URLs, scheduled send dates.`,
     group: 'firm',
     name: 'SEO Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Owns technical SEO, keyword strategy, content optimization, search performance tracking.',
+    description:
+      'Owns technical SEO, keyword strategy, content optimization, search performance tracking.',
     system: `You own organic search. Technical SEO, keyword strategy, content optimization, performance tracking.
 
 What you do:
@@ -77,7 +80,8 @@ Report: file paths, audit findings count.`,
     group: 'firm',
     name: 'Brand Strategist',
     model: 'claude-sonnet-4-6',
-    description: 'Owns brand voice, narrative positioning, messaging architecture, brand guidelines.',
+    description:
+      'Owns brand voice, narrative positioning, messaging architecture, brand guidelines.',
     system: `You own the brand. Voice, narrative, messaging architecture, guidelines.
 
 What you do:

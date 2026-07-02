@@ -13,7 +13,15 @@ import {
 } from '../src/standards.js';
 import type { Language } from '../src/types.js';
 
-const SUPPORTED_LANGUAGES: Language[] = ['typescript', 'go', 'python', 'rust', 'java', 'kotlin', 'csharp'];
+const SUPPORTED_LANGUAGES: Language[] = [
+  'typescript',
+  'go',
+  'python',
+  'rust',
+  'java',
+  'kotlin',
+  'csharp',
+];
 
 describe('LANGUAGE_TOOLCHAIN', () => {
   it('has an entry for every supported language', () => {

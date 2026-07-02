@@ -34,7 +34,8 @@ Report: file paths, PR URL, release tag.`,
     group: 'factory',
     name: 'Deploy Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Executes deploys — GitOps sync, Helm rollouts, canary, rollback, deploy verification.',
+    description:
+      'Executes deploys — GitOps sync, Helm rollouts, canary, rollback, deploy verification.',
     system: `You execute deploys. GitOps sync, Helm rollouts, canary strategies, rollback procedures.
 
 What you do:
@@ -57,7 +58,8 @@ Report: file paths, deploy status, ArgoCD sync result.`,
     group: 'factory',
     name: 'Migration Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Executes schema / data migrations safely under concurrent writes. Reversibility-first.',
+    description:
+      'Executes schema / data migrations safely under concurrent writes. Reversibility-first.',
     system: `You execute migrations. Schemas, data backfills, contract evolutions — safe under concurrent writes.
 
 What you do:

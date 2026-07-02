@@ -36,7 +36,21 @@ import type { GateResult, TeamRole } from './types.js';
 
 export type Verdict = 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES';
 
-export type Grade = 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D+' | 'D' | 'D-' | 'F' | 'N/A';
+export type Grade =
+  | 'A+'
+  | 'A'
+  | 'A-'
+  | 'B+'
+  | 'B'
+  | 'B-'
+  | 'C+'
+  | 'C'
+  | 'C-'
+  | 'D+'
+  | 'D'
+  | 'D-'
+  | 'F'
+  | 'N/A';
 
 export interface GateVerdict {
   role: TeamRole;
@@ -66,7 +80,11 @@ function hasEvidenceBlock(output: string, header: 'TRANSCRIPTS' | 'CITATIONS'): 
  *   auto-downgrade to REJECT (EVIDENCE_CONTRACT enforcement at the pipeline layer).
  * - REJECT may ship without TRANSCRIPTS/CITATIONS — the point there is to fail fast.
  */
-export function parseGateVerdict(role: TeamRole, output: string, opts?: { readFile?: FileReader }): GateVerdict {
+export function parseGateVerdict(
+  role: TeamRole,
+  output: string,
+  opts?: { readFile?: FileReader },
+): GateVerdict {
   const verdictMatch = output.match(VERDICT_RE);
   const feedbackMatch = output.match(FEEDBACK_RE);
   const feedback = feedbackMatch ? feedbackMatch[1].trim() : '';
@@ -96,7 +114,9 @@ export function parseGateVerdict(role: TeamRole, output: string, opts?: { readFi
     const hasTranscripts = hasEvidenceBlock(output, 'TRANSCRIPTS');
     const hasCitations = hasEvidenceBlock(output, 'CITATIONS');
     if (!hasTranscripts || !hasCitations) {
-      const missing = [!hasTranscripts && 'TRANSCRIPTS', !hasCitations && 'CITATIONS'].filter(Boolean).join(' and ');
+      const missing = [!hasTranscripts && 'TRANSCRIPTS', !hasCitations && 'CITATIONS']
+        .filter(Boolean)
+        .join(' and ');
       return {
         role,
         verdict: 'REJECT',
@@ -192,7 +212,8 @@ export function parseCitations(output: string): Citation[] {
   if (!headerMatch || headerMatch.index === undefined) return [];
   const rest = output.slice(headerMatch.index + headerMatch[0].length);
   const nextHeader = rest.match(/^\s*(?:GATE_[A-Z]+|TRANSCRIPTS|CITATIONS|QUALITY_GRADES):/m);
-  const block = nextHeader && nextHeader.index !== undefined ? rest.slice(0, nextHeader.index) : rest;
+  const block =
+    nextHeader && nextHeader.index !== undefined ? rest.slice(0, nextHeader.index) : rest;
 
   const indentOf = (s: string) => s.length - s.trimStart().length;
   const stripQuotes = (s: string) => s.trim().replace(/^["']|["']$/g, '');
@@ -282,9 +303,15 @@ function containsRun(haystack: string[], needle: string[]): boolean {
  */
 export function verifyCitations(citations: Citation[], readFile: FileReader): CitationCheck[] {
   return citations.map((citation): CitationCheck => {
-    if (!citation.file) return { citation, ok: false, status: 'malformed', reason: 'citation has no file path' };
+    if (!citation.file)
+      return { citation, ok: false, status: 'malformed', reason: 'citation has no file path' };
     if (!citation.quotedFragment.trim())
-      return { citation, ok: false, status: 'malformed', reason: 'citation has no quoted_fragment' };
+      return {
+        citation,
+        ok: false,
+        status: 'malformed',
+        reason: 'citation has no quoted_fragment',
+      };
     let content: string | null;
     try {
       content = readFile(citation.file);
@@ -297,10 +324,20 @@ export function verifyCitations(citations: Citation[], readFile: FileReader): Ci
       };
     }
     if (content === null)
-      return { citation, ok: false, status: 'file-unreadable', reason: `cited file not found: ${citation.file}` };
+      return {
+        citation,
+        ok: false,
+        status: 'file-unreadable',
+        reason: `cited file not found: ${citation.file}`,
+      };
     const needle = normalizeLines(citation.quotedFragment);
     if (needle.length === 0)
-      return { citation, ok: false, status: 'malformed', reason: 'quoted_fragment is empty after normalization' };
+      return {
+        citation,
+        ok: false,
+        status: 'malformed',
+        reason: 'quoted_fragment is empty after normalization',
+      };
     const ok = containsRun(normalizeLines(content), needle);
     return ok
       ? { citation, ok: true, status: 'ok' }
@@ -326,7 +363,10 @@ export function verifyCitations(citations: Citation[], readFile: FileReader): Ci
  */
 export function mergeGateVerdicts(verdicts: GateVerdict[]): GateResult {
   if (verdicts.length === 0) {
-    return { decision: 'reject', feedback: 'Merge gate ran with zero verdicts — configuration error.' };
+    return {
+      decision: 'reject',
+      feedback: 'Merge gate ran with zero verdicts — configuration error.',
+    };
   }
 
   const binding = verdicts.filter((v) => !v.advisory);
@@ -335,8 +375,10 @@ export function mergeGateVerdicts(verdicts: GateVerdict[]): GateResult {
   const rejects = binding.filter((v) => v.verdict === 'REJECT');
   const changes = binding.filter((v) => v.verdict === 'REQUEST_CHANGES');
 
-  const format = (v: GateVerdict) => `[${v.role}${v.advisory ? ' (advisory)' : ''}] ${v.verdict}: ${v.feedback}`;
-  const advisoryNotes = advisory.length > 0 ? '\n\nAdvisory:\n' + advisory.map(format).join('\n') : '';
+  const format = (v: GateVerdict) =>
+    `[${v.role}${v.advisory ? ' (advisory)' : ''}] ${v.verdict}: ${v.feedback}`;
+  const advisoryNotes =
+    advisory.length > 0 ? '\n\nAdvisory:\n' + advisory.map(format).join('\n') : '';
 
   if (rejects.length > 0) {
     return {
@@ -371,7 +413,10 @@ export function mergeGateVerdicts(verdicts: GateVerdict[]): GateResult {
  * it affect every role, but only a role whose own block changed should be
  * downgraded — the caller decides by passing the conflicted role set).
  */
-export function applySelfReviewDowngrade(verdicts: GateVerdict[], conflictedRoles: Set<TeamRole>): GateVerdict[] {
+export function applySelfReviewDowngrade(
+  verdicts: GateVerdict[],
+  conflictedRoles: Set<TeamRole>,
+): GateVerdict[] {
   if (conflictedRoles.size === 0) return verdicts;
   return verdicts.map((v) => (conflictedRoles.has(v.role) ? { ...v, advisory: true } : v));
 }
@@ -492,7 +537,10 @@ export function aggregateGrades(verdicts: GateVerdict[]): Record<string, Grade> 
  * Dimensions graded N/A on either side are excluded — no drift signal
  * from a dimension that doesn't apply.
  */
-export function compareGrades(internal: Record<string, Grade>, external: Record<string, Grade>): GradeDrift {
+export function compareGrades(
+  internal: Record<string, Grade>,
+  external: Record<string, Grade>,
+): GradeDrift {
   const dims = new Set([...Object.keys(internal), ...Object.keys(external)]);
   const drifted: string[] = [];
   let maxDrift = 0;

@@ -4,7 +4,13 @@ import { createRuntime } from './runtimes/index.js';
 import type { GateResult, Language, TeamGroup, TeamRole } from './types.js';
 import { formatEvent } from './stream.js';
 import { callAdvisor } from './advisor.js';
-import { getAgentByRole, getBudgetLimit, getPrimaryRepo, setProjectLanguage, setSourceDirs } from './state.js';
+import {
+  getAgentByRole,
+  getBudgetLimit,
+  getPrimaryRepo,
+  setProjectLanguage,
+  setSourceDirs,
+} from './state.js';
 import { CODE_GATE_ROLES, DOCS_GATE_ROLES } from './standards.js';
 import {
   parseGateVerdict,
@@ -20,7 +26,15 @@ import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
 import { normalizeDelimiters, spotlight } from './guardrails.js';
 
-const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = ['typescript', 'go', 'python', 'rust', 'java', 'kotlin', 'csharp'];
+const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = [
+  'typescript',
+  'go',
+  'python',
+  'rust',
+  'java',
+  'kotlin',
+  'csharp',
+];
 
 // ── Workflow types ──────────────────────────────────────────────────
 
@@ -82,7 +96,8 @@ export const WORKFLOWS: Workflow[] = [
     steps: [
       {
         role: 'product',
-        instruction: 'Draft a PRD with requirements, user stories, success metrics, and launch criteria.',
+        instruction:
+          'Draft a PRD with requirements, user stories, success metrics, and launch criteria.',
       },
       {
         role: 'design-lead',
@@ -91,7 +106,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'react-engineer',
-        instruction: 'Plan the UI implementation based on Design specs. Run build, lint, and tests before reporting.',
+        instruction:
+          'Plan the UI implementation based on Design specs. Run build, lint, and tests before reporting.',
         group: 1,
       },
       {
@@ -125,34 +141,46 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'build-verifier',
-        instruction: 'FINAL VERIFICATION: Confirm fixes. Run full test suite. Report final pass/fail and coverage.',
+        instruction:
+          'FINAL VERIFICATION: Confirm fixes. Run full test suite. Report final pass/fail and coverage.',
       },
       {
         role: 'ops-sre',
         instruction: 'Define SLOs, monitoring, alerting rules, and deployment infrastructure.',
         group: 3,
       },
-      { role: 'ops-incident', instruction: 'Write runbooks, escalation paths, and change management plan.', group: 3 },
+      {
+        role: 'ops-incident',
+        instruction: 'Write runbooks, escalation paths, and change management plan.',
+        group: 3,
+      },
       {
         role: 'marketing-lead',
-        instruction: 'Create a campaign plan with positioning, messaging, channels, and content calendar.',
+        instruction:
+          'Create a campaign plan with positioning, messaging, channels, and content calendar.',
         group: 4,
       },
       {
         role: 'sales-lead',
-        instruction: 'Draft a proposal template and battle card with competitive positioning and pricing.',
+        instruction:
+          'Draft a proposal template and battle card with competitive positioning and pricing.',
         group: 4,
       },
       {
         role: 'cs-success',
-        instruction: 'Design the onboarding playbook with milestones, health scoring, and intervention triggers.',
+        instruction:
+          'Design the onboarding playbook with milestones, health scoring, and intervention triggers.',
         group: 4,
       },
       {
         role: 'data-analyst',
-        instruction: 'Define success metrics, instrument analytics events, and design monitoring dashboards.',
+        instruction:
+          'Define success metrics, instrument analytics events, and design monitoring dashboards.',
       },
-      { role: 'content-engineer', instruction: 'Write API docs, user guides, and changelog for the launch.' },
+      {
+        role: 'content-engineer',
+        instruction: 'Write API docs, user guides, and changelog for the launch.',
+      },
       {
         role: 'fidelity-engineer',
         instruction:
@@ -162,13 +190,15 @@ export const WORKFLOWS: Workflow[] = [
   },
   {
     name: 'feature-build',
-    description: 'Build a feature: requirements → design → build (parallel) → test (parallel) → fix → verify',
+    description:
+      'Build a feature: requirements → design → build (parallel) → test (parallel) → fix → verify',
     team: 'factory',
     gateProfile: 'code',
     steps: [
       {
         role: 'product',
-        instruction: 'Draft functional requirements, user stories, and acceptance criteria for this feature.',
+        instruction:
+          'Draft functional requirements, user stories, and acceptance criteria for this feature.',
       },
       {
         role: 'design-lead',
@@ -176,17 +206,20 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'react-engineer',
-        instruction: 'Implement the frontend based on Design specs. Run build, lint, and tests before reporting.',
+        instruction:
+          'Implement the frontend based on Design specs. Run build, lint, and tests before reporting.',
         group: 1,
       },
       {
         role: 'node-engineer',
-        instruction: 'Implement the backend APIs and services. Run build, lint, and tests before reporting.',
+        instruction:
+          'Implement the backend APIs and services. Run build, lint, and tests before reporting.',
         group: 1,
       },
       {
         role: 'agent-engineer',
-        instruction: 'Implement AI integration if applicable. Run build, lint, and tests before reporting.',
+        instruction:
+          'Implement AI integration if applicable. Run build, lint, and tests before reporting.',
         group: 1,
       },
       {
@@ -229,11 +262,18 @@ export const WORKFLOWS: Workflow[] = [
         instruction:
           'Assess the incident: severity, affected services, blast radius. Draft initial response and escalation.',
       },
-      { role: 'node-engineer', instruction: 'Diagnose root cause, implement a fix, and describe what changed.' },
-      { role: 'build-verifier', instruction: 'Define regression tests to prevent recurrence and validate the fix.' },
+      {
+        role: 'node-engineer',
+        instruction: 'Diagnose root cause, implement a fix, and describe what changed.',
+      },
+      {
+        role: 'build-verifier',
+        instruction: 'Define regression tests to prevent recurrence and validate the fix.',
+      },
       {
         role: 'ops-incident',
-        instruction: 'Write a postmortem: timeline, root cause, action items, and process improvements.',
+        instruction:
+          'Write a postmortem: timeline, root cause, action items, and process improvements.',
       },
     ],
   },
@@ -244,15 +284,18 @@ export const WORKFLOWS: Workflow[] = [
     steps: [
       {
         role: 'sales-lead',
-        instruction: 'Prepare the customer handoff: deal context, expectations, success criteria, and key contacts.',
+        instruction:
+          'Prepare the customer handoff: deal context, expectations, success criteria, and key contacts.',
       },
       {
         role: 'cs-success',
-        instruction: 'Design the onboarding plan: milestones, touchpoints, health scoring, and intervention triggers.',
+        instruction:
+          'Design the onboarding plan: milestones, touchpoints, health scoring, and intervention triggers.',
       },
       {
         role: 'product',
-        instruction: 'Review onboarding feedback and identify product improvements that would reduce time-to-value.',
+        instruction:
+          'Review onboarding feedback and identify product improvements that would reduce time-to-value.',
       },
     ],
   },
@@ -261,14 +304,19 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Go-to-market campaign: positioning → campaigns → sales enablement',
     team: 'firm',
     steps: [
-      { role: 'product', instruction: 'Define the value proposition, target audience, and key differentiators.' },
+      {
+        role: 'product',
+        instruction: 'Define the value proposition, target audience, and key differentiators.',
+      },
       {
         role: 'marketing-lead',
-        instruction: 'Create a campaign plan with channels, messaging framework, content calendar, and KPIs.',
+        instruction:
+          'Create a campaign plan with channels, messaging framework, content calendar, and KPIs.',
       },
       {
         role: 'sales-lead',
-        instruction: 'Build battle cards and proposal templates aligned with the campaign messaging.',
+        instruction:
+          'Build battle cards and proposal templates aligned with the campaign messaging.',
       },
     ],
   },
@@ -291,16 +339,19 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'content-engineer',
-        instruction: 'Create social selling content and LinkedIn outreach scripts for the target accounts.',
+        instruction:
+          'Create social selling content and LinkedIn outreach scripts for the target accounts.',
         group: 1,
       },
       {
         role: 'lead-research-curator',
-        instruction: 'Set up lead scoring, landing page optimization, and routing rules for inbound leads.',
+        instruction:
+          'Set up lead scoring, landing page optimization, and routing rules for inbound leads.',
       },
       {
         role: 'lead-events',
-        instruction: 'Plan a webinar or event targeting the same audience. Design promotion and follow-up sequences.',
+        instruction:
+          'Plan a webinar or event targeting the same audience. Design promotion and follow-up sequences.',
         group: 2,
       },
       {
@@ -331,17 +382,24 @@ export const WORKFLOWS: Workflow[] = [
         instruction:
           "Draft the proposal with pricing, timeline, and value proposition aligned to prospect's stated needs.",
       },
-      { role: 'sales-ops', instruction: 'Validate pipeline stage, update CRM records, prepare forecast entry.' },
+      {
+        role: 'sales-ops',
+        instruction: 'Validate pipeline stage, update CRM records, prepare forecast entry.',
+      },
       {
         role: 'legal-curator',
         instruction: 'Review and customize the service agreement. Flag any non-standard terms.',
       },
-      { role: 'cs-success', instruction: 'Prepare the onboarding plan so handoff is immediate after signature.' },
+      {
+        role: 'cs-success',
+        instruction: 'Prepare the onboarding plan so handoff is immediate after signature.',
+      },
     ],
   },
   {
     name: 'content-engine',
-    description: 'Content pipeline: research → brand → create + SEO (parallel) → distribute → measure',
+    description:
+      'Content pipeline: research → brand → create + SEO (parallel) → distribute → measure',
     team: 'firm',
     gateProfile: 'docs',
     steps: [
@@ -352,28 +410,36 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'brand-strategist',
-        instruction: 'Define messaging pillars and tone for this content initiative. Ensure brand consistency.',
+        instruction:
+          'Define messaging pillars and tone for this content initiative. Ensure brand consistency.',
       },
       {
         role: 'content-engineer',
-        instruction: 'Write the content pieces: blog posts, case studies, whitepapers, or tutorials.',
+        instruction:
+          'Write the content pieces: blog posts, case studies, whitepapers, or tutorials.',
         group: 1,
       },
       {
         role: 'seo-engineer',
-        instruction: 'Produce keyword research, optimize content for search, and plan internal linking.',
+        instruction:
+          'Produce keyword research, optimize content for search, and plan internal linking.',
         group: 1,
       },
-      { role: 'content-engineer', instruction: 'Design email sequences to distribute the content to segmented lists.' },
+      {
+        role: 'content-engineer',
+        instruction: 'Design email sequences to distribute the content to segmented lists.',
+      },
       {
         role: 'data-analyst',
-        instruction: 'Define content performance metrics and set up tracking: organic traffic, engagement, conversion.',
+        instruction:
+          'Define content performance metrics and set up tracking: organic traffic, engagement, conversion.',
       },
     ],
   },
   {
     name: 'security-audit',
-    description: 'Comprehensive security + compliance: scan → review code → infra → compliance → legal',
+    description:
+      'Comprehensive security + compliance: scan → review code → infra → compliance → legal',
     team: 'factory',
     gateProfile: 'code',
     steps: [
@@ -384,12 +450,14 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'node-engineer',
-        instruction: 'Review and fix security findings in backend code: injection, auth bypass, data exposure.',
+        instruction:
+          'Review and fix security findings in backend code: injection, auth bypass, data exposure.',
         group: 1,
       },
       {
         role: 'react-engineer',
-        instruction: 'Review and fix security findings in frontend code: XSS, CSRF, sensitive data in client.',
+        instruction:
+          'Review and fix security findings in frontend code: XSS, CSRF, sensitive data in client.',
         group: 1,
       },
       {
@@ -399,7 +467,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'compliance-curator',
-        instruction: 'Map security findings to compliance frameworks (SOC 2, GDPR). Identify control gaps.',
+        instruction:
+          'Map security findings to compliance frameworks (SOC 2, GDPR). Identify control gaps.',
       },
       {
         role: 'legal-curator',
@@ -425,7 +494,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'ops-finops',
-        instruction: 'Analyze cloud costs: identify waste, rightsizing opportunities, and cost per request/user.',
+        instruction:
+          'Analyze cloud costs: identify waste, rightsizing opportunities, and cost per request/user.',
       },
       {
         role: 'data-analyst',
@@ -447,25 +517,30 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'design-lead',
-        instruction: 'Design mobile UI: navigation patterns, touch targets, responsive layouts, platform conventions.',
+        instruction:
+          'Design mobile UI: navigation patterns, touch targets, responsive layouts, platform conventions.',
       },
       {
         role: 'mobile-engineer',
-        instruction: 'Implement the mobile app based on design specs. Handle platform-specific behavior.',
+        instruction:
+          'Implement the mobile app based on design specs. Handle platform-specific behavior.',
       },
       {
         role: 'ux-engineer',
-        instruction: 'Test user flows on both platforms: navigation, gestures, loading states, error handling.',
+        instruction:
+          'Test user flows on both platforms: navigation, gestures, loading states, error handling.',
         group: 1,
       },
       {
         role: 'build-verifier',
-        instruction: 'Write automated tests for mobile: unit tests, integration tests, device matrix.',
+        instruction:
+          'Write automated tests for mobile: unit tests, integration tests, device matrix.',
         group: 1,
       },
       {
         role: 'accessibility-engineer',
-        instruction: 'Audit mobile accessibility: touch targets, screen reader, dynamic type, contrast.',
+        instruction:
+          'Audit mobile accessibility: touch targets, screen reader, dynamic type, contrast.',
       },
       {
         role: 'fidelity-engineer',
@@ -486,16 +561,22 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'sales-lead',
-        instruction: 'Draft the partnership proposal: structure, incentives, co-marketing plan, integration scope.',
+        instruction:
+          'Draft the partnership proposal: structure, incentives, co-marketing plan, integration scope.',
       },
-      { role: 'product', instruction: 'Assess product integration requirements and timeline for the partnership.' },
+      {
+        role: 'product',
+        instruction: 'Assess product integration requirements and timeline for the partnership.',
+      },
       {
         role: 'legal-curator',
-        instruction: 'Draft or review the partnership agreement: terms, IP, revenue share, termination.',
+        instruction:
+          'Draft or review the partnership agreement: terms, IP, revenue share, termination.',
       },
       {
         role: 'content-engineer',
-        instruction: 'Create co-marketing materials: joint case study, landing page, announcement blog post.',
+        instruction:
+          'Create co-marketing materials: joint case study, landing page, announcement blog post.',
       },
     ],
   },
@@ -506,20 +587,27 @@ export const WORKFLOWS: Workflow[] = [
     steps: [
       {
         role: 'chief-of-staff',
-        instruction: "Compile status from all teams: what shipped, what's in progress, what's blocked.",
+        instruction:
+          "Compile status from all teams: what shipped, what's in progress, what's blocked.",
       },
       {
         role: 'product',
-        instruction: 'Prioritize the backlog for the next sprint based on OKRs, customer feedback, and technical debt.',
+        instruction:
+          'Prioritize the backlog for the next sprint based on OKRs, customer feedback, and technical debt.',
       },
-      { role: 'chief-of-staff', instruction: 'Estimate capacity and flag technical risks for the prioritized items.' },
+      {
+        role: 'chief-of-staff',
+        instruction: 'Estimate capacity and flag technical risks for the prioritized items.',
+      },
       {
         role: 'design-lead',
-        instruction: 'Confirm design readiness for prioritized items. Flag items that need more design work.',
+        instruction:
+          'Confirm design readiness for prioritized items. Flag items that need more design work.',
       },
       {
         role: 'data-analyst',
-        instruction: "Report on key metrics: what moved, what didn't, what needs attention this sprint.",
+        instruction:
+          "Report on key metrics: what moved, what didn't, what needs attention this sprint.",
       },
     ],
   },
@@ -540,7 +628,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'accessibility-engineer',
-        instruction: 'Audit accessibility: WCAG compliance, keyboard navigation, screen reader, contrast.',
+        instruction:
+          'Audit accessibility: WCAG compliance, keyboard navigation, screen reader, contrast.',
       },
       {
         role: 'ux-writer',
@@ -562,7 +651,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'ops-sre',
-        instruction: 'Set up monitoring, alerting, and SLOs. Configure dashboards and on-call rotation.',
+        instruction:
+          'Set up monitoring, alerting, and SLOs. Configure dashboards and on-call rotation.',
       },
       {
         role: 'ops-incident',
@@ -598,7 +688,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'data-analyst',
-        instruction: 'Pull usage metrics for the account: feature adoption, growth trends, cost/value analysis.',
+        instruction:
+          'Pull usage metrics for the account: feature adoption, growth trends, cost/value analysis.',
       },
       {
         role: 'sales-lead',
@@ -624,7 +715,8 @@ export const WORKFLOWS: Workflow[] = [
       },
       {
         role: 'ops-automation',
-        instruction: 'Design and build the automation: scripts, integrations, error handling, and testing.',
+        instruction:
+          'Design and build the automation: scripts, integrations, error handling, and testing.',
       },
       {
         role: 'chief-of-staff',
@@ -643,12 +735,19 @@ export const WORKFLOWS: Workflow[] = [
         instruction:
           'Audit data pipelines: schema validation, drift detection, contract compliance, event instrumentation.',
       },
-      { role: 'pr-reviewer', instruction: 'Review data quality findings and prioritize fixes by business impact.' },
+      {
+        role: 'pr-reviewer',
+        instruction: 'Review data quality findings and prioritize fixes by business impact.',
+      },
       {
         role: 'data-analyst',
-        instruction: 'Verify dashboard accuracy against source data. Flag stale or misleading metrics.',
+        instruction:
+          'Verify dashboard accuracy against source data. Flag stale or misleading metrics.',
       },
-      { role: 'ops-sre', instruction: 'Update operational procedures for data pipeline monitoring and alerting.' },
+      {
+        role: 'ops-sre',
+        instruction: 'Update operational procedures for data pipeline monitoring and alerting.',
+      },
     ],
   },
 ];
@@ -728,11 +827,15 @@ export async function executeWorkflow(
       await setProjectLanguage(lang as Language);
       console.log(`${DIM}Project language: ${lang}${RESET}`);
     } else if (lang) {
-      console.log(`${YELLOW}Unknown constraints.language "${lang}" — defaulting to typescript${RESET}`);
+      console.log(
+        `${YELLOW}Unknown constraints.language "${lang}" — defaulting to typescript${RESET}`,
+      );
     }
 
     const rawDirs = intake?.source_dirs;
-    const intakeDirs = Array.isArray(rawDirs) ? rawDirs.filter((d): d is string => typeof d === 'string') : [];
+    const intakeDirs = Array.isArray(rawDirs)
+      ? rawDirs.filter((d): d is string => typeof d === 'string')
+      : [];
     await setSourceDirs(intakeDirs);
     if (intakeDirs.length) console.log(`${DIM}Source dirs: ${intakeDirs.join(', ')}${RESET}`);
 
@@ -744,7 +847,9 @@ export async function executeWorkflow(
       console.log(
         `${DIM}Check the Branch hook message above for the specific cause (missing intake JSON, missing context.product, no primary repo, or GitHub API failure).${RESET}`,
       );
-      console.log(`${DIM}If no primary repo is configured: fab repo add <github-url> --token <github-pat>${RESET}`);
+      console.log(
+        `${DIM}If no primary repo is configured: fab repo add <github-url> --token <github-pat>${RESET}`,
+      );
       return;
     }
     context = `${branchInfo.context}\n\n${context}`;
@@ -761,7 +866,9 @@ export async function executeWorkflow(
       let output: string;
 
       if (isParallel) {
-        console.log(`${CYAN}── Parallel: ${roleNames}${attempt > 0 ? ` (revision ${attempt})` : ''} ──${RESET}\n`);
+        console.log(
+          `${CYAN}── Parallel: ${roleNames}${attempt > 0 ? ` (revision ${attempt})` : ''} ──${RESET}\n`,
+        );
         // allSettled, not all: one role's transient blip degrades to a gap in the
         // joined output instead of rejecting the whole workflow. A gate or the
         // revision loop then re-runs the batch.
@@ -782,7 +889,8 @@ ${s.instruction}`,
         const perRole = settled.map((result, i) => {
           if (result.status === 'fulfilled') return result.value;
           const role = steps[i].role;
-          const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          const msg =
+            result.reason instanceof Error ? result.reason.message : String(result.reason);
           console.log(`${RED}Role ${role} failed: ${msg} — continuing with a gap${RESET}`);
           return { role, out: roleSessionGap(role, result.reason) };
         });
@@ -816,7 +924,8 @@ ${step.instruction}`,
       if (isParallel) globalStepNum += steps.length;
 
       // Gate check
-      const shouldGate = !options?.noGates && options?.onGate && (isParallel || steps[0].gate !== false);
+      const shouldGate =
+        !options?.noGates && options?.onGate && (isParallel || steps[0].gate !== false);
 
       if (!shouldGate) break; // no gate, advance
 
@@ -849,7 +958,9 @@ ${step.instruction}`,
       return;
     }
     if (gateResult.decision === 'revise') {
-      console.log(`${YELLOW}${BOLD}Merge gate requested revisions after 3 attempts — stopping.${RESET}`);
+      console.log(
+        `${YELLOW}${BOLD}Merge gate requested revisions after 3 attempts — stopping.${RESET}`,
+      );
       if (gateResult.feedback) console.log(`${DIM}${gateResult.feedback}${RESET}`);
       return;
     }
@@ -882,7 +993,9 @@ Return the PR URL prominently in your response.`,
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.log(`${RED}${BOLD}release-manager failed to open the PR: ${msg}${RESET}`);
-        console.log(`${DIM}The gate approved; open the PR by hand or re-run the release step.${RESET}`);
+        console.log(
+          `${DIM}The gate approved; open the PR by hand or re-run the release step.${RESET}`,
+        );
       }
     }
   }
@@ -923,12 +1036,16 @@ async function preCreateFeatureBranch(
 ): Promise<{ context: string; source: CitationSource } | null> {
   const intake = parseIntakeJson(userPrompt);
   if (!intake) {
-    console.log(`${DIM}Branch hook: no JSON intake detected — skipping branch pre-creation.${RESET}`);
+    console.log(
+      `${DIM}Branch hook: no JSON intake detected — skipping branch pre-creation.${RESET}`,
+    );
     return null;
   }
   const productName = intake.context?.product;
   if (!productName || typeof productName !== 'string') {
-    console.log(`${DIM}Branch hook: context.product missing — skipping branch pre-creation.${RESET}`);
+    console.log(
+      `${DIM}Branch hook: context.product missing — skipping branch pre-creation.${RESET}`,
+    );
     return null;
   }
 
@@ -937,7 +1054,9 @@ async function preCreateFeatureBranch(
 
   const primary = await getPrimaryRepo();
   if (!primary) {
-    console.log(`${DIM}Branch hook: no primary repo configured — skipping branch pre-creation.${RESET}`);
+    console.log(
+      `${DIM}Branch hook: no primary repo configured — skipping branch pre-creation.${RESET}`,
+    );
     return null;
   }
 
@@ -955,7 +1074,9 @@ async function preCreateFeatureBranch(
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(`${RED}Branch pre-creation FAILED for ${primary.owner}/${primary.repo} ${branch}: ${msg}${RESET}`);
+    console.log(
+      `${RED}Branch pre-creation FAILED for ${primary.owner}/${primary.repo} ${branch}: ${msg}${RESET}`,
+    );
     return null;
   }
 
@@ -968,7 +1089,10 @@ async function preCreateFeatureBranch(
     `PR CREATION: release-manager opens the consolidated PR at workflow end — never open one yourself.`,
     `Workflow: ${workflow.name}`,
   ].join('\n');
-  return { context, source: { token: primary.token, owner: primary.owner, repo: primary.repo, branch } };
+  return {
+    context,
+    source: { token: primary.token, owner: primary.owner, repo: primary.repo, branch },
+  };
 }
 
 interface CitationSource {
@@ -991,7 +1115,10 @@ interface CitationSource {
  * parseGateVerdict treats as non-blocking `file-unreadable`, so a
  * path-convention mismatch can't produce a false REJECT either.
  */
-async function buildCitationReader(source: CitationSource, output: string): Promise<FileReader | undefined> {
+async function buildCitationReader(
+  source: CitationSource,
+  output: string,
+): Promise<FileReader | undefined> {
   const files = [
     ...new Set(
       parseCitations(output)
@@ -1004,12 +1131,17 @@ async function buildCitationReader(source: CitationSource, output: string): Prom
   try {
     await Promise.all(
       files.map(async (file) => {
-        cache.set(file, await fetchRepoFile(source.token, source.owner, source.repo, file, source.branch));
+        cache.set(
+          file,
+          await fetchRepoFile(source.token, source.owner, source.repo, file, source.branch),
+        );
       }),
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(`${DIM}Citation verification skipped (could not read ${source.owner}/${source.repo}): ${msg}${RESET}`);
+    console.log(
+      `${DIM}Citation verification skipped (could not read ${source.owner}/${source.repo}): ${msg}${RESET}`,
+    );
     return undefined;
   }
   return (file) => cache.get(file) ?? null;
@@ -1065,10 +1197,14 @@ Review the PR candidate against your role's merge-gate criteria per FACTORY_PREA
         // treats as a REJECT — the gate fails safe (never silently approves) and
         // the workflow keeps going instead of crashing.
         const msg = err instanceof Error ? err.message : String(err);
-        console.log(`${RED}Gate role ${role} failed: ${msg} — recording no verdict (fails safe)${RESET}`);
+        console.log(
+          `${RED}Gate role ${role} failed: ${msg} — recording no verdict (fails safe)${RESET}`,
+        );
         roleOutput = roleSessionGap(role, err);
       }
-      const readFile = citationSource ? await buildCitationReader(citationSource, roleOutput) : undefined;
+      const readFile = citationSource
+        ? await buildCitationReader(citationSource, roleOutput)
+        : undefined;
       verdicts.push(parseGateVerdict(role, roleOutput, readFile ? { readFile } : undefined));
     }
 
@@ -1082,7 +1218,13 @@ Review the PR candidate against your role's merge-gate criteria per FACTORY_PREA
       let external: Record<string, Grade> | undefined;
       let drift: GradeDrift | undefined;
       if (profile === 'code') {
-        const calibration = await runExternalCalibration(runtime, workflowName, verdicts, context, runRole);
+        const calibration = await runExternalCalibration(
+          runtime,
+          workflowName,
+          verdicts,
+          context,
+          runRole,
+        );
         if (calibration) {
           external = calibration.external;
           drift = calibration.drift;
@@ -1101,7 +1243,15 @@ Review the PR candidate against your role's merge-gate criteria per FACTORY_PREA
           }
         }
       }
-      await recordQuality(workflowName, profile, 'approve', attempt + 1, lastInternal, external, drift);
+      await recordQuality(
+        workflowName,
+        profile,
+        'approve',
+        attempt + 1,
+        lastInternal,
+        external,
+        drift,
+      );
       return lastResult;
     }
     if (lastResult.decision === 'reject') {
@@ -1196,7 +1346,9 @@ Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_
     // Calibration is advisory; a failed session fails open (skip it) rather than
     // block an already-approved gate.
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(`${YELLOW}External-reviewer calibration failed: ${msg} — skipping calibration${RESET}`);
+    console.log(
+      `${YELLOW}External-reviewer calibration failed: ${msg} — skipping calibration${RESET}`,
+    );
     return null;
   }
 
@@ -1212,7 +1364,9 @@ Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_
 
   const drift = compareGrades(internalGrades, externalGrades);
   if (drift.drifted.length === 0) {
-    console.log(`${GREEN}External calibration aligned (max drift ${drift.maxDrift} letter).${RESET}\n`);
+    console.log(
+      `${GREEN}External calibration aligned (max drift ${drift.maxDrift} letter).${RESET}\n`,
+    );
     return { block: null, internal: internalGrades, external: externalGrades, drift };
   }
 
@@ -1234,7 +1388,11 @@ Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_
 
 // ── Revision ────────────────────────────────────────────────────────
 
-export async function reviseWorkflow(api: AnthropicAgents, sessionId: string, feedback: string): Promise<void> {
+export async function reviseWorkflow(
+  api: AnthropicAgents,
+  sessionId: string,
+  feedback: string,
+): Promise<void> {
   const message = `The user has reviewed the workflow output and has revision feedback:
 
 FEEDBACK:
@@ -1294,7 +1452,9 @@ async function runRoleSession(
   // (ManagedAgentsRuntime errors loudly if the role isn't deployed;
   // SdkRuntime builds the system prompt inline).
   const entry = await getAgentByRole(role);
-  const session = await runtime.runRoleSession(role, message, { title: `${workflowName}: ${role}` });
+  const session = await runtime.runRoleSession(role, message, {
+    title: `${workflowName}: ${role}`,
+  });
   const output = await streamSessionWithAdvisor(session, {
     agentId: entry?.agentId ?? `sdk:${role}`,
     agentRole: role,
@@ -1351,7 +1511,10 @@ export async function streamWithAdvisor(
  * so it runs against any transport — Managed Agents or the
  * Claude Agent SDK — without branching.
  */
-export async function streamSessionWithAdvisor(session: AgentSession, options?: StreamOptions): Promise<string> {
+export async function streamSessionWithAdvisor(
+  session: AgentSession,
+  options?: StreamOptions,
+): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? '';
   const budgetLimit = await getBudgetLimit();
   const sessionId = session.id;
@@ -1421,7 +1584,9 @@ export async function streamSessionWithAdvisor(session: AgentSession, options?: 
     }
 
     if (event.type === 'session.status_rescheduled') {
-      process.stdout.write(`\n${YELLOW}session rescheduled — transient error, retrying automatically...${RESET}\n`);
+      process.stdout.write(
+        `\n${YELLOW}session rescheduled — transient error, retrying automatically...${RESET}\n`,
+      );
       continue;
     }
 
@@ -1475,7 +1640,12 @@ export async function streamSessionWithAdvisor(session: AgentSession, options?: 
             );
 
             try {
-              const advice = await callAdvisor(apiKey, question, context, options?.agentRole ?? 'agent');
+              const advice = await callAdvisor(
+                apiKey,
+                question,
+                context,
+                options?.agentRole ?? 'agent',
+              );
               await session.sendInput({
                 type: 'user.custom_tool_result',
                 custom_tool_use_id: eventId,
@@ -1545,7 +1715,10 @@ export async function streamSessionWithAdvisor(session: AgentSession, options?: 
  * Group workflow steps into sequential singles and parallel batches.
  * Steps with the same `group` value run in parallel.
  */
-function groupSteps(steps: WorkflowStep[], forceSequential?: boolean): (WorkflowStep | WorkflowStep[])[] {
+function groupSteps(
+  steps: WorkflowStep[],
+  forceSequential?: boolean,
+): (WorkflowStep | WorkflowStep[])[] {
   if (forceSequential) return steps;
 
   const result: (WorkflowStep | WorkflowStep[])[] = [];

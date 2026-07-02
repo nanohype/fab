@@ -6,7 +6,8 @@ export const SYSTEM_CURATORS: TeamMember[] = [
     group: 'firm',
     name: 'GitHub Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards GitHub conventions — repo settings, branch protections, Actions, code owners, security.',
+    description:
+      'Stewards GitHub conventions — repo settings, branch protections, Actions, code owners, security.',
     system: `You steward GitHub. Repo settings, branch protections, Actions, code owners, security features.
 
 What you advise on:
@@ -29,7 +30,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'firm',
     name: 'Jira Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Jira conventions when a client mandates it — project schemes, workflows, fields, JQL.',
+    description:
+      'Stewards Jira conventions when a client mandates it — project schemes, workflows, fields, JQL.',
     system: `You steward Jira when a client mandates it. Project schemes, workflows, custom fields, JQL.
 
 What you advise on:
@@ -50,7 +52,8 @@ Report: file paths.`,
     group: 'firm',
     name: 'Notion Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Notion workspace structure — databases, permissions, templates, sync patterns.',
+    description:
+      'Stewards Notion workspace structure — databases, permissions, templates, sync patterns.',
     system: `You steward Notion. Workspace structure, databases, permissions, templates.
 
 What you advise on:
@@ -72,7 +75,8 @@ Report: file paths, Notion page URLs.`,
     group: 'firm',
     name: 'Slack Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Slack conventions — channel naming, workflow apps, notification routing, retention.',
+    description:
+      'Stewards Slack conventions — channel naming, workflow apps, notification routing, retention.',
     system: `You steward Slack. Channel conventions, workflow apps, notification routing, retention.
 
 What you advise on:
@@ -93,7 +97,8 @@ Report: file paths.`,
     group: 'firm',
     name: 'Linear Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Linear conventions — workspace shape, projects, cycles, labels, automation.',
+    description:
+      'Stewards Linear conventions — workspace shape, projects, cycles, labels, automation.',
     system: `You steward Linear. Workspace shape, projects, cycles, labels, automations.
 
 What you advise on:
@@ -114,7 +119,8 @@ Report: file paths.`,
     group: 'firm',
     name: 'Figma Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Figma conventions — file structure, libraries, tokens, branching, dev mode handoff.',
+    description:
+      'Stewards Figma conventions — file structure, libraries, tokens, branching, dev mode handoff.',
     system: `You steward Figma. File structure, libraries, design tokens, branching, dev mode handoff.
 
 What you advise on:
@@ -135,7 +141,8 @@ Report: file paths.`,
     group: 'firm',
     name: 'Stripe Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Stripe — products / pricing model, billing flows, taxes, payouts, webhook hygiene.',
+    description:
+      'Stewards Stripe — products / pricing model, billing flows, taxes, payouts, webhook hygiene.',
     system: `You steward Stripe. Products + pricing model, billing flows, tax, payouts, webhook hygiene.
 
 What you advise on:

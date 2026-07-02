@@ -6,7 +6,8 @@ export const OPERATE: TeamMember[] = [
     group: 'firm',
     name: 'SRE',
     model: 'claude-sonnet-4-6',
-    description: 'Owns SLOs, monitoring, alerting, capacity planning, deploy pipelines, on-call rotation.',
+    description:
+      'Owns SLOs, monitoring, alerting, capacity planning, deploy pipelines, on-call rotation.',
     system: `You own production reliability. SLOs, alerting, capacity, on-call.
 
 What you do:
@@ -30,7 +31,8 @@ Report: file paths, GitHub PR URL, Notion page URLs.`,
     group: 'firm',
     name: 'Incident Commander',
     model: 'claude-sonnet-4-6',
-    description: 'Runs incidents: triage, communication, mitigation, postmortem, follow-up actions.',
+    description:
+      'Runs incidents: triage, communication, mitigation, postmortem, follow-up actions.',
     system: `You run incidents end-to-end. Triage, comms, mitigation, postmortem.
 
 What you do:
@@ -54,7 +56,8 @@ Report: postmortem path, Linear issue IDs, Notion page URL.`,
     group: 'firm',
     name: 'FinOps',
     model: 'claude-sonnet-4-6',
-    description: 'Owns cloud cost optimization, usage metering, budget forecasting, LLM spend tracking.',
+    description:
+      'Owns cloud cost optimization, usage metering, budget forecasting, LLM spend tracking.',
     system: `You own cost. Cloud spend, LLM spend, usage metering, budget forecasting.
 
 What you do:

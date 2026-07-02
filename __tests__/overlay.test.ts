@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { appendOverlays, loadSkillWithOverlay, overlayLayers, resolveSkillPath } from '../src/overlay.js';
+import {
+  appendOverlays,
+  loadSkillWithOverlay,
+  overlayLayers,
+  resolveSkillPath,
+} from '../src/overlay.js';
 
 // Bundled baseline lives at <fab>/skills/ — resolved the same way
 // the runtime does it.
@@ -135,8 +140,14 @@ describe('resolveSkillPath', () => {
   it('collects .append.md from every layer in low-to-high priority order', () => {
     ws.bundledFile('skill-with-appends.md', '# Base\n');
     writeFileSync(join(ws.envDir, 'skill-with-appends.append.md'), '# env-append\n');
-    writeFileSync(join(ws.userHome, '.fab', 'skills', 'skill-with-appends.append.md'), '# user-append\n');
-    writeFileSync(join(ws.projectCwd, '.fab', 'skills', 'skill-with-appends.append.md'), '# project-append\n');
+    writeFileSync(
+      join(ws.userHome, '.fab', 'skills', 'skill-with-appends.append.md'),
+      '# user-append\n',
+    );
+    writeFileSync(
+      join(ws.projectCwd, '.fab', 'skills', 'skill-with-appends.append.md'),
+      '# project-append\n',
+    );
 
     const result = resolveSkillPath('skill-with-appends', ws.env, ws.projectCwd);
     expect(result.appends.map((a) => a.source)).toEqual(['project', 'user', 'env']);

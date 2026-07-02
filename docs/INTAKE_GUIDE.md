@@ -343,7 +343,14 @@ Path to a reference site or repo whose visual feel you want to match. Triggers t
       "Cross-workspace federation (single Slack workspace only)"
     ]
   },
-  "artifacts": ["prd", "architecture", "test-plan", "runbook", "onboarding-playbook", "compliance-checklist"],
+  "artifacts": [
+    "prd",
+    "architecture",
+    "test-plan",
+    "runbook",
+    "onboarding-playbook",
+    "compliance-checklist"
+  ],
   "roles": [
     "product",
     "product-research-curator",
@@ -424,7 +431,14 @@ Path to a reference site or repo whose visual feel you want to match. Triggers t
       "Multi-region active-active deployment (single us-west-2 in v1)"
     ]
   },
-  "artifacts": ["prd", "architecture", "test-plan", "runbook", "onboarding-playbook", "compliance-checklist"],
+  "artifacts": [
+    "prd",
+    "architecture",
+    "test-plan",
+    "runbook",
+    "onboarding-playbook",
+    "compliance-checklist"
+  ],
   "roles": [
     "product",
     "product-research-curator",

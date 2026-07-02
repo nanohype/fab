@@ -221,7 +221,10 @@ describe('aggregateGrades', () => {
   });
 
   it('lets a later verdict win on a collision', () => {
-    const merged = aggregateGrades([v('pr-reviewer', { architecture: 'C' }), v('qa-security', { architecture: 'A' })]);
+    const merged = aggregateGrades([
+      v('pr-reviewer', { architecture: 'C' }),
+      v('qa-security', { architecture: 'A' }),
+    ]);
     expect(merged).toEqual({ architecture: 'A' });
   });
 
@@ -398,7 +401,12 @@ describe('parseCitations', () => {
 });
 
 describe('verifyCitations', () => {
-  const cit: Citation = { claim: 'x', file: 'a.ts', lineRange: '1-2', quotedFragment: 'const a = 1;' };
+  const cit: Citation = {
+    claim: 'x',
+    file: 'a.ts',
+    lineRange: '1-2',
+    quotedFragment: 'const a = 1;',
+  };
 
   it('passes when the fragment appears in the cited file', () => {
     const reader: FileReader = (f) => (f === 'a.ts' ? 'line0\nconst a = 1;\nline2' : null);
@@ -436,7 +444,8 @@ describe('verifyCitations', () => {
 describe('parseGateVerdict with citation verification', () => {
   const out = withEvidence('GATE_VERDICT: APPROVE');
   const fragment = 'const { userId } = await oktaClient.users.getByEmail(claim.email);';
-  const present: FileReader = (f) => (f === 'src/auth/middleware.ts' ? `foo\n${fragment}\nbar` : null);
+  const present: FileReader = (f) =>
+    f === 'src/auth/middleware.ts' ? `foo\n${fragment}\nbar` : null;
   const absent: FileReader = () => 'unrelated content with no such line';
   const missing: FileReader = () => null;
 

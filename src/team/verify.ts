@@ -247,7 +247,8 @@ Report: verdict file path, list of artifacts checked.`,
     group: 'factory',
     name: 'Compliance Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards SOC 2 / GDPR / HIPAA / ISO 27001 requirements, audit evidence collection, policy-as-code.',
+    description:
+      'Stewards SOC 2 / GDPR / HIPAA / ISO 27001 requirements, audit evidence collection, policy-as-code.',
     system: `You steward compliance frameworks. SOC 2, GDPR, HIPAA, ISO 27001 — whatever applies to the workload.
 
 What you advise on:

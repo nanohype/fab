@@ -1,7 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { AgentEvent } from '../src/types.js';
 import type { ParsedArgs } from '../src/args.js';
-import { executeRoleSession, serializeEvent, streamEventsToJsonl } from '../src/runtimes/role-session.js';
+import {
+  executeRoleSession,
+  serializeEvent,
+  streamEventsToJsonl,
+} from '../src/runtimes/role-session.js';
 import { SdkRuntime } from '../src/runtimes/sdk.js';
 import { TEAM } from '../src/team.js';
 
@@ -26,7 +30,11 @@ const toolUse: AgentEvent = {
   input: { command: 'go test ./...' },
   processed_at: '2026-05-22T00:00:01Z',
 };
-const idle: AgentEvent = { type: 'session.status_idle', id: 's1', processed_at: '2026-05-22T00:00:02Z' };
+const idle: AgentEvent = {
+  type: 'session.status_idle',
+  id: 's1',
+  processed_at: '2026-05-22T00:00:02Z',
+};
 const failed: AgentEvent = {
   type: 'session.error',
   id: 's1',
@@ -97,7 +105,9 @@ describe('executeRoleSession', () => {
     vi.stubEnv('FAB_ROLE', undefined);
     vi.stubEnv('FAB_MESSAGE', undefined);
     await expect(
-      executeRoleSession(args({ flags: { role: 'not-a-real-role' }, sub: 'build', positional: ['it'] })),
+      executeRoleSession(
+        args({ flags: { role: 'not-a-real-role' }, sub: 'build', positional: ['it'] }),
+      ),
     ).rejects.toThrow(/not-a-real-role/);
   });
 

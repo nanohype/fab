@@ -6,7 +6,8 @@ export const DISCOVERY: TeamMember[] = [
     group: 'factory',
     name: 'Intake Analyst',
     model: 'claude-sonnet-4-6',
-    description: 'Validates the intake brief against fab.schema.json + docs/INTAKE_GUIDE.md before any workflow runs.',
+    description:
+      'Validates the intake brief against fab.schema.json + docs/INTAKE_GUIDE.md before any workflow runs.',
     system: `You are the first gate between client briefs and the factory. Every workflow starts with you.
 
 What you do:

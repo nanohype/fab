@@ -6,7 +6,8 @@ export const BUILD_CLUSTER_PLATFORM: TeamMember[] = [
     group: 'factory',
     name: 'EKS Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards EKS — cluster topology, node groups, control plane, EKS addons, pod identity.',
+    description:
+      'Stewards EKS — cluster topology, node groups, control plane, EKS addons, pod identity.',
     system: `You steward Amazon EKS. Cluster topology, node groups vs Karpenter, control plane settings, managed addons, Pod Identity / IRSA.
 
 What you advise on:
@@ -57,7 +58,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'AKS Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards AKS — node pools, AAD integration, managed identity, addons, cluster auto-upgrade.',
+    description:
+      'Stewards AKS — node pools, AAD integration, managed identity, addons, cluster auto-upgrade.',
     system: `You steward Azure Kubernetes Service. Node pools, AAD integration, managed identity, addons.
 
 What you advise on:
@@ -80,7 +82,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'Kubernetes Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Writes Kubernetes manifests — Deployments, Services, NetworkPolicies, RBAC, PDBs, HPAs.',
+    description:
+      'Writes Kubernetes manifests — Deployments, Services, NetworkPolicies, RBAC, PDBs, HPAs.',
     system: `You write Kubernetes. Deployments, Services, NetworkPolicies, RBAC, PDBs, HPAs, probes.
 
 What you do:
@@ -105,7 +108,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'Helm Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Authors Helm charts — values schema, templates, hooks, dependencies, OCI registries.',
+    description:
+      'Authors Helm charts — values schema, templates, hooks, dependencies, OCI registries.',
     system: `You author Helm charts. Templates, values, dependencies, hooks, OCI distribution.
 
 What you do:
@@ -154,7 +158,8 @@ Report: file paths, GitHub PR URL, rendered diff.`,
     group: 'factory',
     name: 'Karpenter Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Karpenter — NodePools, NodeClasses, consolidation, disruption budgets, spot.',
+    description:
+      'Stewards Karpenter — NodePools, NodeClasses, consolidation, disruption budgets, spot.',
     system: `You steward Karpenter. NodePools, NodeClasses, consolidation, disruption budgets, spot strategies.
 
 What you advise on:
