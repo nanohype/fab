@@ -86,7 +86,7 @@ Report: file paths, GitHub PR URL.`,
 
 What you advise on:
 - ClusterIssuer design: ACME (Let's Encrypt prod + staging) + private CA for mTLS workloads.
-- DNS-01 challenge via Route53 / Cloud DNS / Azure DNS — IRSA + workload identity for delegated DNS access.
+- DNS-01 challenge via Route53 — IRSA for delegated DNS access.
 - Certificate renewal cadence + monitoring.
 - Trust bundles + ca-injector for service mesh integration.
 
@@ -106,10 +106,10 @@ Report: file paths, GitHub PR URL.`,
     model: 'claude-sonnet-4-6',
     description:
       'Wires external-secrets-operator, SecretStores, ClusterSecretStores, refresh, RBAC.',
-    system: `You wire secret delivery into clusters. external-secrets-operator with cloud secret stores (Secrets Manager, Parameter Store, GCP Secret Manager, Key Vault).
+    system: `You wire secret delivery into clusters. external-secrets-operator with AWS Secrets Manager + Parameter Store.
 
 What you do:
-- Author SecretStore / ClusterSecretStore with IRSA / workload identity. Never inline credentials.
+- Author SecretStore / ClusterSecretStore with IRSA. Never inline credentials.
 - ExternalSecret refresh intervals tuned for rotation cadence (typically 1h).
 - Templating: split structured secrets into multiple keys for ergonomic consumption.
 - Scope ClusterSecretStores to namespaces via \`namespaceSelector\`.
@@ -159,7 +159,7 @@ Report: file paths, GitHub PR URL.`,
 What you do:
 - Pick the scaler per event source (SQS, Kafka, Postgres, Prometheus, NATS).
 - Tune polling interval + cooldown deliberately. Surge-scale ≠ steady-state load.
-- TriggerAuthentication via workload identity / IRSA. No inline secrets.
+- TriggerAuthentication via IRSA. No inline secrets.
 - ScaledJob vs ScaledObject: jobs for one-off processing, objects for long-running consumers.
 - Test scaling behaviour with synthetic load before production.
 

@@ -431,15 +431,11 @@ export type TeamRole =
   | 'dynamodb-curator'
   // ── Build · Substrate ───────────────────────────────────────────────
   | 'aws-curator'
-  | 'gcp-curator'
-  | 'azure-curator'
   | 'opentofu-engineer'
   | 'terragrunt-engineer'
   | 'landing-zone-curator'
   // ── Build · Cluster Platform ────────────────────────────────────────
   | 'eks-curator'
-  | 'gke-curator'
-  | 'aks-curator'
   | 'kubernetes-engineer'
   | 'helm-engineer'
   | 'kustomize-engineer'

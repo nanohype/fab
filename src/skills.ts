@@ -141,16 +141,6 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
       'AWS services, Well-Architected pillars, account topology, IAM patterns, networking.',
     type: 'generated',
   },
-  'gcp-curator': {
-    name: 'gcp-curation',
-    description: 'GCP services, project topology, workload identity, Vertex AI.',
-    type: 'generated',
-  },
-  'azure-curator': {
-    name: 'azure-curation',
-    description: 'Azure services, management groups, RBAC, networking, Azure OpenAI.',
-    type: 'generated',
-  },
   'opentofu-engineer': {
     name: 'opentofu-engineering',
     description: 'OpenTofu / Terraform modules, state backends, providers, plan/apply lifecycle.',
@@ -170,16 +160,6 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   'eks-curator': {
     name: 'eks-curation',
     description: 'EKS cluster topology, node strategy, managed addons, Pod Identity / IRSA.',
-    type: 'generated',
-  },
-  'gke-curator': {
-    name: 'gke-curation',
-    description: 'GKE Standard vs Autopilot, node pools, workload identity, GKE addons.',
-    type: 'generated',
-  },
-  'aks-curator': {
-    name: 'aks-curation',
-    description: 'AKS node pools, AAD integration, workload identity, addons.',
     type: 'generated',
   },
   'kubernetes-engineer': {
