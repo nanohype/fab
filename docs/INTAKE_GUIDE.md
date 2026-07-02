@@ -42,7 +42,7 @@ Actual delivery window with units. _"3 weeks"_, _"Q3 2026"_, _"by 2026-05-15"_. 
 
 ### `constraints.deploy_target` (required for code workflows)
 
-One of `aws | gcp | k8s | fly | vercel | cloudflare`. The factory's branch-creation hook and IaC defaults read this. Code-producing workflows without a `deploy_target` fail the merge gate's IaC dimension.
+One of `aws | k8s | fly | vercel | cloudflare`. The factory's branch-creation hook and IaC defaults read this. Code-producing workflows without a `deploy_target` fail the merge gate's IaC dimension.
 
 ### `constraints.budget`
 

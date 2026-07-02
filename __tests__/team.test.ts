@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TEAM } from '../src/team.js';
 
 describe('TEAM structure', () => {
-  it('has 84 agents organized by phase', () => {
-    expect(TEAM).toHaveLength(84);
+  it('has 80 agents organized by phase', () => {
+    expect(TEAM).toHaveLength(80);
   });
 
   it('every agent has a group field set to factory, firm, or lab', () => {

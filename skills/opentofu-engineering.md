@@ -32,7 +32,7 @@ modules/<scope>/<resource>/
 
 - **Typed inputs.** Every variable declares `type` (`string` / `number` / `bool` / `list(string)` / `map(object({...}))` / etc.) plus `description`. Required variables omit `default`; optional variables explicitly default. Use `validation` blocks for shape constraints (`error_message` required).
 - **Pinned providers.** `required_providers` block names every provider with an explicit version constraint (`~> 5.0` is acceptable; floating `>= 5.0` is not). `required_version` pins the OpenTofu CLI version range too.
-- **State backend.** Pick per cloud convention. AWS: S3 + DynamoDB locking (`use_lockfile = true` with the new lockfile-based locking; DynamoDB is the legacy path). GCP: GCS with object-versioning. Azure: AzureRM with blob locking. Never commit state to git.
+- **State backend.** S3 + DynamoDB locking (`use_lockfile = true` with the new lockfile-based locking; DynamoDB is the legacy path). Never commit state to git.
 - **Workspaces vs separate state.** Workspaces share backend config and are awkward at scale. Prefer one state file per environment + per logical stack (matches Terragrunt composition).
 - **Resource tagging.** Every cloud resource carries `workload`, `environment`, `owner`, `cost_center` tags. Tags drive cost reports + ownership routing. Use `default_tags` on the provider block for AWS to avoid copy-paste.
 - **Naming.** `<workload>-<env>-<resource>` for cloud resource names. The module emits computed names; callers don't construct them.
@@ -50,8 +50,6 @@ modules/<scope>/<resource>/
 ## Provider patterns
 
 - **AWS:** `aws` provider with `assume_role` block for cross-account. `default_tags` on every region. Pin to a known stable version; upgrade intentionally per a release-note review.
-- **GCP:** `google` + `google-beta` providers. Use `impersonate_service_account` for cross-project, never key files.
-- **Azure:** `azurerm` provider with `features {}` block. Subscription bound at provider level; for multi-sub stacks use provider aliases.
 - **Kubernetes provider:** `kubernetes` only for substrate scaffolding (namespaces, ServiceAccounts, base CRDs). Application manifests belong in the gitops repo, not Terraform.
 
 ## Module README contract

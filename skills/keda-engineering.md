@@ -122,8 +122,6 @@ spec:
 
 - **aws-sqs-queue** — SQS messages available.
 - **aws-kinesis-stream** — shard count from iterator age.
-- **gcp-pubsub** — Pub/Sub subscription backlog.
-- **azure-servicebus** — Service Bus message count.
 
 ### Open-source brokers
 

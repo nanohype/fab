@@ -44,7 +44,7 @@
         },
         "deploy_target": {
           "type": "string",
-          "enum": ["aws", "gcp", "fly", "vercel", "cloudflare", "k8s"],
+          "enum": ["aws", "fly", "vercel", "cloudflare", "k8s"],
           "description": "Infrastructure target for engineering."
         },
         "budget": {

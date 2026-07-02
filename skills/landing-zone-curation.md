@@ -34,8 +34,6 @@ landing-zone/modules/
 │   ├── cost-pipeline/         # CUR → Athena → QuickSight or Grafana
 │   ├── eventbridge-buses/     # Per-workload event buses + archive
 │   └── waf/                   # Org-wide WAF rule set + scope-down
-├── gcp/                       # Mirror structure when supporting GCP
-└── azure/                     # Mirror structure when supporting Azure
 ```
 
 Each module is `opentofu-engineer`'s output. You steward placement + ordering, not the HCL itself.
@@ -78,8 +76,8 @@ Use Terragrunt's three-layer include (root → env → region) so dev / staging 
 
 ## Compliance + audit
 
-- CloudTrail (or GCP audit logs / Azure Activity Log) enabled at account-baseline. Logs to a write-once bucket in a separate account.
-- AWS Config (or equivalent) recording resource state changes. Conformance packs aligned with SOC 2 / PCI / HIPAA where applicable.
+- CloudTrail enabled at account-baseline. Logs to a write-once bucket in a separate account.
+- AWS Config recording resource state changes. Conformance packs aligned with SOC 2 / PCI / HIPAA where applicable.
 - Access Analyzer + IAM Access Advisor reports surfaced quarterly.
 
 ## What this curator does in a workflow
