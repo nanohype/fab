@@ -16,7 +16,14 @@ import { randomUUID } from 'node:crypto';
  * Neither is something an inference-time content filter does — they harden
  * the prompt at assembly time, which is exactly the gap fab owns.
  */
-const RESERVED_TAGS = ['thinking', 'system', 'user', 'assistant', 'tool_use', 'tool_result'] as const;
+const RESERVED_TAGS = [
+  'thinking',
+  'system',
+  'user',
+  'assistant',
+  'tool_use',
+  'tool_result',
+] as const;
 
 /** Strip Claude reserved tags from untrusted text, replacing each with a visible marker. */
 export function normalizeDelimiters(text: string): string {

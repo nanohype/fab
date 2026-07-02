@@ -62,7 +62,10 @@ export const ADVISOR_TOOL: CustomTool = {
   input_schema: {
     type: 'object',
     properties: {
-      question: { type: 'string', description: 'The specific irreversible decision you need guidance on.' },
+      question: {
+        type: 'string',
+        description: 'The specific irreversible decision you need guidance on.',
+      },
       context: {
         type: 'string',
         description:

@@ -35,7 +35,9 @@ describe('TEAM structure', () => {
   });
 
   it('curator/engineer convention: -curator and -engineer suffix the specialists', () => {
-    const suffixed = TEAM.filter((m) => m.role.endsWith('-curator') || m.role.endsWith('-engineer'));
+    const suffixed = TEAM.filter(
+      (m) => m.role.endsWith('-curator') || m.role.endsWith('-engineer'),
+    );
     // The bulk of the roster follows the convention; process names
     // (pr-reviewer, build-verifier, artifact-auditor, release-manager,
     // external-reviewer, etc.) are intentional exceptions.

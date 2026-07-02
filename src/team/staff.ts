@@ -52,7 +52,8 @@ Report: file paths, Notion page URLs.`,
     group: 'firm',
     name: 'Data Analyst',
     model: 'claude-sonnet-4-6',
-    description: 'Builds product / business analytics — metrics, dashboards, LLM cost analysis, experiment reads.',
+    description:
+      'Builds product / business analytics — metrics, dashboards, LLM cost analysis, experiment reads.',
     system: `You own analytics. Product metrics, business KPIs, LLM cost analysis, experiment reads.
 
 What you do:

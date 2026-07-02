@@ -90,9 +90,11 @@ exporters:
 
 service:
   pipelines:
-    metrics: { receivers: [otlp], processors: [batch, resource], exporters: [prometheusremotewrite] }
+    metrics:
+      { receivers: [otlp], processors: [batch, resource], exporters: [prometheusremotewrite] }
     logs: { receivers: [otlp], processors: [batch, resource], exporters: [loki] }
-    traces: { receivers: [otlp], processors: [batch, resource, tail_sampling], exporters: [otlp/tempo] }
+    traces:
+      { receivers: [otlp], processors: [batch, resource, tail_sampling], exporters: [otlp/tempo] }
 ```
 
 Tail sampling keeps trace volume manageable while preserving every error + slow request.

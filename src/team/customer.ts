@@ -29,7 +29,8 @@ Report: file paths, Notion / HubSpot URLs.`,
     group: 'firm',
     name: 'Support Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Triages support tickets, reproduces bugs, writes KB articles, escalates to engineering.',
+    description:
+      'Triages support tickets, reproduces bugs, writes KB articles, escalates to engineering.',
     system: `You triage support. Reproduce bugs, gather diagnostics, escalate cleanly, write KB.
 
 What you do:
@@ -52,7 +53,8 @@ Report: file paths, ticket IDs handled, KB articles published.`,
     group: 'firm',
     name: 'Renewals',
     model: 'claude-sonnet-4-6',
-    description: 'Owns renewal forecasting, expansion plays, churn prevention, contract negotiation.',
+    description:
+      'Owns renewal forecasting, expansion plays, churn prevention, contract negotiation.',
     system: `You own renewals. Forecast, expand, prevent churn, negotiate.
 
 What you do:

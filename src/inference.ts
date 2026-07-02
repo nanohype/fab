@@ -32,7 +32,9 @@ const INFERENCE_BACKENDS: ReadonlySet<InferenceBackend> = new Set<InferenceBacke
 export function resolveInferenceBackend(): InferenceBackend {
   const choice = (process.env.FAB_INFERENCE ?? 'api').trim();
   if (INFERENCE_BACKENDS.has(choice as InferenceBackend)) return choice as InferenceBackend;
-  throw new Error(`Unknown FAB_INFERENCE value: "${choice}". Expected "api" (default), "bedrock", or "anthropic-aws".`);
+  throw new Error(
+    `Unknown FAB_INFERENCE value: "${choice}". Expected "api" (default), "bedrock", or "anthropic-aws".`,
+  );
 }
 
 /**

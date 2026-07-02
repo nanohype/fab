@@ -6,7 +6,14 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { AgentRuntime, AgentSession, RunRoleOptions } from '../runtime.js';
-import type { AgentEvent, EffortLevel, FabState, TeamMember, TeamRole, UserEvent } from '../types.js';
+import type {
+  AgentEvent,
+  EffortLevel,
+  FabState,
+  TeamMember,
+  TeamRole,
+  UserEvent,
+} from '../types.js';
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getPrimaryRepo } from '../state.js';
@@ -32,7 +39,11 @@ import { isTerminal, translateSdkMessage } from './sdk-events.js';
  * Parity matrix lives in `docs/transports.md`.
  */
 export class ClaudeCliRuntime implements AgentRuntime {
-  async runRoleSession(role: TeamRole, message: string, options?: RunRoleOptions): Promise<AgentSession> {
+  async runRoleSession(
+    role: TeamRole,
+    message: string,
+    options?: RunRoleOptions,
+  ): Promise<AgentSession> {
     const member = TEAM.find((m) => m.role === role);
     if (!member) {
       throw new Error(`Unknown role: "${role}"`);
@@ -128,7 +139,9 @@ class ClaudeCliSession implements AgentSession {
         // have no analogue at this transport layer.
         return;
       default:
-        throw new Error(`ClaudeCliRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`);
+        throw new Error(
+          `ClaudeCliRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`,
+        );
     }
   }
 

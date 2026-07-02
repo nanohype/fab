@@ -18,7 +18,9 @@ const SANDBOX_MODES: ReadonlySet<SandboxMode> = new Set<SandboxMode>(['cloud', '
 export function resolveSandboxMode(): SandboxMode {
   const choice = (process.env.FAB_SANDBOX ?? 'cloud').trim();
   if (SANDBOX_MODES.has(choice as SandboxMode)) return choice as SandboxMode;
-  throw new Error(`Unknown FAB_SANDBOX value: "${choice}". Expected "cloud" (default) or "self-hosted".`);
+  throw new Error(
+    `Unknown FAB_SANDBOX value: "${choice}". Expected "cloud" (default) or "self-hosted".`,
+  );
 }
 
 /**

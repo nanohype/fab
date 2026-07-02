@@ -54,7 +54,11 @@ export class AnthropicAgents {
     return this.post(`/v1/agents/${id}/archive`, {});
   }
 
-  async updateAgent(id: string, version: number, params: Partial<AgentCreateParams>): Promise<Agent> {
+  async updateAgent(
+    id: string,
+    version: number,
+    params: Partial<AgentCreateParams>,
+  ): Promise<Agent> {
     return this.post(`/v1/agents/${id}`, { version, ...params });
   }
 
@@ -119,10 +123,18 @@ export class AnthropicAgents {
 
     // Create the first version with the same files
     const versionForm = new FormData();
-    versionForm.append('files[]', new Blob([skillMd], { type: 'text/markdown' }), `${dirName}/SKILL.md`);
+    versionForm.append(
+      'files[]',
+      new Blob([skillMd], { type: 'text/markdown' }),
+      `${dirName}/SKILL.md`,
+    );
     if (params.reference_files) {
       for (const ref of params.reference_files) {
-        versionForm.append('files[]', new Blob([ref.content], { type: 'text/markdown' }), `${dirName}/${ref.name}`);
+        versionForm.append(
+          'files[]',
+          new Blob([ref.content], { type: 'text/markdown' }),
+          `${dirName}/${ref.name}`,
+        );
       }
     }
 
@@ -144,10 +156,18 @@ export class AnthropicAgents {
   async updateSkillVersion(skillId: string, params: SkillCreateParams): Promise<void> {
     const dirName = params.name;
     const form = new FormData();
-    form.append('files[]', new Blob([params.content], { type: 'text/markdown' }), `${dirName}/SKILL.md`);
+    form.append(
+      'files[]',
+      new Blob([params.content], { type: 'text/markdown' }),
+      `${dirName}/SKILL.md`,
+    );
     if (params.reference_files) {
       for (const ref of params.reference_files) {
-        form.append('files[]', new Blob([ref.content], { type: 'text/markdown' }), `${dirName}/${ref.name}`);
+        form.append(
+          'files[]',
+          new Blob([ref.content], { type: 'text/markdown' }),
+          `${dirName}/${ref.name}`,
+        );
       }
     }
 
@@ -187,7 +207,9 @@ export class AnthropicAgents {
     return this.post('/v1/vaults', { display_name: displayName, ...(metadata && { metadata }) });
   }
 
-  async listVaults(): Promise<Paginated<{ id: string; display_name: string; archived_at: string | null }>> {
+  async listVaults(): Promise<
+    Paginated<{ id: string; display_name: string; archived_at: string | null }>
+  > {
     return this.get('/v1/vaults?limit=50&include_archived=false');
   }
 
@@ -219,7 +241,9 @@ export class AnthropicAgents {
 
   async listCredentials(
     vaultId: string,
-  ): Promise<Paginated<{ id: string; display_name: string; auth: { type: string; mcp_server_url: string } }>> {
+  ): Promise<
+    Paginated<{ id: string; display_name: string; auth: { type: string; mcp_server_url: string } }>
+  > {
     return this.get(`/v1/vaults/${vaultId}/credentials?limit=50`);
   }
 
@@ -268,7 +292,12 @@ export class AnthropicAgents {
     await this.post(`/v1/sessions/${sessionId}/events`, { events });
   }
 
-  async confirmTool(sessionId: string, toolUseId: string, result: 'allow' | 'deny', threadId?: string): Promise<void> {
+  async confirmTool(
+    sessionId: string,
+    toolUseId: string,
+    result: 'allow' | 'deny',
+    threadId?: string,
+  ): Promise<void> {
     const event: UserEvent = {
       type: 'user.tool_confirmation',
       tool_use_id: toolUseId,
@@ -293,7 +322,11 @@ export class AnthropicAgents {
     await this.post(`/v1/sessions/${sessionId}/events`, { events: [event] });
   }
 
-  async listEvents(sessionId: string, limit = 100, order: 'asc' | 'desc' = 'asc'): Promise<Paginated<AgentEvent>> {
+  async listEvents(
+    sessionId: string,
+    limit = 100,
+    order: 'asc' | 'desc' = 'asc',
+  ): Promise<Paginated<AgentEvent>> {
     return this.get(`/v1/sessions/${sessionId}/events?limit=${limit}&order=${order}`);
   }
 
@@ -322,15 +355,25 @@ export class AnthropicAgents {
 
   // ── Threads (multiagent) ──────────────────────────────────────
 
-  async listThreads(sessionId: string): Promise<Paginated<{ id: string; agent_id: string; status: string }>> {
+  async listThreads(
+    sessionId: string,
+  ): Promise<Paginated<{ id: string; agent_id: string; status: string }>> {
     return this.get(`/v1/sessions/${sessionId}/threads`);
   }
 
-  async *streamThread(sessionId: string, threadId: string, timeoutMs = 300_000): AsyncGenerator<AgentEvent> {
+  async *streamThread(
+    sessionId: string,
+    threadId: string,
+    timeoutMs = 300_000,
+  ): AsyncGenerator<AgentEvent> {
     yield* this.streamSSE(`/v1/sessions/${sessionId}/threads/${threadId}/events/stream`, timeoutMs);
   }
 
-  private async *streamSSE(path: string, timeoutMs: number, maxRetries = 3): AsyncGenerator<AgentEvent> {
+  private async *streamSSE(
+    path: string,
+    timeoutMs: number,
+    maxRetries = 3,
+  ): AsyncGenerator<AgentEvent> {
     let lastEventId: string | undefined;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -352,7 +395,9 @@ export class AnthropicAgents {
           if ((status === 429 || status >= 500) && attempt < maxRetries) {
             // Equal jitter on the capped exponential backoff so retrying clients
             // don't reconnect in lockstep (thundering herd).
-            const delay = Math.round(Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5));
+            const delay = Math.round(
+              Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5),
+            );
             await new Promise((r) => setTimeout(r, delay));
             continue;
           }
@@ -399,7 +444,9 @@ export class AnthropicAgents {
         if (attempt < maxRetries) {
           // Equal jitter on the capped exponential backoff so retrying clients
           // don't reconnect in lockstep (thundering herd).
-          const delay = Math.round(Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5));
+          const delay = Math.round(
+            Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5),
+          );
           process.stderr.write(
             `warning: stream disconnected, reconnecting in ${delay}ms (attempt ${attempt + 1}/${maxRetries})...\n`,
           );
@@ -462,7 +509,12 @@ export class AnthropicAgents {
    * Retry transient failures (429, 500, 502, 503, 504) with exponential backoff.
    * Client errors (4xx except 429) are not retried.
    */
-  private async withRetry<T>(_method: string, _path: string, fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  private async withRetry<T>(
+    _method: string,
+    _path: string,
+    fn: () => Promise<T>,
+    maxRetries = 3,
+  ): Promise<T> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         return await fn();
@@ -470,7 +522,9 @@ export class AnthropicAgents {
         const status = err instanceof HttpError ? err.status : 0;
         const retryable = status === 429 || status >= 500;
         if (!retryable || attempt === maxRetries) throw err;
-        const delay = Math.round(Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5));
+        const delay = Math.round(
+          Math.min(1000 * 2 ** attempt, 10_000) * (0.5 + Math.random() * 0.5),
+        );
         await new Promise((r) => setTimeout(r, delay));
       }
     }

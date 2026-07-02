@@ -99,7 +99,13 @@ describe('translateSdkMessage', () => {
 
   it('attaches native total_cost_usd from the result onto status_idle', () => {
     const event = translateSdkMessage(
-      { type: 'result', subtype: 'success', uuid: 'uuid-6b', session_id: 'sess', total_cost_usd: 0.0421 },
+      {
+        type: 'result',
+        subtype: 'success',
+        uuid: 'uuid-6b',
+        session_id: 'sess',
+        total_cost_usd: 0.0421,
+      },
       () => {},
     );
     expect(event!.type).toBe('session.status_idle');

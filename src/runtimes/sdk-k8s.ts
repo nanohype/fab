@@ -2,7 +2,12 @@ import type { AgentRuntime, AgentSession } from '../runtime.js';
 import type { AgentEvent, TeamRole, UserEvent } from '../types.js';
 import { TEAM } from '../team.js';
 import { isTerminal } from './sdk-events.js';
-import { K8sClient, apiVersionForKind, type AgentSandboxManifest, type AgentSandboxResource } from '../k8s.js';
+import {
+  K8sClient,
+  apiVersionForKind,
+  type AgentSandboxManifest,
+  type AgentSandboxResource,
+} from '../k8s.js';
 
 /**
  * Kubernetes-dispatch SDK runtime.
@@ -95,7 +100,11 @@ export function resolveK8sDispatchConfig(): K8sDispatchConfig {
 }
 
 /** Build the `AgentSandbox` CR for one role-session. */
-export function buildAgentSandboxManifest(role: string, message: string, cfg: K8sDispatchConfig): AgentSandboxManifest {
+export function buildAgentSandboxManifest(
+  role: string,
+  message: string,
+  cfg: K8sDispatchConfig,
+): AgentSandboxManifest {
   const env = [
     { name: 'FAB_ROLE', value: role },
     { name: 'FAB_MESSAGE', value: message },
@@ -136,7 +145,10 @@ export class SdkK8sRuntime implements AgentRuntime {
     }
     const cfg = resolveK8sDispatchConfig();
     const k8s = new K8sClient();
-    const created = await k8s.createAgentSandbox(cfg.namespace, buildAgentSandboxManifest(role, message, cfg));
+    const created = await k8s.createAgentSandbox(
+      cfg.namespace,
+      buildAgentSandboxManifest(role, message, cfg),
+    );
     return new SdkK8sSession(k8s, cfg.namespace, cfg.platform, created.metadata.name);
   }
 
@@ -234,7 +246,9 @@ class SdkK8sSession implements AgentSession {
       try {
         box = await this.k8s.getAgentSandbox(this.namespace, this.name);
       } catch (err) {
-        process.stderr.write(`[sdk-k8s] transient error reading the AgentSandbox: ${errMessage(err)}\n`);
+        process.stderr.write(
+          `[sdk-k8s] transient error reading the AgentSandbox: ${errMessage(err)}\n`,
+        );
         await sleep(POLL_INTERVAL_MS);
         continue;
       }
@@ -247,7 +261,9 @@ class SdkK8sSession implements AgentSession {
       if (box.status?.podName) return box.status.podName;
       await sleep(POLL_INTERVAL_MS);
     }
-    yield this.syntheticError(`timed out after ${POD_SCHEDULE_TIMEOUT_MS}ms waiting for the session pod to be created`);
+    yield this.syntheticError(
+      `timed out after ${POD_SCHEDULE_TIMEOUT_MS}ms waiting for the session pod to be created`,
+    );
     return undefined;
   }
 
@@ -261,7 +277,9 @@ class SdkK8sSession implements AgentSession {
       try {
         phase = (await this.k8s.getPod(tenantNs, podName)).status?.phase;
       } catch (err) {
-        process.stderr.write(`[sdk-k8s] transient error polling the session pod: ${errMessage(err)}\n`);
+        process.stderr.write(
+          `[sdk-k8s] transient error polling the session pod: ${errMessage(err)}\n`,
+        );
         await sleep(POLL_INTERVAL_MS);
         continue;
       }
@@ -272,7 +290,9 @@ class SdkK8sSession implements AgentSession {
       await sleep(POLL_INTERVAL_MS);
     }
     if (!started) {
-      yield this.syntheticError(`the session pod ${podName} did not start within ${POD_START_TIMEOUT_MS}ms`);
+      yield this.syntheticError(
+        `the session pod ${podName} did not start within ${POD_START_TIMEOUT_MS}ms`,
+      );
       return;
     }
 
@@ -282,7 +302,9 @@ class SdkK8sSession implements AgentSession {
         const event = parseLogLine(line);
         if (!event) {
           if (line.trim().startsWith('{')) {
-            process.stderr.write(`[sdk-k8s] dropped malformed log line: ${line.trim().slice(0, 120)}\n`);
+            process.stderr.write(
+              `[sdk-k8s] dropped malformed log line: ${line.trim().slice(0, 120)}\n`,
+            );
           }
           continue;
         }

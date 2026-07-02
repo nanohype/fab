@@ -147,10 +147,12 @@ describe('fab.schema.json', () => {
   });
 
   it('canonical example is rubric-clean (success_criteria are measurable-shaped)', () => {
-    const sc = (schema.examples[0] as { context: { success_criteria: string[] } }).context.success_criteria;
+    const sc = (schema.examples[0] as { context: { success_criteria: string[] } }).context
+      .success_criteria;
     // Every criterion should be a falsifiable assertion — typically contains a number,
     // a comparison, an explicit "zero" / "every" quantifier, or a named test.
-    const looksMeasurable = (s: string) => /\d|every|zero|≥|>|<|all\s+\w+\s+(must|are|include)/i.test(s);
+    const looksMeasurable = (s: string) =>
+      /\d|every|zero|≥|>|<|all\s+\w+\s+(must|are|include)/i.test(s);
     for (const c of sc) {
       expect(looksMeasurable(c), `criterion not measurable-shaped: "${c}"`).toBe(true);
     }

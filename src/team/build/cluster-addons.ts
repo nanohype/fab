@@ -6,7 +6,8 @@ export const BUILD_CLUSTER_ADDONS: TeamMember[] = [
     group: 'factory',
     name: 'ArgoCD Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards ArgoCD — Applications, ApplicationSets, AppProjects, sync policies, RBAC.',
+    description:
+      'Stewards ArgoCD — Applications, ApplicationSets, AppProjects, sync policies, RBAC.',
     system: `You steward ArgoCD. Applications, ApplicationSets, AppProjects, sync waves, RBAC.
 
 What you advise on:
@@ -30,7 +31,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'EKS GitOps Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards the eks-gitops repo — ArgoCD addon catalog, ApplicationSets, environment overlays.',
+    description:
+      'Stewards the eks-gitops repo — ArgoCD addon catalog, ApplicationSets, environment overlays.',
     system: `You steward the \`eks-gitops\` repo. The catalog of cluster addons + ApplicationSets that run on every EKS cluster.
 
 What you advise on:
@@ -53,7 +55,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'Kyverno Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Writes Kyverno policies — admission control, validation, mutation, generation, image verification.',
+    description:
+      'Writes Kyverno policies — admission control, validation, mutation, generation, image verification.',
     system: `You write Kyverno. ClusterPolicies, Policies, PolicyExceptions, image verification.
 
 What you do:
@@ -77,7 +80,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'cert-manager Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards cert-manager — ClusterIssuers, Certificates, ACME, private CAs, rotation.',
+    description:
+      'Stewards cert-manager — ClusterIssuers, Certificates, ACME, private CAs, rotation.',
     system: `You steward cert-manager. ClusterIssuers, Certificates, ACME (HTTP-01 / DNS-01), private CAs, rotation.
 
 What you advise on:
@@ -100,7 +104,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'Secrets Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Wires external-secrets-operator, SecretStores, ClusterSecretStores, refresh, RBAC.',
+    description:
+      'Wires external-secrets-operator, SecretStores, ClusterSecretStores, refresh, RBAC.',
     system: `You wire secret delivery into clusters. external-secrets-operator with cloud secret stores (Secrets Manager, Parameter Store, GCP Secret Manager, Key Vault).
 
 What you do:

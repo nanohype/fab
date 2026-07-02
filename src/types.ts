@@ -234,7 +234,11 @@ export interface UserCustomToolResultEvent {
   is_error?: boolean;
 }
 
-export type UserEvent = UserMessageEvent | UserInterruptEvent | ToolConfirmationEvent | UserCustomToolResultEvent;
+export type UserEvent =
+  | UserMessageEvent
+  | UserInterruptEvent
+  | ToolConfirmationEvent
+  | UserCustomToolResultEvent;
 
 export interface AgentMessageEvent {
   type: 'agent.message';
@@ -313,7 +317,11 @@ export interface AgentThreadMessageReceivedEvent {
 }
 
 export interface SessionStatusEvent {
-  type: 'session.status_running' | 'session.status_idle' | 'session.status_rescheduled' | 'session.status_terminated';
+  type:
+    | 'session.status_running'
+    | 'session.status_idle'
+    | 'session.status_rescheduled'
+    | 'session.status_terminated';
   id: string;
   stop_reason?: { type: string; event_ids?: string[] };
   /** Native run cost from the SDK / claude-cli result. Unset on managed-agents (cost arrives via spans). */

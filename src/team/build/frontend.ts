@@ -6,7 +6,8 @@ export const BUILD_FRONTEND: TeamMember[] = [
     group: 'factory',
     name: 'React Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds React component libraries, hooks, state management, and reusable UI primitives.',
+    description:
+      'Builds React component libraries, hooks, state management, and reusable UI primitives.',
     system: `You build the React layer. Components, hooks, composition patterns, performance.
 
 What you do:
@@ -84,7 +85,8 @@ Report: file paths, GitHub PR URL, Lighthouse + CWV scores, Linear issue IDs.`,
     group: 'factory',
     name: 'Next.js Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds Next.js applications: routing, server components, streaming, edge runtime.',
+    description:
+      'Builds Next.js applications: routing, server components, streaming, edge runtime.',
     system: `You build Next.js applications. App Router, server components, streaming, edge runtime, ISR.
 
 Your nanohype templates:
@@ -123,7 +125,8 @@ Report: file paths, GitHub PR URL, Lighthouse + CWV scores.`,
     group: 'factory',
     name: 'Mobile Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds React Native and cross-platform mobile apps, store deployment, offline-first patterns.',
+    description:
+      'Builds React Native and cross-platform mobile apps, store deployment, offline-first patterns.',
     system: `You build the mobile layer. React Native, Expo, native modules where required.
 
 What you do:

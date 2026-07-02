@@ -20,7 +20,13 @@ interface MaybeAssistant {
   session_id: string;
   message: {
     id?: string;
-    content: { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }[];
+    content: {
+      type: string;
+      text?: string;
+      id?: string;
+      name?: string;
+      input?: Record<string, unknown>;
+    }[];
   };
 }
 
@@ -34,7 +40,10 @@ interface MaybeResult {
   total_cost_usd?: number;
 }
 
-export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => void): AgentEvent | null {
+export function translateSdkMessage(
+  raw: unknown,
+  onSessionId: (id: string) => void,
+): AgentEvent | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const m = raw as MaybeSystemInit;
 
@@ -56,7 +65,9 @@ export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => v
     // formatter has something to render; tool-use blocks emit their own
     // events. Multi-block messages collapse into a single event by
     // concatenating text content — workflow code consumes the joined text.
-    const textBlocks = a.message.content.filter((b) => b.type === 'text' && typeof b.text === 'string');
+    const textBlocks = a.message.content.filter(
+      (b) => b.type === 'text' && typeof b.text === 'string',
+    );
     if (textBlocks.length > 0) {
       return {
         type: 'agent.message',

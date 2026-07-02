@@ -29,7 +29,9 @@ export async function startRepl(options: ReplOptions): Promise<void> {
   const promptStr = () => `${CYAN}${role}${RESET}${DIM}>${RESET} `;
 
   console.log(`${DIM}Session: ${sessionId}${RESET}`);
-  console.log(`${DIM}Type /quit to exit, /status for session info, /switch <role> to change agent${RESET}\n`);
+  console.log(
+    `${DIM}Type /quit to exit, /status for session info, /switch <role> to change agent${RESET}\n`,
+  );
 
   const askQuestion = (rl: Interface, prompt: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -100,7 +102,10 @@ interface SlashContext {
   rl: Interface;
 }
 
-async function handleSlashCommand(input: string, ctx: SlashContext): Promise<'quit' | 'switch' | 'handled'> {
+async function handleSlashCommand(
+  input: string,
+  ctx: SlashContext,
+): Promise<'quit' | 'switch' | 'handled'> {
   const [cmd] = input.split(/\s+/);
 
   switch (cmd) {
@@ -115,7 +120,9 @@ async function handleSlashCommand(input: string, ctx: SlashContext): Promise<'qu
         console.log(`${DIM}Session: ${sess.id}`);
         console.log(`Status: ${sess.status}`);
         console.log(`Agent: ${ctx.role}`);
-        console.log(`Tokens: ${sess.usage.input_tokens} in / ${sess.usage.output_tokens} out${RESET}\n`);
+        console.log(
+          `Tokens: ${sess.usage.input_tokens} in / ${sess.usage.output_tokens} out${RESET}\n`,
+        );
       } catch (err) {
         console.error(`Status failed: ${err instanceof Error ? err.message : String(err)}`);
       }

@@ -53,7 +53,11 @@ let writeChain: Promise<void> = Promise.resolve();
  * Serialized against any in-flight collection so the perf file is never lost to
  * a concurrent write.
  */
-export function collectSessionMetrics(api: AnthropicAgents, sessionId: string, state: FabState): Promise<void> {
+export function collectSessionMetrics(
+  api: AnthropicAgents,
+  sessionId: string,
+  state: FabState,
+): Promise<void> {
   const run = writeChain.then(() => collectSessionMetricsInner(api, sessionId, state));
   // Keep the chain alive even if one collection rejects.
   writeChain = run.then(
@@ -63,7 +67,11 @@ export function collectSessionMetrics(api: AnthropicAgents, sessionId: string, s
   return run;
 }
 
-async function collectSessionMetricsInner(api: AnthropicAgents, sessionId: string, state: FabState): Promise<void> {
+async function collectSessionMetricsInner(
+  api: AnthropicAgents,
+  sessionId: string,
+  state: FabState,
+): Promise<void> {
   const perf = await loadPerf();
   const agentIdToRole = new Map<string, string>();
   for (const a of state.agents) {
@@ -119,7 +127,8 @@ export function formatPerfReport(perf: PerfData): string {
 
   for (const [role, m] of roles) {
     const rate = rateFor(TEAM.find((t) => t.role === role)?.model);
-    const cost = (m.totalInputTokens / 1e6) * rate.input + (m.totalOutputTokens / 1e6) * rate.output;
+    const cost =
+      (m.totalInputTokens / 1e6) * rate.input + (m.totalOutputTokens / 1e6) * rate.output;
     lines.push(
       `${role.padEnd(22)} ${String(m.sessions).padStart(4)} ${String(m.selfEvalPass).padStart(4)} ${String(m.selfEvalFail).padStart(4)} ${String(m.advisorCalls).padStart(4)} ${String(m.revisions).padStart(4)} ${fmtTok(m.totalInputTokens).padStart(10)} ${fmtTok(m.totalOutputTokens).padStart(10)} ${('$' + cost.toFixed(2)).padStart(8)}`,
     );
@@ -134,7 +143,10 @@ export function formatPerfReport(perf: PerfData): string {
         output: acc.output + m.totalOutputTokens,
         // Sum the model-aware per-role costs — the roster mixes tiers, so a flat
         // rate on the aggregate would mis-price (Opus roles especially).
-        cost: acc.cost + (m.totalInputTokens / 1e6) * rate.input + (m.totalOutputTokens / 1e6) * rate.output,
+        cost:
+          acc.cost +
+          (m.totalInputTokens / 1e6) * rate.input +
+          (m.totalOutputTokens / 1e6) * rate.output,
       };
     },
     { sessions: 0, input: 0, output: 0, cost: 0 },

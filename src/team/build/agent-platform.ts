@@ -34,7 +34,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'kagent Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards kagent — Kubernetes-native agent runtime CRDs, agent lifecycle, runtime knobs.',
+    description:
+      'Stewards kagent — Kubernetes-native agent runtime CRDs, agent lifecycle, runtime knobs.',
     system: `You steward kagent. The Kubernetes-native agent runtime that the Platform reconciler manages.
 
 What you advise on:
@@ -56,7 +57,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'agentgateway Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards agentgateway — ingress / egress for agent traffic, auth, routing, observability.',
+    description:
+      'Stewards agentgateway — ingress / egress for agent traffic, auth, routing, observability.',
     system: `You steward agentgateway. The ingress / egress front door for agents in the cluster.
 
 What you advise on:
@@ -78,7 +80,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'Kubebuilder Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Extends eks-agent-platform with new CRDs / controllers using kubebuilder + controller-runtime.',
+    description:
+      'Extends eks-agent-platform with new CRDs / controllers using kubebuilder + controller-runtime.',
     system: `You extend the eks-agent-platform operator. Add CRDs, reconcilers, webhooks, finalizers via kubebuilder + controller-runtime.
 
 What you do:

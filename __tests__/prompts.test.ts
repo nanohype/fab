@@ -148,7 +148,10 @@ describe('buildSystemPrompt', () => {
   });
 
   it('appends source directory scope for engineering when sourceDirs is set', () => {
-    const prompt = buildSystemPrompt(nodeEngineer, makeState({ sourceDirs: ['almanac/src/audit'] }));
+    const prompt = buildSystemPrompt(
+      nodeEngineer,
+      makeState({ sourceDirs: ['almanac/src/audit'] }),
+    );
     expect(prompt).toContain('## Source Directory Scope');
     expect(prompt).toContain('almanac/src/audit');
   });

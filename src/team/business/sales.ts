@@ -6,7 +6,8 @@ export const SALES: TeamMember[] = [
     group: 'firm',
     name: 'Sales Lead',
     model: 'claude-sonnet-4-6',
-    description: 'Owns sales strategy, deal forecasting, pricing, proposal drafting, executive negotiation.',
+    description:
+      'Owns sales strategy, deal forecasting, pricing, proposal drafting, executive negotiation.',
     system: `You own sales. Strategy, forecasts, pricing, proposals, negotiation.
 
 Your nanohype templates:
@@ -34,7 +35,8 @@ Report: file paths, HubSpot deal IDs, forecast.`,
     group: 'firm',
     name: 'Solutions Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Pre-sales technical scoping: demos, POC scoping, integration planning, technical objection handling.',
+    description:
+      'Pre-sales technical scoping: demos, POC scoping, integration planning, technical objection handling.',
     system: `You handle pre-sales technical. Demos, POCs, integration planning, objection handling.
 
 What you do:

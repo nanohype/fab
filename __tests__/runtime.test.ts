@@ -12,7 +12,13 @@ vi.mock('../src/state.js', () => ({
   getMemoryResource: vi.fn(async () => null),
 }));
 
-import { getAgentByRole, getEnvironmentId, getRepos, getVaultIds, getMemoryResource } from '../src/state.js';
+import {
+  getAgentByRole,
+  getEnvironmentId,
+  getRepos,
+  getVaultIds,
+  getMemoryResource,
+} from '../src/state.js';
 import { ManagedAgentsRuntime } from '../src/runtimes/managed-agents.js';
 
 function fakeApi(overrides: Partial<AnthropicAgents> = {}): AnthropicAgents {
@@ -145,7 +151,9 @@ describe('ManagedAgentsRuntime.runRoleSession', () => {
     expect(createSession).toHaveBeenCalledWith({
       agent: 'agent_p',
       environment_id: 'env_xyz',
-      resources: [{ type: 'github_repository', url: 'https://github.com/x/y', authorization_token: 'pat' }],
+      resources: [
+        { type: 'github_repository', url: 'https://github.com/x/y', authorization_token: 'pat' },
+      ],
       vault_ids: ['vault_a'],
     });
   });
@@ -159,7 +167,11 @@ describe('ManagedAgentsRuntime.runRoleSession', () => {
     });
     mockedGetEnvironmentId.mockResolvedValue('env_xyz');
     mockedGetRepos.mockResolvedValue([
-      { type: 'github_repository', url: 'https://github.com/x/from-state', authorization_token: 'pat' },
+      {
+        type: 'github_repository',
+        url: 'https://github.com/x/from-state',
+        authorization_token: 'pat',
+      },
     ]);
     mockedGetVaultIds.mockResolvedValue(['from-state-vault']);
 
@@ -172,7 +184,13 @@ describe('ManagedAgentsRuntime.runRoleSession', () => {
 
     const runtime = new ManagedAgentsRuntime(api);
     await runtime.runRoleSession('product', 'm', {
-      resources: [{ type: 'github_repository', url: 'https://github.com/x/override', authorization_token: 'pat2' }],
+      resources: [
+        {
+          type: 'github_repository',
+          url: 'https://github.com/x/override',
+          authorization_token: 'pat2',
+        },
+      ],
       vaultIds: ['override-vault'],
     });
 
@@ -205,7 +223,9 @@ describe('ManagedAgentSession', () => {
   });
 
   it('events delegates to api.stream', async () => {
-    const events: AgentEvent[] = [{ id: 'e1', type: 'session.status_running', processed_at: '2026-04-08T00:00:00Z' }];
+    const events: AgentEvent[] = [
+      { id: 'e1', type: 'session.status_running', processed_at: '2026-04-08T00:00:00Z' },
+    ];
     const stream = vi.fn(() => yieldEvents(events));
     const api = fakeApi({
       createSession: vi.fn(async () => ({ id: 'sess_s' }) as Session),

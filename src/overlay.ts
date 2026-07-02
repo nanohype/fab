@@ -56,7 +56,10 @@ function bundledDir(): string {
  * Compute the priority-ordered list of layers. Exposed for tests and
  * for `fab skills layers` style CLI introspection.
  */
-export function overlayLayers(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): Layer[] {
+export function overlayLayers(
+  env: NodeJS.ProcessEnv = process.env,
+  cwd: string = process.cwd(),
+): Layer[] {
   // `env.HOME` is honored when passed (lets tests inject a sandbox).
   // Falls through to `os.homedir()` when the caller doesn't override it.
   const home = env.HOME ?? homedir();

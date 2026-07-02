@@ -101,7 +101,9 @@ const defaultRunner: CliRunner = (file, args) => execFileAsync(file, args, { tim
  * there is nothing to carry the human into AWS, so fail loudly rather than
  * silently run as the tenant role.
  */
-export function resolveSessionIdentity(env: NodeJS.ProcessEnv = process.env): SessionIdentity | null {
+export function resolveSessionIdentity(
+  env: NodeJS.ProcessEnv = process.env,
+): SessionIdentity | null {
   const operator = env[ENV_OPERATOR]?.trim();
   if (!operator) return null;
 
@@ -128,7 +130,8 @@ export function resolveSessionIdentity(env: NodeJS.ProcessEnv = process.env): Se
   // as an opaque STS error.
   if (!ROLE_ARN_RE.test(roleArn)) {
     throw new Error(
-      `${ENV_SESSION_ROLE}="${roleArn}" is not an IAM role ARN ` + `(expected arn:aws:iam::<account-id>:role/<name>).`,
+      `${ENV_SESSION_ROLE}="${roleArn}" is not an IAM role ARN ` +
+        `(expected arn:aws:iam::<account-id>:role/<name>).`,
     );
   }
 
@@ -228,7 +231,10 @@ export async function assumeWithSourceIdentity(
  * `docs/attribution.md`). `operator` is JSON-encoded so it is always a safe
  * YAML scalar.
  */
-export function writeImpersonationKubeconfig(operator: string, dir = mkdtempSync(join(tmpdir(), 'fab-kube-'))): string {
+export function writeImpersonationKubeconfig(
+  operator: string,
+  dir = mkdtempSync(join(tmpdir(), 'fab-kube-')),
+): string {
   const path = join(dir, 'config');
   const kubeconfig = [
     'apiVersion: v1',

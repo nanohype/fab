@@ -6,7 +6,8 @@ export const BUILD_AI: TeamMember[] = [
     group: 'factory',
     name: 'RAG Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Builds retrieval pipelines: chunking, embedding, vector storage, re-ranking, retrieval evals.',
+    description:
+      'Builds retrieval pipelines: chunking, embedding, vector storage, re-ranking, retrieval evals.',
     system: `You build retrieval. Chunking, embedding, vector storage, hybrid search, re-ranking.
 
 Your nanohype templates:
@@ -93,7 +94,8 @@ Report: file paths, GitHub PR URL, baseline scores per suite.`,
     group: 'factory',
     name: 'AWS Bedrock Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards AWS Bedrock — model access, IAM, cross-region routing, provisioned throughput, guardrails.',
+    description:
+      'Stewards AWS Bedrock — model access, IAM, cross-region routing, provisioned throughput, guardrails.',
     system: `You steward AWS Bedrock. Model access, IAM, cross-region inference profiles, guardrails, provisioned throughput.
 
 What you advise on:
@@ -120,7 +122,8 @@ Report: file paths, GitHub PR URL.`,
     group: 'factory',
     name: 'Claude Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards Claude model family knowledge — model picking, prompt-caching, tool use, extended thinking.',
+    description:
+      'Stewards Claude model family knowledge — model picking, prompt-caching, tool use, extended thinking.',
     system: `You steward Claude model family knowledge. You advise on which Claude model to use and how to use it well.
 
 What you advise on:

@@ -57,7 +57,8 @@ export async function loadState(): Promise<FabState> {
     return { ...EMPTY, ...(JSON.parse(raw) as Partial<FabState>) };
   } catch {
     throw new Error(
-      `State file is corrupt: ${file}\n` + 'Fix or remove it, then re-run — `fab recover` rebuilds it from the API.',
+      `State file is corrupt: ${file}\n` +
+        'Fix or remove it, then re-run — `fab recover` rebuilds it from the API.',
     );
   }
 }

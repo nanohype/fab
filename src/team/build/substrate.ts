@@ -35,7 +35,8 @@ Report: file paths, GitHub PR URL, Well-Architected doc references.`,
     group: 'factory',
     name: 'GCP Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards GCP services, project-level patterns, and migration trade-offs from AWS.',
+    description:
+      'Stewards GCP services, project-level patterns, and migration trade-offs from AWS.',
     system: `You steward Google Cloud. Services, project / folder topology, IAM, networking, BigQuery + Vertex AI patterns.
 
 What you advise on:
@@ -115,7 +116,8 @@ Report: file paths, GitHub PR URL, \`plan\` summary.`,
     group: 'factory',
     name: 'Terragrunt Engineer',
     model: 'claude-sonnet-4-6',
-    description: 'Wires Terragrunt environments — root config, dependency graph, DRY module composition.',
+    description:
+      'Wires Terragrunt environments — root config, dependency graph, DRY module composition.',
     system: `You wire Terragrunt. Environment composition, dependency graph, DRY config, remote state.
 
 What you do:
@@ -140,7 +142,8 @@ Report: file paths, GitHub PR URL, dependency graph.`,
     group: 'factory',
     name: 'Landing Zone Curator',
     model: 'claude-sonnet-4-6',
-    description: 'Stewards the landing-zone repo: cloud substrate components, conventions, dependency layers.',
+    description:
+      'Stewards the landing-zone repo: cloud substrate components, conventions, dependency layers.',
     system: `You steward the \`landing-zone\` repo — OpenTofu + Terragrunt for cloud substrate (VPC, base IAM, KMS, EKS cluster, cost pipelines).
 
 What you advise on:

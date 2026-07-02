@@ -18,7 +18,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   // ── Discovery ───────────────────────────────────────────────────────
   'intake-analyst': {
     name: 'intake-analysis',
-    description: 'Intake JSON validation, constraint feasibility, ambiguity resolution, workflow suggestion.',
+    description:
+      'Intake JSON validation, constraint feasibility, ambiguity resolution, workflow suggestion.',
     type: 'generated',
   },
   product: {
@@ -107,12 +108,14 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   },
   'bedrock-curator': {
     name: 'bedrock-curation',
-    description: 'AWS Bedrock model access, IAM, cross-region routing, provisioned throughput, guardrails.',
+    description:
+      'AWS Bedrock model access, IAM, cross-region routing, provisioned throughput, guardrails.',
     type: 'generated',
   },
   'claude-curator': {
     name: 'claude-curation',
-    description: 'Claude model family — picking, prompt-caching, tool use, extended thinking, vision.',
+    description:
+      'Claude model family — picking, prompt-caching, tool use, extended thinking, vision.',
     type: 'generated',
   },
   // ── Build · Data ────────────────────────────────────────────────────
@@ -134,7 +137,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   // ── Build · Substrate ───────────────────────────────────────────────
   'aws-curator': {
     name: 'aws-curation',
-    description: 'AWS services, Well-Architected pillars, account topology, IAM patterns, networking.',
+    description:
+      'AWS services, Well-Architected pillars, account topology, IAM patterns, networking.',
     type: 'generated',
   },
   'gcp-curator': {
@@ -211,7 +215,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   },
   'kyverno-engineer': {
     name: 'kyverno-engineering',
-    description: 'Kyverno policies: admission, validation, mutation, generation, image verification.',
+    description:
+      'Kyverno policies: admission, validation, mutation, generation, image verification.',
     type: 'generated',
   },
   'cert-manager-curator': {
@@ -264,7 +269,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   },
   'pr-reviewer': {
     name: 'pr-review',
-    description: 'Diff-level code review: architecture, patterns, frontend, code_quality dimensions.',
+    description:
+      'Diff-level code review: architecture, patterns, frontend, code_quality dimensions.',
     type: 'generated',
   },
   'qa-security': {
@@ -279,18 +285,21 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   },
   'artifact-auditor': {
     name: 'artifact-auditing',
-    description: 'Artifact completeness, scope ledger correctness, link integrity, doc-impl alignment.',
+    description:
+      'Artifact completeness, scope ledger correctness, link integrity, doc-impl alignment.',
     type: 'generated',
   },
   'compliance-curator': {
     name: 'compliance-curation',
-    description: 'SOC 2 / GDPR / HIPAA / ISO 27001 framework scoping, audit evidence, policy-as-code.',
+    description:
+      'SOC 2 / GDPR / HIPAA / ISO 27001 framework scoping, audit evidence, policy-as-code.',
     type: 'generated',
   },
   // ── Ship ────────────────────────────────────────────────────────────
   'release-manager': {
     name: 'release-management',
-    description: 'Scope-ledger release notes, version bumps, post-gate PR creation, deploy handoff.',
+    description:
+      'Scope-ledger release notes, version bumps, post-gate PR creation, deploy handoff.',
     type: 'generated',
   },
   'deploy-engineer': {
@@ -400,7 +409,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   // ── System Curators ─────────────────────────────────────────────────
   'github-curator': {
     name: 'github-curation',
-    description: 'GitHub repo settings, branch protections, Actions, CODEOWNERS, security features.',
+    description:
+      'GitHub repo settings, branch protections, Actions, CODEOWNERS, security features.',
     type: 'generated',
   },
   'jira-curator': {
@@ -446,7 +456,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   },
   'data-analyst': {
     name: 'data-analysis',
-    description: 'Product / business analytics, metrics, dashboards, LLM cost analysis, experiments.',
+    description:
+      'Product / business analytics, metrics, dashboards, LLM cost analysis, experiments.',
     type: 'generated',
   },
   // ── Lab ─────────────────────────────────────────────────────────────
@@ -458,7 +469,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   },
   'prompt-optimizer': {
     name: 'prompt-optimizer',
-    description: 'Agent output analysis, prompt failure detection, prompt improvement recommendations.',
+    description:
+      'Agent output analysis, prompt failure detection, prompt improvement recommendations.',
     type: 'generated',
   },
   learner: {
@@ -573,7 +585,10 @@ async function loadBriefSkill(
   const briefPath = join(templateDir, 'skeleton', 'brief.md');
   const yamlPath = join(templateDir, 'template.yaml');
 
-  const [briefRaw, yamlRaw] = await Promise.all([readFile(briefPath, 'utf-8'), readFile(yamlPath, 'utf-8')]);
+  const [briefRaw, yamlRaw] = await Promise.all([
+    readFile(briefPath, 'utf-8'),
+    readFile(yamlPath, 'utf-8'),
+  ]);
 
   const variables = parseVariables(yamlRaw);
   const content = wrapAsSkillMd(def, stripPlaceholders(briefRaw, variables));

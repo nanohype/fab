@@ -142,7 +142,9 @@ Always scaffold into /workspace/src/ and commit the result to the mounted reposi
   if (isEngineering) {
     const lang = state.projectLanguage;
     const tc = LANGUAGE_TOOLCHAIN[lang];
-    const typecheckLine = tc.typecheck ? `   b. \`${tc.typecheck}\` — type checking, zero errors.\n` : '';
+    const typecheckLine = tc.typecheck
+      ? `   b. \`${tc.typecheck}\` — type checking, zero errors.\n`
+      : '';
     sections.push(`## Build Verification Protocol (${lang})
 
 Before reporting completion or creating a PR, run the four-phase contract for this project's language (\`${lang}\`) and fix every failure:

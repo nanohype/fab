@@ -105,7 +105,10 @@ export class K8sClient {
 
   // ── AgentSandbox ──────────────────────────────────────────────────
 
-  async createAgentSandbox(namespace: string, manifest: AgentSandboxManifest): Promise<AgentSandboxResource> {
+  async createAgentSandbox(
+    namespace: string,
+    manifest: AgentSandboxManifest,
+  ): Promise<AgentSandboxResource> {
     return this.request('POST', this.agentSandboxPath(namespace), manifest);
   }
 
@@ -121,7 +124,10 @@ export class K8sClient {
 
   async getPlatform(namespace: string, name: string): Promise<PlatformResource> {
     const group = groupForKind('Platform');
-    return this.request('GET', `/apis/${group}/${CRD_VERSION}/namespaces/${namespace}/platforms/${name}`);
+    return this.request(
+      'GET',
+      `/apis/${group}/${CRD_VERSION}/namespaces/${namespace}/platforms/${name}`,
+    );
   }
 
   // ── Pods ──────────────────────────────────────────────────────────
@@ -135,7 +141,11 @@ export class K8sClient {
    * caller passes an `AbortSignal` to bound the overall wait — a `follow`
    * connection has no natural timeout.
    */
-  async *followPodLog(namespace: string, name: string, signal?: AbortSignal): AsyncGenerator<string> {
+  async *followPodLog(
+    namespace: string,
+    name: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<string> {
     const path = `/api/v1/namespaces/${namespace}/pods/${name}/log?follow=true&timestamps=false`;
     const res = await fetch(`${this.base}${path}`, { headers: this.headers(), signal });
     if (!res.ok) {

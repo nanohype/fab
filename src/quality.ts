@@ -122,7 +122,8 @@ export function formatQualityTrend(runs: QualityRun[]): string {
     const overall = mean(values);
     const recent = mean(values.slice(-RECENT_WINDOW));
     const delta = recent - overall;
-    const arrow = delta > 0.15 ? `${GREEN}↑${RESET}` : delta < -0.15 ? `${RED}↓${RESET}` : `${DIM}→${RESET}`;
+    const arrow =
+      delta > 0.15 ? `${GREEN}↑${RESET}` : delta < -0.15 ? `${RED}↓${RESET}` : `${DIM}→${RESET}`;
     lines.push(
       `${dim.padEnd(18)} ${String(values.length).padStart(4)} ${overall.toFixed(2).padStart(8)} ${recent.toFixed(2).padStart(8)} ${arrow.padStart(6)}`,
     );

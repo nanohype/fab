@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { unlink } from 'node:fs/promises';
-import { appendQualityRun, loadQualityRuns, formatQualityTrend, gradeToGpa, type QualityRun } from '../src/quality.js';
+import {
+  appendQualityRun,
+  loadQualityRuns,
+  formatQualityTrend,
+  gradeToGpa,
+  type QualityRun,
+} from '../src/quality.js';
 
 const QUALITY_FILE = process.env.FAB_QUALITY_FILE!;
 
@@ -83,14 +89,20 @@ describe('quality', () => {
     });
 
     it('prefers external grades over internal for the trend', () => {
-      const out = formatQualityTrend([run({ internal: { architecture: 'A' }, external: { architecture: 'C' } })]);
+      const out = formatQualityTrend([
+        run({ internal: { architecture: 'A' }, external: { architecture: 'C' } }),
+      ]);
       // External C (2.00) wins over internal A (4.00).
       expect(out).toMatch(/architecture\s+1\s+2\.00\s+2\.00/);
     });
 
     it('counts approvals, calibration coverage and drift in the footer', () => {
       const out = formatQualityTrend([
-        run({ decision: 'approve', external: { architecture: 'B' }, drift: { drifted: [], maxDrift: 0 } }),
+        run({
+          decision: 'approve',
+          external: { architecture: 'B' },
+          drift: { drifted: [], maxDrift: 0 },
+        }),
         run({ decision: 'reject' }),
       ]);
       expect(out).toMatch(/2 runs/);

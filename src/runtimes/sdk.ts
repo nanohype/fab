@@ -3,7 +3,12 @@ import type { AgentEvent, EffortLevel, FabState, TeamRole, UserEvent } from '../
 import { TEAM } from '../team.js';
 import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getBudgetLimit } from '../state.js';
-import { inferenceEnv, resolveInferenceBackend, resolveModelId, type InferenceBackend } from '../inference.js';
+import {
+  inferenceEnv,
+  resolveInferenceBackend,
+  resolveModelId,
+  type InferenceBackend,
+} from '../inference.js';
 import { isTerminal, textOf, translateSdkMessage } from './sdk-events.js';
 import { buildHttpMcpServers, type HttpMcpServer } from '../mcp.js';
 
@@ -36,7 +41,11 @@ import { buildHttpMcpServers, type HttpMcpServer } from '../mcp.js';
  * Bedrock (see `src/inference.ts`); the default is the Anthropic API.
  */
 export class SdkRuntime implements AgentRuntime {
-  async runRoleSession(role: TeamRole, message: string, options?: RunRoleOptions): Promise<AgentSession> {
+  async runRoleSession(
+    role: TeamRole,
+    message: string,
+    options?: RunRoleOptions,
+  ): Promise<AgentSession> {
     const member = TEAM.find((m) => m.role === role);
     if (!member) {
       throw new Error(`Unknown role: "${role}"`);
@@ -59,7 +68,9 @@ export class SdkRuntime implements AgentRuntime {
     // --mcp-config; the same gateway-bearer logic lives in buildHttpMcpServers.
     const { servers: mcpServers, skipped } = buildHttpMcpServers(member.mcpServers, process.env);
     if (skipped.length > 0) {
-      process.stderr.write(`[sdk] MCP_GATEWAY_TOKEN not set — dropping gateway server(s): ${skipped.join(', ')}.\n`);
+      process.stderr.write(
+        `[sdk] MCP_GATEWAY_TOKEN not set — dropping gateway server(s): ${skipped.join(', ')}.\n`,
+      );
     }
 
     const sdk = await loadSdk();
@@ -87,7 +98,10 @@ export class SdkRuntime implements AgentRuntime {
 }
 
 interface AgentSdkModule {
-  query: (params: { prompt: string | AsyncIterable<unknown>; options?: Record<string, unknown> }) => SdkQuery;
+  query: (params: {
+    prompt: string | AsyncIterable<unknown>;
+    options?: Record<string, unknown>;
+  }) => SdkQuery;
 }
 
 interface SdkQuery extends AsyncIterable<unknown> {
@@ -157,7 +171,10 @@ class SdkAgentSession implements AgentSession {
         ...(this.budgetUsd != null && { maxBudgetUsd: this.budgetUsd }),
         // Role's MCP servers, scoped strictly to fab's set (not the user's
         // ambient ~/.claude MCP config) — matches claude-cli's --strict-mcp-config.
-        ...(Object.keys(this.mcpServers).length > 0 && { mcpServers: this.mcpServers, strictMcpConfig: true }),
+        ...(Object.keys(this.mcpServers).length > 0 && {
+          mcpServers: this.mcpServers,
+          strictMcpConfig: true,
+        }),
         ...(this.effort && { effort: this.effort }),
         ...(backendEnv && { env: { ...process.env, ...backendEnv } }),
         // Resources hint: the SDK uses cwd for filesystem-bound tools;
@@ -194,7 +211,9 @@ class SdkAgentSession implements AgentSession {
         // does not depend on them in the sdk runtime.
         return;
       default:
-        throw new Error(`SdkRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`);
+        throw new Error(
+          `SdkRuntime: unhandled UserEvent type "${(input as { type: string }).type}"`,
+        );
     }
   }
 

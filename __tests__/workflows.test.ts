@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getWorkflow, listWorkflows, executeWorkflow, runMergeGate, type RoleRunner } from '../src/workflows.js';
+import {
+  getWorkflow,
+  listWorkflows,
+  executeWorkflow,
+  runMergeGate,
+  type RoleRunner,
+} from '../src/workflows.js';
 import type { AnthropicAgents } from '../src/api.js';
 import type { AgentRuntime } from '../src/runtime.js';
 
@@ -89,7 +95,10 @@ describe('workflows', () => {
       const lastVerifier = roles.lastIndexOf('build-verifier');
       const lastFidelity = roles.lastIndexOf('fidelity-engineer');
       if (lastVerifier >= 0) {
-        expect(lastVerifier, `fidelity-engineer must follow build-verifier in ${name}`).toBeLessThan(lastFidelity);
+        expect(
+          lastVerifier,
+          `fidelity-engineer must follow build-verifier in ${name}`,
+        ).toBeLessThan(lastFidelity);
       }
     }
   });
@@ -123,7 +132,13 @@ describe('workflows', () => {
   });
 
   it('non-code-producing workflows have no gateProfile', () => {
-    const nonCodeWorkflows = ['sprint-plan', 'lead-gen', 'deal-close', 'customer-onboard', 'market-push'];
+    const nonCodeWorkflows = [
+      'sprint-plan',
+      'lead-gen',
+      'deal-close',
+      'customer-onboard',
+      'market-push',
+    ];
     for (const name of nonCodeWorkflows) {
       const wf = getWorkflow(name)!;
       expect(wf.gateProfile, `${name} should not have a merge gate`).toBeUndefined();
@@ -218,7 +233,9 @@ describe('executeWorkflow resilience', () => {
       runRole,
       onGate: async () => {
         gateCalls += 1;
-        return gateCalls === 1 ? { decision: 'revise', feedback: 'tighten it' } : { decision: 'approve' };
+        return gateCalls === 1
+          ? { decision: 'revise', feedback: 'tighten it' }
+          : { decision: 'approve' };
       },
     });
 

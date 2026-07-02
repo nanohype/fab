@@ -35,11 +35,15 @@ describe('resolveSessionIdentity', () => {
   });
 
   it('throws when an operator is set but no session role', () => {
-    expect(() => resolveSessionIdentity({ FAB_OPERATOR: 'alice@acme.com' })).toThrow(/FAB_SESSION_ROLE_ARN/);
+    expect(() => resolveSessionIdentity({ FAB_OPERATOR: 'alice@acme.com' })).toThrow(
+      /FAB_SESSION_ROLE_ARN/,
+    );
   });
 
   it('resolves operator + role with the default duration', () => {
-    expect(resolveSessionIdentity({ FAB_OPERATOR: 'alice@acme.com', FAB_SESSION_ROLE_ARN: ROLE })).toEqual({
+    expect(
+      resolveSessionIdentity({ FAB_OPERATOR: 'alice@acme.com', FAB_SESSION_ROLE_ARN: ROLE }),
+    ).toEqual({
       operator: 'alice@acme.com',
       roleArn: ROLE,
       durationSeconds: 3600,
@@ -79,7 +83,10 @@ describe('resolveSessionIdentity', () => {
 
   it('rejects a session role that is not an IAM role ARN', () => {
     expect(() =>
-      resolveSessionIdentity({ FAB_OPERATOR: 'alice@acme.com', FAB_SESSION_ROLE_ARN: 'not-an-arn' }),
+      resolveSessionIdentity({
+        FAB_OPERATOR: 'alice@acme.com',
+        FAB_SESSION_ROLE_ARN: 'not-an-arn',
+      }),
     ).toThrow(/not an IAM role ARN/);
     // a role ARN from another partition (GovCloud) is still accepted
     expect(
@@ -91,10 +98,12 @@ describe('resolveSessionIdentity', () => {
   });
 
   it('rejects an operator that is not STS-clean (so AWS == K8s binding)', () => {
-    expect(() => resolveSessionIdentity({ FAB_OPERATOR: 'alice smith', FAB_SESSION_ROLE_ARN: ROLE })).toThrow(
-      /A-Za-z0-9/,
+    expect(() =>
+      resolveSessionIdentity({ FAB_OPERATOR: 'alice smith', FAB_SESSION_ROLE_ARN: ROLE }),
+    ).toThrow(/A-Za-z0-9/);
+    expect(() => resolveSessionIdentity({ FAB_OPERATOR: 'x', FAB_SESSION_ROLE_ARN: ROLE })).toThrow(
+      /2–64/,
     );
-    expect(() => resolveSessionIdentity({ FAB_OPERATOR: 'x', FAB_SESSION_ROLE_ARN: ROLE })).toThrow(/2–64/);
   });
 });
 
@@ -135,7 +144,9 @@ describe('assumeWithSourceIdentity', () => {
 
   it('throws when STS returns no credentials', async () => {
     const empty: CliRunner = async () => ({ stdout: JSON.stringify({}) });
-    await expect(assumeWithSourceIdentity(id, 'fab-build', empty)).rejects.toThrow(/no usable credentials/);
+    await expect(assumeWithSourceIdentity(id, 'fab-build', empty)).rejects.toThrow(
+      /no usable credentials/,
+    );
   });
 });
 
@@ -213,13 +224,17 @@ describe('applySessionIdentity', () => {
       AWS_WEB_IDENTITY_TOKEN_FILE: '/var/run/secrets/eks.amazonaws.com/serviceaccount/token',
       AWS_ROLE_SESSION_NAME: 'botocore-session',
     };
-    await expect(applySessionIdentity('fab-build', env, failing)).rejects.toThrow(/sts unavailable/);
+    await expect(applySessionIdentity('fab-build', env, failing)).rejects.toThrow(
+      /sts unavailable/,
+    );
     // Both bindings are computed before any env mutation, so a throw leaves env
     // pristine: no assumed creds, no kubeconfig, and the pod IRSA vars survive.
     expect(env.AWS_ACCESS_KEY_ID).toBeUndefined();
     expect(env.KUBECONFIG).toBeUndefined();
     expect(env.AWS_ROLE_ARN).toBe('arn:aws:iam::1:role/tenant');
-    expect(env.AWS_WEB_IDENTITY_TOKEN_FILE).toBe('/var/run/secrets/eks.amazonaws.com/serviceaccount/token');
+    expect(env.AWS_WEB_IDENTITY_TOKEN_FILE).toBe(
+      '/var/run/secrets/eks.amazonaws.com/serviceaccount/token',
+    );
     expect(env.AWS_ROLE_SESSION_NAME).toBe('botocore-session');
   });
 });
