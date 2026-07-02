@@ -484,7 +484,7 @@ describe('executeWorkflow code-profile fail-fast', () => {
     await executeWorkflow(api, 'sid', workflow, 'a plain prose brief', { runRole });
 
     expect(runRole).not.toHaveBeenCalled();
-    const logged = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    const logged = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('\n');
     expect(logged).toContain('Halted');
   });
 });
