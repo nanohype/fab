@@ -27,10 +27,10 @@ export default defineConfig({
       // on minor fluctuation. Raise these as the runtime + workflow tests
       // grow. Run via `npm run test:coverage`.
       thresholds: {
-        lines: 45, // measured 47.45
-        functions: 36, // measured 38.10
-        branches: 47, // measured 49.64
-        statements: 45, // measured 47.64
+        lines: 53, // measured 55.31
+        functions: 40, // measured 41.94
+        branches: 55, // measured 57.38
+        statements: 52, // measured 54.88
       },
     },
   },
