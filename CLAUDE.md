@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A TypeScript CLI that deploys and orchestrates a team of 84 Claude managed agents via the Anthropic Managed Agents API. The roster is organized around factory phases — workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions. There is no top-level coordinator agent; Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
+A TypeScript CLI that deploys and orchestrates a team of 80 Claude managed agents via the Anthropic Managed Agents API. The roster is organized around factory phases — workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions. There is no top-level coordinator agent; Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
 
 Naming convention (see [`docs/roster.md`](docs/roster.md)):
 

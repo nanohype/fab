@@ -2,11 +2,11 @@
 
 You're an AI client (or the author of one) about to drive the factory or extend it — run a workflow, author an intake brief, pick a transport, pass the merge gate, add a role or skill. This file gets you running. For how fab fits the wider stack, read the [Platform Reference](https://github.com/nanohype/nanohype/blob/main/docs/platform-reference.md).
 
-fab is the open-source reference factory orchestrator: a zero-runtime-dependency TypeScript CLI (Node ≥24, ESM, `@nanohype/fab`, Apache-2.0) that drives 84 Claude agents through a production-grade pipeline — Discovery → Design → Build → Verify → Ship.
+fab is the open-source reference factory orchestrator: a zero-runtime-dependency TypeScript CLI (Node ≥24, ESM, `@nanohype/fab`, Apache-2.0) that drives 80 Claude agents through a production-grade pipeline — Discovery → Design → Build → Verify → Ship.
 
 ## The mental model
 
-- **84 agents in three groups** (each `TeamMember.group`): **factory** (Discovery/Design/Build/Verify/Ship — ships artifacts, gets `FACTORY_PREAMBLE`), **firm** (Operate/Customer/Business/System-Curators/Staff — runs the business, ungated), **lab** (external-reviewer/prompt-optimizer/learner — calibration + meta).
+- **80 agents in three groups** (each `TeamMember.group`): **factory** (Discovery/Design/Build/Verify/Ship — ships artifacts, gets `FACTORY_PREAMBLE`), **firm** (Operate/Customer/Business/System-Curators/Staff — runs the business, ungated), **lab** (external-reviewer/prompt-optimizer/learner — calibration + meta).
 - **Naming convention:** `-curator` = knowledge stewardship (advises/reviews), `-engineer` = production with a tool/language, process names (no suffix) = gate roles (`pr-reviewer`, `build-verifier`, `artifact-auditor`, `release-manager`, `external-reviewer`).
 - **No coordinator agent.** `src/workflows.ts` is the top-level router; it runs each role in its own session via `runtime.runRoleSession`. Managed Agents caps a multiagent roster at 20 unique agents and won't nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
 - Full hierarchy + model tiering in [`docs/roster.md`](docs/roster.md); roles are declared per phase in `src/team/<phase>/<area>.ts` (≤8 specialists each, re-exported by `src/team.ts`).
@@ -33,7 +33,7 @@ The first user message must conform to `fab.schema.json` (`$id https://nanohype.
 
 - `goal` — the outcome, not the process.
 - `workflow` — one of the 18 (omit to let routing decide).
-- `constraints` — `timeline`, `deploy_target` (`aws`|`gcp`|`fly`|`vercel`|`cloudflare`|`k8s`), `budget`, **`language`** (`typescript`|`go`|`python`|`rust`|`java`|`kotlin`|`csharp` — **required for the code-producing workflows**, it dispatches `LANGUAGE_TOOLCHAIN`), `language_versions` (latest-stable-first; EOL runtimes rejected), `model`.
+- `constraints` — `timeline`, `deploy_target` (`aws`|`fly`|`vercel`|`cloudflare`|`k8s`), `budget`, **`language`** (`typescript`|`go`|`python`|`rust`|`java`|`kotlin`|`csharp` — **required for the code-producing workflows**, it dispatches `LANGUAGE_TOOLCHAIN`), `language_versions` (latest-stable-first; EOL runtimes rejected), `model`.
 - `context` — `client` (no `Acme Corp` placeholders), `product` (slugged into the branch), `problem`, `audience`, `success_criteria[]` (**must be falsifiable** — `<3s p50`, not "fast"), `security_requirements[]`, `out_of_scope[]`, `existing_systems[]`, `competitors[]`.
 - `roles[]`, `artifacts[]`, `source_dirs[]` (soft-scope to a subtree).
 
@@ -100,7 +100,7 @@ Node ≥24, TS strict, ESM, Node16 resolution. Raw arg parsing (no yargs/command
 
 ## Pointers
 
-- [`docs/roster.md`](docs/roster.md) — the 84-role hierarchy, naming, gate roles, model tiering.
+- [`docs/roster.md`](docs/roster.md) — the 80-role hierarchy, naming, gate roles, model tiering.
 - [`docs/INTAKE_GUIDE.md`](docs/INTAKE_GUIDE.md) — the brief-authoring rubric (apply before submitting an intake).
 - [`docs/transports.md`](docs/transports.md) — the four-transport parity matrix + inference backends.
 - [`docs/attribution.md`](docs/attribution.md) — operator binding + the platform IAM/RBAC it needs.

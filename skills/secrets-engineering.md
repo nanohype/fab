@@ -5,7 +5,7 @@ description: external-secrets-operator, SecretStores, refresh, scoping, RBAC.
 
 # Secrets Engineering
 
-You wire secret delivery into clusters via external-secrets-operator (ESO). Cloud secret stores (Secrets Manager, Parameter Store, GCP Secret Manager, Key Vault) → Kubernetes Secrets, on a schedule, via workload identity.
+You wire secret delivery into clusters via external-secrets-operator (ESO). AWS secret stores (Secrets Manager, Parameter Store) → Kubernetes Secrets, on a schedule, via IRSA.
 
 ## Ground in
 
@@ -17,8 +17,8 @@ You wire secret delivery into clusters via external-secrets-operator (ESO). Clou
 ## Stack shape
 
 ```
-Cloud secret store (Secrets Manager / Param Store / GCP SM / Key Vault)
-    ↑ read via workload identity (IRSA / Pod Identity / WI Federation)
+AWS secret store (Secrets Manager / Parameter Store)
+    ↑ read via IRSA / Pod Identity
 SecretStore (per-namespace) or ClusterSecretStore (cluster-wide)
     ↓ referenced by
 ExternalSecret (per-secret, per-namespace)
@@ -159,17 +159,13 @@ Either way, the application picks up the new credential via a reload mechanism (
 
 ## Audit
 
-Cloud secret stores log every `GetSecretValue` call:
-
-- AWS: CloudTrail records caller IAM role + secret ARN + timestamp.
-- GCP: Cloud Audit Logs.
-- Azure: Activity Log.
+Every `GetSecretValue` call is logged: CloudTrail records caller IAM role + secret ARN + timestamp.
 
 The audit pipeline (`landing-zone/modules/aws/audit-baseline`) ingests these. Anomalous access patterns (a new role, an unusual time, a different region) trigger an alert.
 
 ## Common pitfalls
 
-- **Long-lived AWS access keys in Secrets.** Defeats the point. Use workload identity for every credential ESO consumes.
+- **Long-lived AWS access keys in Secrets.** Defeats the point. Use IRSA for every credential ESO consumes.
 - **`creationPolicy: Owner` and manual Secret edits.** ESO will overwrite your edits at next refresh. If you must override, use `creationPolicy: Merge` carefully.
 - **Hardcoded ARNs in SecretStore.** Use templated values from Helm + per-env overlays.
 - **One ClusterSecretStore for everything.** Cross-tenant contamination risk. Prefer per-namespace SecretStores.

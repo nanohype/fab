@@ -1,6 +1,6 @@
 # Fab Roster
 
-The roster is 84 specialists organized around factory phases. Workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions; there is no top-level coordinator agent. Anthropic's Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
+The roster is 80 specialists organized around factory phases. Workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions; there is no top-level coordinator agent. Anthropic's Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
 
 ## Naming convention
 
@@ -31,13 +31,12 @@ Workflow code (src/workflows.ts) — top-level routing
 │   │   bedrock-curator · claude-curator
 │   ├── Data (3)
 │   │   postgres-engineer · opensearch-engineer · dynamodb-curator
-│   ├── Substrate (6)
-│   │   aws-curator · gcp-curator · azure-curator ·
-│   │   opentofu-engineer · terragrunt-engineer · landing-zone-curator
-│   ├── Cluster Platform (7)
-│   │   eks-curator · gke-curator · aks-curator ·
-│   │   kubernetes-engineer · helm-engineer · kustomize-engineer ·
-│   │   karpenter-curator
+│   ├── Substrate (4)
+│   │   aws-curator · opentofu-engineer ·
+│   │   terragrunt-engineer · landing-zone-curator
+│   ├── Cluster Platform (5)
+│   │   eks-curator · kubernetes-engineer ·
+│   │   helm-engineer · kustomize-engineer · karpenter-curator
 │   ├── Cluster Addons (7)
 │   │   argocd-curator · eks-gitops-curator · kyverno-engineer ·
 │   │   cert-manager-curator · secrets-engineer ·
@@ -141,7 +140,7 @@ Curators and engineers have bundled baselines at `fab/skills/<def.name>.md`. Ove
 
 Every role declares a `model` in `src/team/<phase>/<area>.ts`. The current spread is deliberate but not yet cost-tuned:
 
-- **82 roles on `claude-sonnet-4-6`** — the default for all factory + firm work.
+- **78 roles on `claude-sonnet-4-6`** — the default for all factory + firm work.
 - **2 lab roles on Opus** (`external-reviewer`, `prompt-optimizer`) plus the `consult_advisor` escalation (`src/advisor.ts`) — Opus where deep reasoning or cold calibration earns it.
 - **0 roles on `claude-haiku-4-5`** — an open cost opportunity. Haiku is $1/$5 per MTok vs Sonnet's $3/$15 (3× cheaper), a good fit for classification / routing / filter / low-stakes-high-volume work.
 

@@ -37,13 +37,13 @@ For smaller orgs: single account per env (dev / staging / prod) + a management a
 
 ### Compute
 
-| Need                                       | Pick                                           |
-| ------------------------------------------ | ---------------------------------------------- |
-| Long-running containerized service         | **EKS** (k8s-native; consistent across clouds) |
-| Stateless functions, sub-second cold start | **Lambda**                                     |
-| Containerized batch / cron / event-driven  | **Fargate** (ECS or EKS)                       |
-| Heritage app, full VM control              | **EC2** with managed AMI                       |
-| Static site                                | **S3 + CloudFront**                            |
+| Need                                       | Pick                                        |
+| ------------------------------------------ | ------------------------------------------- |
+| Long-running containerized service         | **EKS** (k8s-native; the default substrate) |
+| Stateless functions, sub-second cold start | **Lambda**                                  |
+| Containerized batch / cron / event-driven  | **Fargate** (ECS or EKS)                    |
+| Heritage app, full VM control              | **EC2** with managed AMI                    |
+| Static site                                | **S3 + CloudFront**                         |
 
 Defer to EKS as the default per `nanohype/CLAUDE.md`. Lambda is an explicit escape hatch via `aws-lambda` deploy_target.
 
