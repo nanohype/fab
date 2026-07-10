@@ -562,15 +562,15 @@ A consolidated bibliography is at the end.
 
 **Pattern-to-solution map:**
 
-| Problem shape                     | Patterns that fit                                                              | Anti-patterns                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Quality regression                | Eval suite as a test tier (golden set + LLM-judge + assertions), run in CI     | "Looks good in the demo", no evals, vibes-based prompt edits         |
-| Untrusted input in prompts        | Instruction/data separation, delimiters, spotlighting, tool allowlists         | String-concatenating user text into the system prompt               |
-| Model output consumed downstream  | Schema-validate (Zod/Pydantic) before use; treat output as untrusted           | `JSON.parse(out)` straight into logic; `eval`/`exec` on model output |
-| Model unavailable / slow / costly | Fallback chain (primary → cheaper/cached → graceful error), timeout, cost cap  | Single hardcoded model, no timeout, no budget                       |
-| Cost + latency blindness          | Per-request + aggregate token/cost metering, prompt caching on stable prefixes | No metering, no cache, completions buffered instead of streamed     |
+| Problem shape                     | Patterns that fit                                                                                           | Anti-patterns                                                                 |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Quality regression                | Eval suite as a test tier (golden set + LLM-judge + assertions), run in CI                                  | "Looks good in the demo", no evals, vibes-based prompt edits                  |
+| Untrusted input in prompts        | Instruction/data separation, delimiters, spotlighting, tool allowlists                                      | String-concatenating user text into the system prompt                         |
+| Model output consumed downstream  | Schema-validate (Zod/Pydantic) before use; treat output as untrusted                                        | `JSON.parse(out)` straight into logic; `eval`/`exec` on model output          |
+| Model unavailable / slow / costly | Fallback chain (primary → cheaper/cached → graceful error), timeout, cost cap                               | Single hardcoded model, no timeout, no budget                                 |
+| Cost + latency blindness          | Per-request + aggregate token/cost metering, prompt caching on stable prefixes                              | No metering, no cache, completions buffered instead of streamed               |
 | Agent tool-use                    | Least-privilege per-tool authz, typed + validated tool I/O, per-user identity, kill-switch on budget breach | Broad tool access, string-typed routing, shared/no identity, no spend ceiling |
-| Prompt management                 | Version-controlled, templated prompts; model id / config injectable            | Inline prompt literals scattered across files; hardcoded model id    |
+| Prompt management                 | Version-controlled, templated prompts; model id / config injectable                                         | Inline prompt literals scattered across files; hardcoded model id             |
 
 **Domain-specific frames:**
 
