@@ -424,7 +424,7 @@ export function applySelfReviewDowngrade(
 // ── Quality rubric — parsing + calibration ─────────────────────────
 //
 // Gate verdicts end with a QUALITY_GRADES: block. external-reviewer
-// runs the full 9-dimension rubric cold. compareGrades detects
+// runs the full 10-dimension rubric cold. compareGrades detects
 // letter-level drift between internal and external; >1 letter on any
 // dimension blocks release and re-invokes the diverged role.
 

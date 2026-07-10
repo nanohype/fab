@@ -58,7 +58,7 @@ Code workflows declare `gateProfile: 'code'`; doc-only declare `'docs'`. Flow (`
 2. **Gate roles** in their own sessions: code = `pr-reviewer` + `qa-security` + `build-verifier` + `artifact-auditor`; docs = `artifact-auditor` + `qa-security`.
 3. **Evidence contract** — every verdict ends with `GATE_VERDICT`, `TRANSCRIPTS:` (per-command stdout/stderr/exit), `CITATIONS:` (`{claim, file, line_range, quoted_fragment}` verbatim), `QUALITY_GRADES:`. `parseGateVerdict` auto-downgrades any APPROVE/REQUEST_CHANGES missing transcripts+citations to REJECT.
 4. **Merge** (`mergeGateVerdicts`): any REJECT → fail; any REQUEST_CHANGES → revise (≤3 attempts); all APPROVE → calibration.
-5. **External calibration** — `external-reviewer` runs cold (intake + tree only), grades all 9 dimensions; `compareGrades` blocks release on >1-letter drift per dimension.
+5. **External calibration** — `external-reviewer` runs cold (intake + tree only), grades all 10 dimensions; `compareGrades` blocks release on >1-letter drift per dimension.
 6. **Self-review downgrade** — if the diff touches a gate role's own definition, that vote goes advisory.
 7. `release-manager` opens the PR only after gate + calibration pass; the body carries a Scope ledger (Planned/Delivered/Deferred).
 

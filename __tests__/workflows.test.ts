@@ -318,8 +318,8 @@ QUALITY_GRADES:
 ${gradeLines}`;
 }
 
-// All nine dimensions graded the same letter — the shape a clean run produces.
-const NINE = (letter: string): Record<string, string> => ({
+// All ten dimensions graded the same letter — the shape a clean run produces.
+const TEN = (letter: string): Record<string, string> => ({
   architecture: letter,
   patterns: letter,
   systems: letter,
@@ -329,6 +329,7 @@ const NINE = (letter: string): Record<string, string> => ({
   code_quality: letter,
   documentation: letter,
   consistency: letter,
+  ai_systems: letter,
 });
 
 describe('runMergeGate behavior', () => {
@@ -346,7 +347,7 @@ describe('runMergeGate behavior', () => {
     const calls: string[] = [];
     const runRole: RoleRunner = async (_rt, role) => {
       calls.push(role);
-      return verdictWith('APPROVE', NINE('B'));
+      return verdictWith('APPROVE', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
@@ -359,8 +360,8 @@ describe('runMergeGate behavior', () => {
     const calls: string[] = [];
     const runRole: RoleRunner = async (_rt, role) => {
       calls.push(role);
-      if (role === 'external-reviewer') return `QUALITY_GRADES:\n${gradeBlock(NINE('B'))}`;
-      return verdictWith('APPROVE', NINE('B'));
+      if (role === 'external-reviewer') return `QUALITY_GRADES:\n${gradeBlock(TEN('B'))}`;
+      return verdictWith('APPROVE', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
@@ -379,9 +380,9 @@ describe('runMergeGate behavior', () => {
       if (role === 'external-reviewer') {
         // Internal says A across the board; external says C on code_quality —
         // a two-letter drift that must block.
-        return `QUALITY_GRADES:\n${gradeBlock({ ...NINE('A'), code_quality: 'C' })}`;
+        return `QUALITY_GRADES:\n${gradeBlock({ ...TEN('A'), code_quality: 'C' })}`;
       }
-      return verdictWith('APPROVE', NINE('A'));
+      return verdictWith('APPROVE', TEN('A'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
@@ -393,7 +394,7 @@ describe('runMergeGate behavior', () => {
   it('fails open when the external reviewer returns no parseable grades', async () => {
     const runRole: RoleRunner = async (_rt, role) => {
       if (role === 'external-reviewer') return 'I could not complete the review.';
-      return verdictWith('APPROVE', NINE('B'));
+      return verdictWith('APPROVE', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
@@ -403,7 +404,7 @@ describe('runMergeGate behavior', () => {
   it('fails open when the external reviewer session throws', async () => {
     const runRole: RoleRunner = async (_rt, role) => {
       if (role === 'external-reviewer') throw new Error('session died');
-      return verdictWith('APPROVE', NINE('B'));
+      return verdictWith('APPROVE', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
@@ -413,7 +414,7 @@ describe('runMergeGate behavior', () => {
   it('an evidence-less APPROVE from one role downgrades and the gate rejects', async () => {
     const runRole: RoleRunner = async (_rt, role) => {
       if (role === 'qa-security') return 'GATE_VERDICT: APPROVE\nGATE_FEEDBACK: trust me';
-      return verdictWith('APPROVE', NINE('B'));
+      return verdictWith('APPROVE', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
@@ -428,7 +429,7 @@ describe('runMergeGate behavior', () => {
         attempts++;
         contexts.push(message);
       }
-      return verdictWith('REQUEST_CHANGES', NINE('B'));
+      return verdictWith('REQUEST_CHANGES', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'initial ctx', null, runRole);
@@ -444,7 +445,7 @@ describe('runMergeGate behavior', () => {
     const runRole: RoleRunner = async (_rt, role) => {
       calls++;
       if (role === 'qa-security') return 'GATE_VERDICT: REJECT\nGATE_FEEDBACK: secrets in diff';
-      return verdictWith('APPROVE', NINE('B'));
+      return verdictWith('APPROVE', TEN('B'));
     };
 
     const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);

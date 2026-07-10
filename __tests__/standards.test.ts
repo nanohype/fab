@@ -148,7 +148,7 @@ describe('EVIDENCE_CONTRACT', () => {
 });
 
 describe('QUALITY_RUBRIC', () => {
-  it('names all 9 dimensions from /quality-check', () => {
+  it('names all 10 dimensions from /quality-check', () => {
     const dims = [
       'Architecture',
       'Patterns',
@@ -159,6 +159,7 @@ describe('QUALITY_RUBRIC', () => {
       'Code Quality',
       'Documentation',
       'Consistency',
+      'AI & Agent',
     ];
     for (const d of dims) {
       expect(QUALITY_RUBRIC).toMatch(new RegExp(d, 'i'));

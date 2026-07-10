@@ -1339,7 +1339,7 @@ Context (intake brief + feature branch reference — internal gate verdicts inte
 ${context}
 
 Your task:
-Apply the 9-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_GRADES block with all 9 dimensions (N/A where a dimension doesn't apply). Include per-dimension key findings with file:line CITATIONS. Do not emit GATE_VERDICT — you are advisory.`,
+Apply the 10-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_GRADES block with all 10 dimensions (N/A where a dimension doesn't apply). Include per-dimension key findings with file:line CITATIONS. Do not emit GATE_VERDICT — you are advisory.`,
       workflowName,
     );
   } catch (err) {

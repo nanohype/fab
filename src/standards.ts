@@ -172,25 +172,26 @@ Applies to: APPROVE and REQUEST_CHANGES verdicts. REJECT verdicts may ship witho
 
 The anti-pattern this prevents: gate saying "42 tests passing" when zero tests exist; artifact-auditor saying "all 11 artifacts verified" when 10 don't exist on disk; threat-model citing an ACL SQL fragment that appears nowhere in the codebase. All three were real Dispatch/Chorus slip-throughs. Citation-bound verdicts and pipeline-level evidence enforcement stop them.`;
 
-// ── Quality rubric (9 dimensions, imported from /quality-check) ────
+// ── Quality rubric (10 dimensions, imported from /quality-check) ───
 
 export const QUALITY_RUBRIC = `## Quality rubric
 
 Grade every dimension A-F per the \`/quality-check\` methodology. A is exceptional, B is solid, C is adequate, D has significant issues, F is broken. Most production code is B-/C+ — grade inflation helps no one.
 
-Dimensions are assigned across gate roles. Every gate verdict ends with a \`QUALITY_GRADES:\` block covering that role's assigned dimensions. The external-reviewer runs all nine dimensions cold (no internal verdicts, no prior context) as a calibration check; >1 letter drift on any dimension between internal and external grades blocks the release.
+Dimensions are assigned across gate roles. Every gate verdict ends with a \`QUALITY_GRADES:\` block covering that role's assigned dimensions. The external-reviewer runs all ten dimensions cold (no internal verdicts, no prior context) as a calibration check; >1 letter drift on any dimension between internal and external grades blocks the release.
 
-| # | Dimension                                  | Graded by           | Mark N/A when                      |
-| - | ------------------------------------------ | ------------------- | ---------------------------------- |
-| 1 | Architecture & Domain Modeling             | pr-reviewer         | never — always applicable          |
-| 2 | Design Patterns & Reuse                    | pr-reviewer         | trivial single-module scripts      |
-| 3 | Systems Thinking                           | qa-security         | pure libraries with no I/O         |
-| 4 | Testing Strategy (Testing Trophy)          | build-verifier      | never — always applicable          |
-| 5 | Frontend Architecture & Design Systems     | pr-reviewer         | no user-facing UI                  |
-| 6 | Security                                   | qa-security         | never — always applicable          |
-| 7 | Code Quality & Craft                       | pr-reviewer         | never — always applicable          |
-| 8 | Documentation & Developer Experience       | artifact-auditor    | never — always applicable          |
-| 9 | Consistency & Polish                       | artifact-auditor    | never — always applicable          |
+| #  | Dimension                                  | Graded by           | Mark N/A when                      |
+| -- | ------------------------------------------ | ------------------- | ---------------------------------- |
+| 1  | Architecture & Domain Modeling             | pr-reviewer         | never — always applicable          |
+| 2  | Design Patterns & Reuse                    | pr-reviewer         | trivial single-module scripts      |
+| 3  | Systems Thinking                           | qa-security         | pure libraries with no I/O         |
+| 4  | Testing Strategy (Testing Trophy)          | build-verifier      | never — always applicable          |
+| 5  | Frontend Architecture & Design Systems     | pr-reviewer         | no user-facing UI                  |
+| 6  | Security                                   | qa-security         | never — always applicable          |
+| 7  | Code Quality & Craft                       | pr-reviewer         | never — always applicable          |
+| 8  | Documentation & Developer Experience       | artifact-auditor    | never — always applicable          |
+| 9  | Consistency & Polish                       | artifact-auditor    | never — always applicable          |
+| 10 | AI & Agent Systems                         | qa-security         | builds with no LLM / agent surface |
 
 Output shape each role appends:
 
@@ -202,7 +203,7 @@ QUALITY_GRADES:
   frontend: N/A
 \`\`\`
 
-Use snake_case keys: \`architecture, patterns, systems, testing, frontend, security, code_quality, documentation, consistency\`.
+Use snake_case keys: \`architecture, patterns, systems, testing, frontend, security, code_quality, documentation, consistency, ai_systems\`.
 
 Quoting the source: "Assign grades honestly. A is exceptional. B is solid. C is adequate. D has significant issues. F is broken. Most production code is B-/C+ — grade inflation helps no one."`;
 
@@ -359,7 +360,7 @@ Every factory build must meet all nine dimensions. Explicit waivers go in the ar
 8. **Code shape** — orchestrators (functions composing 3+ sibling modules into a request-response pipeline) are not 70-line procedural scripts. Use an explicit pipeline pattern (named stages, typed handoffs) so each stage is independently testable. Discriminated unions / tagged enums / sum types for state ("unverified" vs "verified" vs "redacted") instead of boolean flags on a single shape that changes meaning.
 9. **Versions** — see VERSION_CURRENCY_POLICY. Latest stable across language runtime, frameworks, and top-level dependencies. EOL runtime = hard REJECT. ≥1 major stale without \`@pin\` annotation = REJECT.
 
-See FOUR_PHASE_CONTRACT (build / lint / test / docs idiom), VERSION_CURRENCY_POLICY (latest-first rule), EVIDENCE_CONTRACT (transcripts + citations on verdicts), QUALITY_RUBRIC (9-dimension grading).`;
+See FOUR_PHASE_CONTRACT (build / lint / test / docs idiom), VERSION_CURRENCY_POLICY (latest-first rule), EVIDENCE_CONTRACT (transcripts + citations on verdicts), QUALITY_RUBRIC (10-dimension grading).`;
 
 // ── Branching, commits, and PR policy ──────────────────────────────
 

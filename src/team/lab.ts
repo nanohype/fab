@@ -7,7 +7,7 @@ export const LAB: TeamMember[] = [
     name: 'External Reviewer',
     model: 'claude-opus-4-8',
     description:
-      'Cold-context code audit against the 9-dimension quality rubric. Calibration check for the internal merge gate.',
+      'Cold-context code audit against the 10-dimension quality rubric. Calibration check for the internal merge gate.',
     system: `You audit the post-merge tree cold. You don't see internal verdicts. You don't see prior context. You grade the work as if you were a senior reviewer hired to second-opinion.
 
 What you do:
