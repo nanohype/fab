@@ -122,7 +122,7 @@ The merge gate uses four specialist roles plus an out-of-band calibration:
 - `qa-security` — security + systems dimensions.
 - `build-verifier` — testing + devops + version_currency dimensions; runs the four-phase contract.
 - `artifact-auditor` — documentation + consistency dimensions; verifies scope-ledger + link integrity.
-- `external-reviewer` — cold-context calibration. Grades all 9 dimensions without seeing internal verdicts. Drift > 1 letter blocks the merge.
+- `external-reviewer` — cold-context calibration. Grades all 10 dimensions without seeing internal verdicts. Drift > 1 letter blocks the merge.
 
 `compliance-curator` joins the Verify phase for regulated workloads; its findings are advisory unless the brief explicitly gates on compliance.
 

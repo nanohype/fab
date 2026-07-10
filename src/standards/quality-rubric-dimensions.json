@@ -3,7 +3,7 @@
   "kind": "nanohype/standards/quality-rubric-dimensions",
   "version": "1",
   "title": "Quality rubric — dimensions",
-  "summary": "The nine dimensions every build on the nanohype stack is graded against. This file names the dimensions, gives a one-line summary, and names the canonical lens for each (the named thinker / framework whose framing the dimension is graded through). The depth — specific REJECT criteria, anti-pattern catalogs, pattern-to-solution maps, reviewer assignments, weights, and merge-gate enforcement — lives in the reference client's bundled `quality-check` skill (`fab/skills/quality-check.md`) and can be overlaid by any consumer with their own deepened version.",
+  "summary": "The ten dimensions every build on the nanohype stack is graded against. This file names the dimensions, gives a one-line summary, and names the canonical lens for each (the named thinker / framework whose framing the dimension is graded through). The depth — specific REJECT criteria, anti-pattern catalogs, pattern-to-solution maps, reviewer assignments, weights, and merge-gate enforcement — lives in the reference client's bundled `quality-check` skill (`fab/skills/quality-check.md`) and can be overlaid by any consumer with their own deepened version.",
   "content": {
     "dimensions": [
       {
@@ -50,6 +50,11 @@
         "id": "consistency",
         "name": "Consistency & Polish",
         "summary": "Conventions inherited from the parent repo, code shape across modules, file layout, absence of aspirational comments that claim behavior the code does not deliver. Lens: Kelling & Wilson (Broken Windows applied to codebases), Hunt & Thomas (camp-site rule), Knuth (Literate Programming)."
+      },
+      {
+        "id": "ai_systems",
+        "name": "AI & Agent Systems",
+        "summary": "Eval suites as the test tier for non-deterministic components, prompt discipline and versioning, model routing + fallback, token/cost metering and caching, structured-output validation, prompt-injection defense, and agent tool-use (least-privilege authz, typed I/O, identity propagation, kill-switch on budget breach). N/A for builds with no LLM or agent surface. Lens: Huyen (AI Engineering), Willison (prompt injection), OWASP (Top 10 for LLM Applications), Anthropic (Building Effective Agents)."
       }
     ]
   }

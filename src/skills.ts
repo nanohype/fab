@@ -444,7 +444,7 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   'external-reviewer': {
     name: 'quality-rubric-cold',
     description:
-      'Cold-context code audit against the 9-dimension quality rubric. No upstream verdicts — grades the post-merge tree against the intake brief and outputs letter grades as the calibration signal.',
+      'Cold-context code audit against the 10-dimension quality rubric. No upstream verdicts — grades the post-merge tree against the intake brief and outputs letter grades as the calibration signal.',
     type: 'generated',
   },
   'prompt-optimizer': {

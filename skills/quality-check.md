@@ -1,6 +1,6 @@
 ---
 name: quality-check
-description: Grade a codebase across the nine production-bar dimensions with file:line evidence. Read-only audit. Pattern-aware — each dimension carries a lens, canonical reading, pattern-to-solution catalog, domain-specific frames, anti-pattern grep, good-pattern grep, and cross-refs.
+description: Grade a codebase across the ten production-bar dimensions with file:line evidence. Read-only audit. Pattern-aware — each dimension carries a lens, canonical reading, pattern-to-solution catalog, domain-specific frames, anti-pattern grep, good-pattern grep, and cross-refs.
 version: 1
 ---
 
@@ -549,6 +549,71 @@ A consolidated bibliography is at the end.
 
 ---
 
+## 10. AI & Agent Systems
+
+**Lens.** Evaluate through Chip Huyen's _AI Engineering_ lens — an LLM or agent feature is a production system with a non-deterministic component, so it needs evals as its test suite, cost and latency as first-class budgets, and failure handling for a model that can be wrong, slow, or down. Simon Willison's prompt-injection corpus and the OWASP _Top 10 for LLM Applications_ supply the threat framing; Anthropic's _Building Effective Agents_ frames tool-use and agent-loop discipline. Mark this dimension **N/A** only when the build has no LLM or agent surface at all.
+
+**Canonical reading:**
+
+- Chip Huyen, _AI Engineering_ (2025) — evals, inference optimization, model routing, cost, the production LLM lifecycle
+- Simon Willison, prompt-injection writing (simonwillison.net, ongoing) — the injection threat, the dual-LLM / trust-boundary patterns
+- OWASP, _Top 10 for LLM Applications_ — prompt injection, insecure output handling, model DoS, excessive agency; the LLM-app checklist baseline
+- Anthropic, _Building Effective Agents_ (2024) — workflows vs. agents, tool design, the bounded agent loop
+
+**Pattern-to-solution map:**
+
+| Problem shape                     | Patterns that fit                                                              | Anti-patterns                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Quality regression                | Eval suite as a test tier (golden set + LLM-judge + assertions), run in CI     | "Looks good in the demo", no evals, vibes-based prompt edits         |
+| Untrusted input in prompts        | Instruction/data separation, delimiters, spotlighting, tool allowlists         | String-concatenating user text into the system prompt               |
+| Model output consumed downstream  | Schema-validate (Zod/Pydantic) before use; treat output as untrusted           | `JSON.parse(out)` straight into logic; `eval`/`exec` on model output |
+| Model unavailable / slow / costly | Fallback chain (primary → cheaper/cached → graceful error), timeout, cost cap  | Single hardcoded model, no timeout, no budget                       |
+| Cost + latency blindness          | Per-request + aggregate token/cost metering, prompt caching on stable prefixes | No metering, no cache, completions buffered instead of streamed     |
+| Agent tool-use                    | Least-privilege per-tool authz, typed + validated tool I/O, per-user identity, kill-switch on budget breach | Broad tool access, string-typed routing, shared/no identity, no spend ceiling |
+| Prompt management                 | Version-controlled, templated prompts; model id / config injectable            | Inline prompt literals scattered across files; hardcoded model id    |
+
+**Domain-specific frames:**
+
+- **Chatbot / assistant** — system-prompt protection, conversation-history budget management, refusal + safety evals
+- **RAG pipeline** — retrieval-quality evals (not just generation), citation grounding, context-window budgeting, injection via retrieved documents
+- **Agent system** — the agent loop is bounded (max steps + budget), tools are least-privilege and input-validated, identity propagates per user, a kill-switch trips on budget/anomaly
+- **Batch / extraction** — structured-output schema enforced, deterministic where possible (temperature 0 + fixed seed), adversarial inputs in the eval set
+- **MCP server** — resource-server auth (audience-bound tokens, RFC 9728 / 8707), tool schemas typed + minimal, no ambient trust inherited from the transport
+
+**What to look for:**
+
+- An eval suite exists and runs in CI — golden cases + adversarial/injection cases, not just a happy-path demo
+- User / untrusted content is delivered in a distinct role or section, never concatenated into system instructions
+- Model output validated against a schema before use; never `eval`/`exec`'d
+- Model access has an explicit timeout, a fallback path, and per-request + aggregate cost/token metering
+- Prompts are versioned artifacts (a `prompts/` module), not inline literals; model id / config is injectable
+- Prompt caching on stable prefixes; completions streamed where the UX benefits
+- Agent tool-use is least-privilege + typed + identity-propagating, with a kill-switch on budget breach
+
+**Anti-pattern grep:**
+
+- A prompt built by concatenating raw user text into the system role → injection surface
+- `eval(` / `new Function(` / `exec(` on any LLM-derived string → RCE via model output
+- `JSON.parse(<modelOutput>)` consumed without a schema validation → trusting the model
+- A single hardcoded model id with no fallback and no cost meter → fragile, blind AI path
+- Inline multi-line prompt string literals duplicated across files → unversioned prompts
+- An LLM / agent call with no timeout → an external call that can hang forever
+- Agent tool registration with no per-tool authz or input validation → excessive agency
+
+**Good-pattern grep:**
+
+- An `evals/` directory or `*.eval.*` suite wired into CI with golden + adversarial cases
+- User content in a distinct user-role message; the system prompt fixed and separate
+- `schema.parse(modelOutput)` (Zod / Pydantic) before the value is consumed
+- A model-router with `[primary, fallback]` + per-request token/cost emission
+- A `prompts/` module with versioned, templated prompts; `modelId` injected from config
+- Bedrock `cachePoint` (or provider equivalent) on the stable system / context prefix
+- A bounded agent loop (`maxSteps`, budget) + a kill-switch on breach
+
+**Cross-references:** Security (prompt injection, insecure output handling, tool authz, identity propagation), Systems Thinking (model fallback, cost/latency budgets, backpressure), Code Quality (prompts as first-class artifacts, schema-validated boundaries), Testing (evals as the test tier for non-deterministic components).
+
+---
+
 ## Output format
 
 When you run this skill, end the report with this exact block (parsed by the merge gate):
@@ -564,6 +629,7 @@ QUALITY_GRADES:
   code_quality: <grade>
   documentation: <grade>
   consistency: <grade>
+  ai_systems: <grade>
 ```
 
 For each dimension that earns < B, include a one-paragraph rationale + file:line citations. For dimensions that earn ≥ A-, briefly note what makes the implementation exemplary (so the team learns from successes, not just failures).
@@ -628,5 +694,12 @@ Per-dimension canonical reading. When grading, cite specific books to ground cla
 - Kelling & Wilson, "Broken Windows" (1982 Atlantic article) — theory applied to codebases
 - Hunt & Thomas — camp-site rule
 - Knuth, _Literate Programming_ (1992) — code as communication
+
+**AI & Agent Systems:**
+
+- Huyen, _AI Engineering_ (2025) — evals, inference optimization, model routing, cost, the production LLM lifecycle
+- Willison, prompt-injection writing (simonwillison.net, ongoing) — the injection threat + trust-boundary patterns
+- OWASP, _Top 10 for LLM Applications_ — the LLM-app risk checklist
+- Anthropic, _Building Effective Agents_ (2024) — workflows vs. agents, tool design, the agent loop
 
 The user's private overlay at `~/.fab/skills/quality-check.md` may deepen any dimension further — additional architects, additional anti-pattern catalogs, additional taste. This baseline is the floor.
