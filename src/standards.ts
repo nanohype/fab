@@ -124,6 +124,12 @@ Then pin to that version. The intake brief's \`constraints.language_versions\` n
   .map(([k, v]) => `${k} → ${v.registry}`)
   .join('; ')}.
 
+### Org-wide holds
+
+Some deps are pinned org-wide because a peer we depend on hasn't caught up. These are legitimate \`@pin <reason>\` cases (compatibility with pinned peer) — annotate them and move on; the currency check honors the annotation.
+
+- **TypeScript — hold at \`^6\`.** TS 7.0 (the Go-native compiler) is GA, but the stable programmatic compiler API doesn't land until TS 7.1, and \`typescript-eslint\` depends on it. Moving a new project to \`typescript@7\` before typescript-eslint ships TS 7 support breaks the lint phase. New projects stay on \`typescript@^6\` with a \`@pin compatibility with typescript-eslint (awaiting TS 7 support, expected TS 7.1)\` annotation until that support ships.
+
 This policy is enforced twice:
 
 1. **build-verifier** runs the currency check over the committed manifest, captures registry-response transcripts, and REJECTs on staleness.
