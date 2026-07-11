@@ -31,23 +31,23 @@ A consolidated bibliography is at the end.
 
 ## 0. Apply the published standards
 
-Before grading the dimensions, resolve the **nanohype standards** that apply to *this* deliverable's type and grade conformance against them. The standards are the machine-readable production bar and the single source of truth; this rubric **consumes** them rather than restating their criteria — so adding a new standard shows up here automatically, no rubric edit. Findings fold into the dimension they belong to — no new grade keys.
+Before grading the dimensions, resolve the **nanohype standards** that apply to _this_ deliverable's type and grade conformance against them. The standards are the machine-readable production bar and the single source of truth; this rubric **consumes** them rather than restating their criteria — so adding a new standard shows up here automatically, no rubric edit. Findings fold into the dimension they belong to — no new grade keys.
 
 **Resolve them** from any of: the `@nanohype/mcp` server (`list_standards`, then `get_standard <name>`), the SDK (`loadStandards`), or the repo (`nanohype/standards/*.json` plus the normative `standards/README.md`).
 
 **Apply only what fits the deliverable** — each standard names when it applies; mark the rest N/A rather than inventing conformance for a surface that isn't there.
 
-| Standard | Applies to | Feeds dimension |
-|---|---|---|
-| `language-toolchain` | every build | Code Quality (build/lint/test/docs run) |
-| `version-currency` | every build | Code Quality |
-| `testing-rubric` | every build | Testing |
-| `observability-slo` | any long-running service / pipeline | Systems |
-| `platform-tenant-contract` | any k8s-native deliverable | Architecture · Systems |
-| `resource-tagging` | any cloud / k8s resources | Consistency · Systems |
-| `llm-policy` | any LLM workload | AI & Agent Systems |
-| `seo-baseline` | any public web deliverable | Frontend · Consistency |
-| `quality-rubric-dimensions` | the dimension set itself | — |
+| Standard                    | Applies to                          | Feeds dimension                         |
+| --------------------------- | ----------------------------------- | --------------------------------------- |
+| `language-toolchain`        | every build                         | Code Quality (build/lint/test/docs run) |
+| `version-currency`          | every build                         | Code Quality                            |
+| `testing-rubric`            | every build                         | Testing                                 |
+| `observability-slo`         | any long-running service / pipeline | Systems                                 |
+| `platform-tenant-contract`  | any k8s-native deliverable          | Architecture · Systems                  |
+| `resource-tagging`          | any cloud / k8s resources           | Consistency · Systems                   |
+| `llm-policy`                | any LLM workload                    | AI & Agent Systems                      |
+| `seo-baseline`              | any public web deliverable          | Frontend · Consistency                  |
+| `quality-rubric-dimensions` | the dimension set itself            | —                                       |
 
 **Severity maps to the grade.** A violated `reject`-severity rule in an applicable standard **caps its host dimension at D**, named with `file:line` (or the missing artifact). A violated `warn` rule is a documented deduction. Worked example: a public site that serves both apex and www with `200`, or redirects apex→www, violates `seo-baseline`'s `apex-canonical` (reject) — Frontend/Consistency is capped until it's fixed.
 
