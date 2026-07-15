@@ -575,7 +575,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 ## 10. AI & Agent Systems
 
-**Lens.** Evaluate through Chip Huyen's _AI Engineering_ lens — an LLM or agent feature is a production system with a non-deterministic component, so it needs evals as its test suite, cost and latency as first-class budgets, and failure handling for a model that can be wrong, slow, or down. Simon Willison's prompt-injection corpus and the OWASP _Top 10 for LLM Applications_ supply the threat framing; Anthropic's _Building Effective Agents_ frames tool-use and agent-loop discipline. Mark this dimension **N/A** only when the build has no LLM or agent surface at all.
+**Lens.** Evaluate through Chip Huyen's _AI Engineering_ lens — an LLM or agent feature is a production system with a non-deterministic component, so it needs evals as its test suite, cost and latency as first-class budgets, and failure handling for a model that can be wrong, slow, or down. Simon Willison's prompt-injection corpus and the OWASP _Top 10 for LLM Applications_ supply the threat framing; Anthropic's _Building Effective Agents_ frames tool-use and agent-loop discipline. Score this dimension for any build with an AI or agent-facing surface — where "agent-facing" includes always-on machine surfaces (structured output, JSON-LD, manifests, tool-call/streaming UI) even with no live model inference; grade those as agent-native craft. Mark it **N/A** only for a build with genuinely none of that.
 
 **Canonical reading:**
 
