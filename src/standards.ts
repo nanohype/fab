@@ -256,7 +256,7 @@ Every k8s-native factory deliverable lands as a Platform tenant — a self-conta
   chart/
     Chart.yaml
     values.yaml                    # base values (all environments)
-    values-dev.yaml                # dev delta only
+    values-development.yaml        # development delta only
     values-staging.yaml            # staging delta only
     values-production.yaml         # prod delta only
     templates/
