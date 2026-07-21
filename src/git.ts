@@ -37,7 +37,7 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string } {
  * branch-safe slug. Lowercases, replaces non-alphanumerics with `-`,
  * collapses runs, trims leading/trailing hyphens.
  *
- *   "Almanac"         → "almanac"
+ *   "Portal"          → "portal"
  *   "Doc Search v2"   → "doc-search-v2"
  *   "Over_Under 3.14" → "over-under-3-14"
  */
