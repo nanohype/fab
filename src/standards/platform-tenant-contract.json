@@ -63,7 +63,8 @@
         },
         "identity": {
           "allowedModelFamilies": ["anthropic"],
-          "extraPolicyArns": []
+          "extraPolicyArns": [],
+          "capabilities": []
         },
         "compliance": {
           "soc2": true,
@@ -91,6 +92,13 @@
       },
       "deletion": "deletionPolicy defaults to Retain: deleting the Platform CR orphans the datastore intact (it keeps the Tenant tag recording what owned it), and the operator holds no delete permission on any datastore. The per-kind deletion_protection backstop is a second gate, defaulting closed."
     },
+    "capability_vocabulary": {
+      "summary": "Managed AWS capabilities outside the datastore vocabulary — SES send, EventBridge Scheduler — are declared in spec.identity.capabilities. The operator generates the scoped IAM from that declaration (a capability-access policy on the tenant role, and for eventBridgeScheduler a minted scheduler-invoke role), so these ride the declaration too instead of a hand-written managed policy referenced by ARN.",
+      "capabilities": {
+        "ses": "Grants ses:SendEmail / ses:SendRawEmail scoped by a ses:FromAddress condition to the tenant's sending domain, plus ses:GetSendQuota. The verified sending identity is account-level mail infrastructure in landing-zone, not provisioned per app.",
+        "eventBridgeScheduler": "Grants scheduler:*Schedule on the tenant's own schedule prefix plus iam:PassRole (Scheduler-service-capped) on an operator-minted <env>-<platform>-scheduler-invoke role, which may SendMessage to the tenant's own queue datastores. Declare a queue datastore as the schedule's target."
+      }
+    },
     "otel_resource_attrs": [
       {
         "name": "agents.tenant",
@@ -116,6 +124,7 @@
     "do_not": [
       "Do NOT scaffold IAM roles inside the chart, and do NOT annotate the ServiceAccount with a role ARN. The eks-agent-platform operator provisions the per-Platform IAM role — with a datastore-access policy generated from spec.datastores — and creates the EKS Pod Identity association that binds the tenant ServiceAccount to it. The chart carries no role ARN.",
       "Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams. Declare them in Platform.spec.datastores — the generic tenant-substrate module provisions them and the operator generates the scoped IAM. Cloud-substrate GAPS the datastore vocabulary does not cover (a shared VPC, base IAM, a KMS key, a new addon) still land in `nanohype/landing-zone` or `nanohype/eks-gitops`, never in-app tofu.",
+      "Do NOT reference a hand-written managed policy through extraPolicyArns for SES or EventBridge Scheduler. Declare them in Platform.spec.identity.capabilities — the operator generates the scoped grants (and mints the scheduler-invoke role). extraPolicyArns stays the escape hatch only for grants outside both the datastore and capability vocabularies.",
       "Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability stack). Those are gitops-repo concerns in `nanohype/eks-gitops`.",
       "Do NOT skip per-env `values-{dev,staging,production}.yaml` — every chart has three deltas even if some are empty.",
       "Do NOT hardcode AWS account IDs, region names, or KMS key ARNs in chart values. Per-env values plumb them in from landing-zone outputs at deploy time."

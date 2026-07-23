@@ -278,7 +278,7 @@ Optional, AI workloads only:
 
 ### Platform CR shape (minimum)
 
-The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores — plus the Pod Identity association binding the tenant ServiceAccount to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration.
+The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, the operator-owned tenant-runtime ServiceAccount, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores and a capability-access policy generated from spec.identity.capabilities — plus the Pod Identity association binding tenant-runtime to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration.
 
 \`\`\`yaml
 apiVersion: platform.nanohype.dev/v1alpha1
@@ -294,7 +294,8 @@ spec:
     name: <BudgetPolicy CR name in same namespace>
   identity:
     allowedModelFamilies: [anthropic]        # or allowedModels — mutually exclusive
-    extraPolicyArns: []                       # reviewed managed policies on top of the baseline
+    extraPolicyArns: []                       # escape hatch: grants outside the datastore + capability vocabs
+    capabilities: []                          # ses | eventBridgeScheduler — operator generates the scoped grants
   compliance:
     soc2: true
     hipaa: false
@@ -311,6 +312,10 @@ spec:
 
 Declare stateful stores in spec.datastores; never hand-write a landing-zone component for them. Six kinds — relational (Aurora Serverless v2), keyValue (DynamoDB), objectStore (S3), queue (SQS), cache (ElastiCache), stream (MSK Serverless). Each entry carries at most the one typed config block matching its kind; omit it for the young/light defaults (keyValue requires its partitionKey; stream carries none). deletionPolicy defaults to Retain, so deleting the CR orphans the datastore intact. The tenant-substrate module provisions each store and the operator generates the scoped IAM to reach it — tenant count is unbounded because adding one is a declaration, not a new component.
 
+### Capability vocabulary
+
+Managed AWS capabilities the datastore vocabulary does not cover — SES send, EventBridge Scheduler — are declared in spec.identity.capabilities, not hand-written managed policies referenced through extraPolicyArns. The operator generates a capability-access policy on the tenant role from the list. \`ses\` grants ses:SendEmail scoped by a ses:FromAddress condition to the tenant's sending domain (the verified sending identity is account-level mail infra in landing-zone, not per-app). \`eventBridgeScheduler\` grants scheduler:*Schedule on the tenant's own schedule prefix plus a Scheduler-service-capped iam:PassRole on an operator-minted <env>-<platform>-scheduler-invoke role that may SendMessage to the tenant's own queue datastores — declare a queue datastore as the schedule's target.
+
 ### OTel resource attributes (required)
 
 Every pod's OTel SDK init must set these resource attributes — they propagate through traces, logs, and metrics:
@@ -324,8 +329,9 @@ The cluster-level OTel Collector tags downstream exporters using these attribute
 
 ### What NOT to do
 
-- Do NOT scaffold IAM roles inside the chart, and do NOT annotate the ServiceAccount with a role ARN — the operator provisions the per-Platform IAM role (with a datastore-access policy generated from spec.datastores) and creates the Pod Identity association that binds the tenant ServiceAccount to it. The chart carries no role ARN.
+- Do NOT scaffold IAM roles inside the chart, do NOT create a chart-owned ServiceAccount, and do NOT annotate any SA with a role ARN — the operator provisions the per-Platform IAM role (with a datastore-access policy from spec.datastores + a capability-access policy from spec.identity.capabilities), creates the tenant-runtime ServiceAccount, and binds it via a Pod Identity association. The chart references tenant-runtime (serviceAccount.create: false) and carries no role ARN.
 - Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams — declare them in spec.datastores. Cloud-substrate gaps the vocabulary does not cover live in \`nanohype/landing-zone\`; app-level tofu is a hard REJECT.
+- Do NOT reference a hand-written managed policy through extraPolicyArns for SES or EventBridge Scheduler — declare them in spec.identity.capabilities and let the operator generate the grants. extraPolicyArns is the escape hatch only for grants outside both vocabularies.
 - Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability). Those are gitops-repo concerns.
 - Do NOT skip per-env \`values-{dev,staging,production}.yaml\` — every chart has three deltas even if some are empty (tooling consistency).
 - Do NOT hardcode AWS account IDs, region names, or KMS key ARNs. The Platform reconciler resolves them at scaffolding time and surfaces them in \`status\`.
