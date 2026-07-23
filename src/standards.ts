@@ -296,6 +296,7 @@ spec:
     allowedModelFamilies: [anthropic]        # or allowedModels — mutually exclusive
     extraPolicyArns: []                       # escape hatch: grants outside the datastore + capability vocabs
     capabilities: []                          # ses | eventBridgeScheduler — operator generates the scoped grants
+    directSecretReads: []                     # secrets the pod reads via the SDK — operator grants read on exactly these
   compliance:
     soc2: true
     hipaa: false
@@ -316,6 +317,10 @@ Declare stateful stores in spec.datastores; never hand-write a landing-zone comp
 
 Managed AWS capabilities the datastore vocabulary does not cover — SES send, EventBridge Scheduler — are declared in spec.identity.capabilities, not hand-written managed policies referenced through extraPolicyArns. The operator generates a capability-access policy on the tenant role from the list. \`ses\` grants ses:SendEmail scoped by a ses:FromAddress condition to the tenant's sending domain (the verified sending identity is account-level mail infra in landing-zone, not per-app). \`eventBridgeScheduler\` grants scheduler:*Schedule on the tenant's own schedule prefix plus a Scheduler-service-capped iam:PassRole on an operator-minted <env>-<platform>-scheduler-invoke role that may SendMessage to the tenant's own queue datastores — declare a queue datastore as the schedule's target.
 
+### Secret access
+
+Most secret material reaches a tenant through the chart's ExternalSecret, projected into the pod by the cluster's External Secrets controller under its own identity — the tenant role needs no Secrets Manager grant for those. Only the secrets a pod resolves itself through the pod role via the AWS SDK are declared in spec.identity.directSecretReads (names under the tenant's own <platform>/<env>/ prefix), and the operator grants secretsmanager:GetSecretValue / DescribeSecret on exactly those. Use it for rotation-sensitive values a handler re-fetches and caches by version, or config bulk-loaded at startup; leaving it empty means the tenant role holds no Secrets Manager grant.
+
 ### OTel resource attributes (required)
 
 Every pod's OTel SDK init must set these resource attributes — they propagate through traces, logs, and metrics:
@@ -332,6 +337,7 @@ The cluster-level OTel Collector tags downstream exporters using these attribute
 - Do NOT scaffold IAM roles inside the chart, do NOT create a chart-owned ServiceAccount, and do NOT annotate any SA with a role ARN — the operator provisions the per-Platform IAM role (with a datastore-access policy from spec.datastores + a capability-access policy from spec.identity.capabilities), creates the tenant-runtime ServiceAccount, and binds it via a Pod Identity association. The chart references tenant-runtime (serviceAccount.create: false) and carries no role ARN.
 - Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams — declare them in spec.datastores. Cloud-substrate gaps the vocabulary does not cover live in \`nanohype/landing-zone\`; app-level tofu is a hard REJECT.
 - Do NOT reference a hand-written managed policy through extraPolicyArns for SES or EventBridge Scheduler — declare them in spec.identity.capabilities and let the operator generate the grants. extraPolicyArns is the escape hatch only for grants outside both vocabularies.
+- Do NOT rely on a broad Secrets Manager grant for the tenant role. Secrets projected into the pod by the chart's ExternalSecret need no grant (the External Secrets controller reads them under its own identity); for the few a pod reads itself via the SDK, list them in spec.identity.directSecretReads so the operator grants read on exactly those.
 - Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability). Those are gitops-repo concerns.
 - Do NOT skip per-env \`values-{dev,staging,production}.yaml\` — every chart has three deltas even if some are empty (tooling consistency).
 - Do NOT hardcode AWS account IDs, region names, or KMS key ARNs. The Platform reconciler resolves them at scaffolding time and surfaces them in \`status\`.
