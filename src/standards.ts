@@ -223,7 +223,7 @@ The factory ships k8s-native by default. Every app lands as a Platform tenant un
 
 - Application chart in \`<app>/chart/\` (Helm, with per-env values files)
 - ApplicationSet entry registered with \`nanohype/eks-gitops\`
-- \`Platform\` CR (\`platform.nanohype.dev/v1alpha1\`) declaring the tenant boundary; the eks-agent-platform operator reconciles Namespace, ResourceQuota, NetworkPolicy, IRSA, S3 + KMS grants
+- \`Platform\` CR (\`platform.nanohype.dev/v1alpha1\`) declaring the tenant boundary + its datastores (spec.datastores); the eks-agent-platform operator reconciles Namespace, ResourceQuota, NetworkPolicy, the tenant IAM role + generated datastore-access policy, and KMS grants, while the tenant-substrate module provisions the declared stores
 - Optional \`AgentFleet\` CR (\`agents.nanohype.dev/v1alpha1\`, AI workloads) composing kagent + KEDA
 
 **Cloud substrate** (shared, slow-moving) — OpenTofu/Terragrunt against \`nanohype/landing-zone\`. VPC, base IAM, KMS keys, cost pipeline, EventBridge buses, Bedrock guardrail templates, WAF. Per-app substrate gaps land as new \`landing-zone\` components, NOT in-app tofu.
@@ -262,7 +262,7 @@ Every k8s-native factory deliverable lands as a Platform tenant — a self-conta
     templates/
       deployment.yaml              # or statefulset.yaml for stateful workloads
       service.yaml
-      serviceaccount.yaml          # eks.amazonaws.com/role-arn annotation filled by Platform reconciler
+      serviceaccount.yaml          # no role-arn annotation — operator binds it via a Pod Identity association
       networkpolicy.yaml           # default-deny + explicit egress allow-list
       <other resources>            # cronjob, ingress, hpa, etc. as needed
   gitops/
@@ -278,7 +278,7 @@ Optional, AI workloads only:
 
 ### Platform CR shape (minimum)
 
-The Platform CR declares the tenant boundary. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, per-Platform IRSA role + KMS grants + S3 bucket policy.
+The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores — plus the Pod Identity association binding the tenant ServiceAccount to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration.
 
 \`\`\`yaml
 apiVersion: platform.nanohype.dev/v1alpha1
@@ -287,18 +287,29 @@ metadata:
   name: <app-name>
   namespace: tenants-<team>
 spec:
+  displayName: <human-readable>
+  persona: <sales-ops|support|finance|ops|founder|eng|marketing|legal|generic>
   tenant: <team>
-  irsa:
-    serviceAccount: <app-name>
-    policies:
-      - <managed-or-inline-policy-arn>      # bedrock-invoke, s3-rw, dynamodb-rw, etc.
-  resourceQuota:
-    cpu: <n>
-    memory: <n>Gi
-  storage:
-    bucket: <app-name>-artifacts            # operator provisions + applies bucket policy
-    kmsKey: cmk-data                         # one of the two CMKs from landing-zone
+  budget:
+    name: <BudgetPolicy CR name in same namespace>
+  identity:
+    allowedModelFamilies: [anthropic]        # or allowedModels — mutually exclusive
+    extraPolicyArns: []                       # reviewed managed policies on top of the baseline
+  compliance:
+    soc2: true
+    hipaa: false
+  isolation: namespace                        # or vcluster for hard isolation
+  datastores:                                 # the tenant's stateful substrate
+    - name: main
+      kind: relational                        # relational|keyValue|objectStore|queue|cache|stream
+    - name: events
+      kind: queue
+      queue: { maxReceiveCount: 3 }           # >0 provisions a dead-letter queue
 \`\`\`
+
+### Datastore vocabulary
+
+Declare stateful stores in spec.datastores; never hand-write a landing-zone component for them. Six kinds — relational (Aurora Serverless v2), keyValue (DynamoDB), objectStore (S3), queue (SQS), cache (ElastiCache), stream (MSK Serverless). Each entry carries at most the one typed config block matching its kind; omit it for the young/light defaults (keyValue requires its partitionKey; stream carries none). deletionPolicy defaults to Retain, so deleting the CR orphans the datastore intact. The tenant-substrate module provisions each store and the operator generates the scoped IAM to reach it — tenant count is unbounded because adding one is a declaration, not a new component.
 
 ### OTel resource attributes (required)
 
@@ -313,8 +324,8 @@ The cluster-level OTel Collector tags downstream exporters using these attribute
 
 ### What NOT to do
 
-- Do NOT scaffold IAM roles inside the chart — the Platform reconciler owns IRSA. Reference \`metadata.annotations."eks.amazonaws.com/role-arn"\` filled in by the operator at scaffolding time.
-- Do NOT add cloud-substrate tofu inside the app — substrate lives in \`nanohype/landing-zone\`. App-level tofu is a hard REJECT.
+- Do NOT scaffold IAM roles inside the chart, and do NOT annotate the ServiceAccount with a role ARN — the operator provisions the per-Platform IAM role (with a datastore-access policy generated from spec.datastores) and creates the Pod Identity association that binds the tenant ServiceAccount to it. The chart carries no role ARN.
+- Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams — declare them in spec.datastores. Cloud-substrate gaps the vocabulary does not cover live in \`nanohype/landing-zone\`; app-level tofu is a hard REJECT.
 - Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability). Those are gitops-repo concerns.
 - Do NOT skip per-env \`values-{dev,staging,production}.yaml\` — every chart has three deltas even if some are empty (tooling consistency).
 - Do NOT hardcode AWS account IDs, region names, or KMS key ARNs. The Platform reconciler resolves them at scaffolding time and surfaces them in \`status\`.

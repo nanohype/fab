@@ -28,7 +28,7 @@
       },
       {
         "path": "<app>/chart/templates/serviceaccount.yaml",
-        "description": "ServiceAccount used by the pod. `eks.amazonaws.com/role-arn` annotation is rendered from `aws.platformRoleArn` per-env value, pointing at the landing-zone-owned IRSA role."
+        "description": "ServiceAccount used by the pod. It carries no role-arn annotation: the eks-agent-platform operator creates an EKS Pod Identity association binding the tenant ServiceAccount to the per-Platform IAM role, whose scoped datastore-access policy the operator generates from Platform.spec.datastores. `serviceAccount.name` must match the tenant-runtime ServiceAccount the association targets."
       },
       {
         "path": "<app>/chart/templates/networkpolicy.yaml",
@@ -40,7 +40,7 @@
       },
       {
         "path": "<app>/platform.yaml",
-        "description": "Platform CR (and any required BudgetPolicy CR) declaring the tenant boundary. The eks-agent-platform operator reconciles Namespace, ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, and the per-Platform IRSA role from this CR."
+        "description": "Platform CR (and any required BudgetPolicy CR) declaring the tenant boundary AND its stateful substrate (spec.datastores). The CR objects live in the team namespace (metadata.namespace: tenants-<team>); the eks-agent-platform operator provisions a per-Platform WORKLOAD namespace named tenants-<platform-name> — where the app's chart deploys — plus its ResourceQuota, LimitRange, default-deny NetworkPolicy, the ArgoCD AppProject named <platform-name>, and the per-Platform IAM role with a datastore-access policy generated from spec.datastores. The declared datastores themselves are provisioned by the generic tenant-substrate module from that same declaration — there is no per-app substrate component. The app's ApplicationSet entry must target that per-Platform namespace + project."
       },
       {
         "path": "<app>/agentfleet.yaml (AI workloads only)",
@@ -69,8 +69,27 @@
           "soc2": true,
           "hipaa": false
         },
-        "isolation": "namespace"
+        "isolation": "namespace",
+        "datastores": [
+          {
+            "name": "<short-name>",
+            "kind": "<one of: relational | keyValue | objectStore | queue | cache | stream>",
+            "deletionPolicy": "Retain"
+          }
+        ]
       }
+    },
+    "datastore_vocabulary": {
+      "summary": "Declare the tenant's stateful stores in spec.datastores instead of hand-writing a landing-zone component. Each entry names a datastore and its kind; the generic tenant-substrate module provisions the resource and the operator generates the scoped IAM to reach it, so tenant count is unbounded. Each kind carries at most the one typed config block matching it — omit it to take the young/light defaults. keyValue requires its block (a DynamoDB table has no default partition key); stream carries none.",
+      "kinds": {
+        "relational": "Aurora PostgreSQL Serverless v2. Config: engineVersion, minACU/maxACU (string, 0.5-ACU steps), backupRetentionDays, deletionProtection.",
+        "keyValue": "DynamoDB. Config (required): partitionKey {name,type}; optional sortKey, billingMode, ttlAttribute, pointInTimeRecovery, globalSecondaryIndexes.",
+        "objectStore": "S3. Config: versioning, lifecycleExpireDays.",
+        "queue": "SQS with an optional dead-letter queue. Config: fifo, visibilityTimeoutSeconds, messageRetentionSeconds, maxReceiveCount (>0 provisions the DLQ).",
+        "cache": "ElastiCache (Valkey/Redis). Config: engine, nodeType, replicas.",
+        "stream": "MSK Serverless with IAM auth. No config block."
+      },
+      "deletion": "deletionPolicy defaults to Retain: deleting the Platform CR orphans the datastore intact (it keeps the Tenant tag recording what owned it), and the operator holds no delete permission on any datastore. The per-kind deletion_protection backstop is a second gate, defaulting closed."
     },
     "otel_resource_attrs": [
       {
@@ -95,8 +114,8 @@
       }
     ],
     "do_not": [
-      "Do NOT scaffold IAM roles inside the chart. The IRSA role is provisioned by the corresponding landing-zone <app>-platform component; the chart's ServiceAccount annotates with its ARN via `aws.platformRoleArn`.",
-      "Do NOT add cloud-substrate tofu (VPCs, base IAM, KMS keys) inside the app. Substrate lives in `nanohype/landing-zone` as a per-app `<app>-platform` component.",
+      "Do NOT scaffold IAM roles inside the chart, and do NOT annotate the ServiceAccount with a role ARN. The eks-agent-platform operator provisions the per-Platform IAM role — with a datastore-access policy generated from spec.datastores — and creates the EKS Pod Identity association that binds the tenant ServiceAccount to it. The chart carries no role ARN.",
+      "Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams. Declare them in Platform.spec.datastores — the generic tenant-substrate module provisions them and the operator generates the scoped IAM. Cloud-substrate GAPS the datastore vocabulary does not cover (a shared VPC, base IAM, a KMS key, a new addon) still land in `nanohype/landing-zone` or `nanohype/eks-gitops`, never in-app tofu.",
       "Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability stack). Those are gitops-repo concerns in `nanohype/eks-gitops`.",
       "Do NOT skip per-env `values-{dev,staging,production}.yaml` — every chart has three deltas even if some are empty.",
       "Do NOT hardcode AWS account IDs, region names, or KMS key ARNs in chart values. Per-env values plumb them in from landing-zone outputs at deploy time."
