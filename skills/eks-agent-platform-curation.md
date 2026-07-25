@@ -1,6 +1,6 @@
 ---
 name: eks-agent-platform-curation
-description: eks-agent-platform operator: Platform CRDs, IRSA, per-tenant scaffolding.
+description: eks-agent-platform operator: Platform CRDs, tenant identity, per-tenant scaffolding.
 ---
 
 # EKS Agent Platform Curation
@@ -11,7 +11,8 @@ You steward the `eks-agent-platform` operator — the Kubernetes operator that t
 
 - The repo's `CLAUDE.md`, `AGENTS.md`, and `docs/` directory are authoritative.
 - Built with kubebuilder + controller-runtime in Go.
-- API groups (version `v1alpha1` across all three): `platform.nanohype.dev` (Tenant, Platform), `agents.nanohype.dev` (AgentFleet, ModelGateway, AgentSandbox, SandboxPool), `governance.nanohype.dev` (BudgetPolicy, EvalSuite).
+- API groups (version `v1alpha1` across all three): `platform.nanohype.dev` (Tenant, Platform), `agents.nanohype.dev` (AgentFleet, ModelGateway, AgentSandbox, SandboxPool, BatchJob), `governance.nanohype.dev` (BudgetPolicy, EvalSuite, SLOPolicy).
+- The generated CRD reference in `docs/crd-reference/` is the field-level authority. Read it before authoring a CR; the shapes below are the shape, not the whole schema.
 
 ## The CRDs
 
@@ -24,38 +25,62 @@ apiVersion: platform.nanohype.dev/v1alpha1
 kind: Platform
 metadata:
   name: marshal
-  namespace: marshal
+  # The CR lives in a control-plane namespace, NOT the tenant's workload
+  # namespace. The operator provisions `tenants-marshal` separately.
+  namespace: eks-agent-platform
 spec:
-  tenant: marshal
-  modelAccess:
-    - bedrock-claude-sonnet-4-6
-    - bedrock-claude-opus-4-8
-  resourceQuota:
-    cpu: '32'
-    memory: 64Gi
-    storage: 500Gi
-  networkPolicy:
-    ingress:
-      - from: argocd
-      - from: observability
-    egress:
-      - bedrock
-      - argocd
-      - external-secrets
-  iam:
-    roles:
-      - name: agent-runtime
-        serviceAccount: marshal/agent
-        policies:
-          - bedrock:InvokeModel
-          - s3:GetObject # for tenant-specific document buckets
-  appProject:
-    sourceRepos:
-      - 'https://github.com/nanohype/protohype'
-    destinations:
-      - namespace: marshal
-    clusterResourceWhitelist: []
+  displayName: Marshal
+  persona: eng # drives fleet/gateway/dashboard defaults
+  tenant: marshal # the cluster-scoped Tenant CR this Platform belongs to
+  isolation: namespace # namespace | vcluster — immutable after create
+  budget:
+    name: marshal-budget # a BudgetPolicy in the same namespace
+  identity:
+    # allowedModels and allowedModelFamilies are mutually exclusive. Whichever is
+    # set becomes a deny-everything-else Bedrock policy; both empty denies all
+    # model invocation.
+    allowedModelFamilies: [anthropic]
+    extraPolicyArns: []
+    # Managed AWS capabilities outside the datastore vocabulary. eventBridgeScheduler
+    # needs a kind=queue datastore to send to, or the minted role carries no grant.
+    capabilities: [ses]
+    # Secrets the pods read through the pod role, PREFIX-RELATIVE to
+    # <platform>/<environment>/ — not the full path.
+    directSecretReads: [vendor/embed-api-key]
+  compliance:
+    soc2: true
+    hipaa: false
+  # Per-session human attribution. A non-empty operators list is the switch;
+  # there is no boolean. Each value must byte-match that operator's Kubernetes
+  # RBAC subject name, because the same string binds the AWS and k8s audit records.
+  attribution:
+    operators: [operator@example.com]
+  # The tenant's stateful substrate. A declaration, not a component: the generic
+  # tenant-substrate tofu module provisions the resource from this same list and
+  # the operator generates the scoped IAM policy that reaches it.
+  #   relational=Aurora  keyValue=DynamoDB  objectStore=S3
+  #   queue=SQS  cache=ElastiCache  stream=MSK
+  datastores:
+    - name: corpus
+      kind: objectStore
+      deletionPolicy: Retain # Retain (default) orphans the data; Delete tears it down
+    - name: chunks
+      kind: keyValue
+      keyValue:
+        partitionKey:
+          name: docId
+          type: S # quote a numeric key's "N" — bare N is a YAML 1.1 boolean
 ```
+
+Two constraints worth knowing before you author one:
+
+- **Name budget.** `metadata.name` + a datastore name must total ≤ 28 characters
+  (they compose into the provisioned bucket / table / queue name), and ≤ 27 for
+  `kind: cache`, whose ElastiCache replication-group id is capped at 40 including
+  the environment token.
+- **A declaration is not a resource.** Declaring a datastore grants the tenant
+  role access and reports it under `status.datastores`. The resource is provisioned
+  when the declaration reaches `landing-zone`'s tenant-substrate input.
 
 ### AgentFleet
 
@@ -65,83 +90,124 @@ A fleet of agents running under a Platform. Composes with `kagent`.
 apiVersion: agents.nanohype.dev/v1alpha1
 kind: AgentFleet
 metadata:
-  name: marshal-coordinators
-  namespace: marshal
+  name: marshal-fleet
+  namespace: eks-agent-platform
 spec:
-  platform: marshal
+  platformRef:
+    name: marshal
+  scaling:
+    enabled: true
+    min: 1
+    max: 5
+    queueDepthTrigger: 10 # KEDA scales on SQS depth when queueUrl is set
   agents:
     - name: coordinator
-      image: anthropic/claude-sonnet-4-6
-      replicas: 3
-      runtime:
-        type: kagent
-        concurrency: 10
-        queueDepth: 50
-        timeout: 5m
+      systemPrompt: |
+        Coordinate the work. Push back on ambiguous requests.
+      modelRoute: primary # a route name on the Platform's ModelGateway
+      tools:
+        - name: knowledge-base-search # a kagent ToolServer, referenced by name
 ```
 
-### Supporting CRDs
+The model comes from the ModelGateway route, not from a container image — the
+fleet declares behavior and the gateway declares which model serves it.
 
-- **PlatformQuota** — quota override per-Platform, applied on top of the base ResourceQuota.
-- **AgentTool** — declares an MCP server or built-in tool available to a fleet.
-- **AgentSkill** — declares a skill (markdown content) attached to a fleet.
+### The rest
+
+Every one of these references its Platform through `spec.platformRef.name`:
+
+- **BudgetPolicy** — the monthly USD cap, alert thresholds, and kill-switch arm.
+- **ModelGateway** — the named routes a fleet's agents pin by `modelRoute`.
+- **EvalSuite** — scheduled eval cases against an AgentFleet, with a pass threshold.
+- **SLOPolicy** — an SLI + objective; a burn breach becomes a platform action.
+- **AgentSandbox** / **SandboxPool** — attributable single-session and pooled sandboxes.
+- **BatchJob** — a Bedrock batch inference run over an S3 prefix.
+
+Tools are kagent `ToolServer` CRs, referenced by name from a fleet agent's
+`tools[]`. There is no per-tool or per-skill CRD in this operator.
 
 ## Reconcile boundary
 
 The operator owns:
 
-| State                                            | Where it lives          | Owner                                              |
-| ------------------------------------------------ | ----------------------- | -------------------------------------------------- |
-| `Namespace` for the tenant                       | Kubernetes              | Operator (CreateOrUpdate)                          |
-| `ResourceQuota`, `LimitRange`                    | Kubernetes              | Operator                                           |
-| `NetworkPolicy`                                  | Kubernetes              | Operator                                           |
-| `ServiceAccount` + IRSA / Pod Identity           | Kubernetes + AWS IAM    | Operator (via AWS SDK + workload-identity factory) |
-| `AppProject`                                     | Kubernetes (ArgoCD CRD) | Operator                                           |
-| KMS grants for Bedrock model access              | AWS                     | Operator (AWS SDK)                                 |
-| S3 bucket policy entries                         | AWS                     | Operator (AWS SDK)                                 |
-| Workload manifests (Deployments, Services, etc.) | Kubernetes              | Application charts (NOT the operator)              |
+| State                                            | Where it lives          | Owner                                     |
+| ------------------------------------------------ | ----------------------- | ----------------------------------------- |
+| `Namespace` for the tenant                       | Kubernetes              | Operator (CreateOrUpdate)                 |
+| `ResourceQuota`, `LimitRange`                    | Kubernetes              | Operator                                  |
+| `NetworkPolicy`                                  | Kubernetes              | Operator                                  |
+| `ServiceAccount` + EKS Pod Identity association  | Kubernetes + AWS IAM    | Operator (AWS SDK; no role ARN pasted in) |
+| `AppProject`                                     | Kubernetes (ArgoCD CRD) | Operator                                  |
+| KMS grants for Bedrock model access              | AWS                     | Operator (AWS SDK)                        |
+| S3 bucket policy entries                         | AWS                     | Operator (AWS SDK)                        |
+| Workload manifests (Deployments, Services, etc.) | Kubernetes              | Application charts (NOT the operator)     |
 
 What the operator does NOT own:
 
 - The cluster itself (`landing-zone`).
 - Cluster-wide addons (`eks-gitops`).
-- Application logic (`protohype/<app>/chart/`).
+- Application logic (each tenant app's own repo, `<app>/chart/`).
 
 ## Required OTel resource attributes
 
 Per `PLATFORM_TENANT_CONTRACT`, every workload reconciled by the operator gets these resource attributes injected:
 
-- `agents.tenant` — the Platform name.
-- `agents.platform` — always `eks-agent-platform`.
-- `agents.model_family` — `claude` / `gpt` / `mistral` / etc., set on AgentFleet.
-- `agents.model_id` — full model identifier (e.g., `anthropic.claude-sonnet-4-6`).
+- `agents.tenant` — `spec.tenant`, the owning **Tenant**.
+- `agents.platform` — the **Platform** name (`metadata.name`), i.e. the app.
+- `agents.model_family` — appended when the owning Platform pins a single family.
 
-The operator injects these via Pod template mutations at reconcile time.
+The two identity attributes are easy to invert, and inverting them makes every
+per-team cost and latency dashboard slice by the wrong dimension. Tenant is the
+team; platform is the app it owns. The operator is authoritative for both — a
+tenant-supplied `OTEL_RESOURCE_ATTRIBUTES` is dropped rather than merged, so a
+workload cannot claim someone else's attribution.
 
-## Tenancy patterns
+`agents.model_id` is deliberately NOT injected. The pods the operator builds
+(sandbox session, worker fleet, eval runner) resolve their model at request time,
+so no single model id is knowable when the pod is built. Don't add it.
 
-### Namespace-per-Platform (default)
+The operator sets these on the pod templates it owns, at reconcile time.
 
-One Platform → one namespace. Simple, well-understood, NetworkPolicy isolates traffic. RBAC scoped per-namespace.
+## Isolation tiers
 
-### Project-per-Platform
+Two orthogonal dials, not one ladder. See `docs/architecture/tenant-isolation-tiers.md`.
 
-For richer multi-tenant: multiple namespaces under one ArgoCD AppProject, all driven by one Platform CR. Used when a tenant has multiple workload classes (e.g., agents + data pipelines + UI).
+- **`controlPlaneNamespace`** — where a tenant's CRs live. `eks-agent-platform`
+  (shared, the default) → `eap-tenant-<name>` (per-tenant, for GitOps granularity
+  or per-tenant control-plane RBAC at scale).
+- **`Platform.isolation`** — how its workloads are contained. `namespace` (the
+  default: namespace RBAC + default-deny NetworkPolicy + ResourceQuota +
+  PSS-restricted) → `vcluster` (all of that PLUS a per-Platform virtual cluster, so
+  tenant code holding a k8s token talks to its own API server).
 
-### Cluster-per-Platform
+`vcluster` is API-server isolation, not kernel or node isolation, and ArgoCD is a
+hard prerequisite — the operator declares the virtual cluster as an ArgoCD
+Application and the tier fails closed rather than downgrading. `isolation` is
+immutable after create: changing it is a re-declaration, not an edit.
 
-Strict isolation. Each Platform deploys to a dedicated cluster. Falls outside the operator's default scope; use `landing-zone` to provision the cluster + bootstrap the operator there.
+A dedicated cluster per tenant is the tier above both, and lives outside this
+operator — `eks-fleet` vends the cluster, `landing-zone` provisions its substrate.
 
-## IRSA / Pod Identity factory
+## The identity factory
 
-The operator calls `landing-zone/modules/aws/workload-identity` outputs (the cluster's OIDC provider + role-creation IAM permissions) to provision per-tenant roles. The Platform CR's `iam.roles[]` is the API; the operator translates each entry into an AWS IAM role + trust policy + permission policy.
+The operator mints the per-tenant role itself through the AWS SDK, trusted via EKS
+Pod Identity — there is no role ARN pasted between layers. `spec.identity` and
+`spec.datastores` are the API: the operator turns them into inline policies scoped
+by the `<env>-<platform>` naming convention — `bedrock-model-scoping`,
+`datastore-access`, `capability-access`, `tenant-secrets` — plus KMS grants and
+the attribution session role when `spec.attribution` is set.
 
-This is the load-bearing pattern. Applications NEVER write IAM HCL — they declare what they need in the Platform CR, and the operator reconciles.
+This is the load-bearing pattern. Applications NEVER write IAM HCL and never
+reference a hand-written managed policy by ARN: they declare what they need on the
+Platform CR, and the operator reconciles it.
+
+The operator holds no delete permission on any datastore. That boundary is
+enforced by permission, not by finalizer logic — so don't reach for a finalizer
+that deletes tenant data.
 
 ## Reconcile loop semantics
 
 - Level-triggered, idempotent. Re-running the reconcile produces the same state.
-- Finalizers on Platform CRs ensure AWS resources (IAM roles, KMS grants) get cleaned up on delete.
+- Finalizers on Platform CRs clean up the AWS resources the operator minted — IAM roles, KMS grants, bucket-policy entries. NOT datastores: those follow `deletionPolicy`, and the operator holds no delete permission on them anyway.
 - Status subresource carries reconcile state, last error, last successful reconcile timestamp.
 - Watch on owned resources — if someone edits a managed ResourceQuota directly, the operator restores it.
 
@@ -153,7 +219,7 @@ This is the load-bearing pattern. Applications NEVER write IAM HCL — they decl
 
 ## Common pitfalls
 
-- **IAM provisioning outside the operator.** Tempting to write the IRSA role in Terraform "just for one tenant" — don't. Once you have two exceptions, the pattern is broken.
+- **IAM provisioning outside the operator.** Tempting to write the tenant role in tofu "just for one tenant" — don't. Once you have two exceptions the pattern is broken, and you have reintroduced the role-ARN paste that Pod Identity exists to remove.
 - **Stuffing application config into the Platform CR.** The CR is the tenant boundary. App-specific knobs (replica counts, env vars) belong in the application chart.
 - **Skipping NetworkPolicy.** Default deny + allow lists keep blast radius contained. Don't rely on namespace boundaries alone.
 - **Mutating webhooks instead of reconciliation.** Webhooks run synchronously and add cluster-wide failure modes. Prefer reconcilers + finalizers.

@@ -222,7 +222,8 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
   // ── Build · Agent Platform ──────────────────────────────────────────
   'eks-agent-platform-curator': {
     name: 'eks-agent-platform-curation',
-    description: 'eks-agent-platform operator: Platform CRDs, IRSA, per-tenant scaffolding.',
+    description:
+      'eks-agent-platform operator: Platform CRDs, tenant identity, per-tenant scaffolding.',
     type: 'generated',
   },
   'kagent-curator': {
