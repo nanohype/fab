@@ -149,7 +149,10 @@ What the operator does NOT own:
 
 ## Required OTel resource attributes
 
-Per `PLATFORM_TENANT_CONTRACT`, every workload reconciled by the operator gets these resource attributes injected:
+Two paths set these, and they carry different sets — don't conflate them.
+
+**Pods the operator builds** (AgentSandbox session, AgentFleet worker, eval
+runner) get `OTEL_RESOURCE_ATTRIBUTES` written at reconcile time:
 
 - `agents.tenant` — `spec.tenant`, the owning **Tenant**.
 - `agents.platform` — the **Platform** name (`metadata.name`), i.e. the app.
@@ -157,15 +160,18 @@ Per `PLATFORM_TENANT_CONTRACT`, every workload reconciled by the operator gets t
 
 The two identity attributes are easy to invert, and inverting them makes every
 per-team cost and latency dashboard slice by the wrong dimension. Tenant is the
-team; platform is the app it owns. The operator is authoritative for both — a
+team; platform is the app it owns. The operator is authoritative for both here — a
 tenant-supplied `OTEL_RESOURCE_ATTRIBUTES` is dropped rather than merged, so a
 workload cannot claim someone else's attribution.
 
-`agents.model_id` is deliberately NOT injected. The pods the operator builds
-(sandbox session, worker fleet, eval runner) resolve their model at request time,
-so no single model id is knowable when the pod is built. Don't add it.
+`agents.model_id` is deliberately absent from this path: these pods resolve their
+model at request time, so no single model id is knowable when the pod is built.
+Don't add it to the operator.
 
-The operator sets these on the pod templates it owns, at reconcile time.
+**Application pods**, rendered by the app's own chart rather than by the operator,
+set the attributes in their own OTel SDK init — including `agents.model_id`, which
+an app that pins one model does know. That contract is `PLATFORM_TENANT_CONTRACT`,
+not this operator.
 
 ## Isolation tiers
 
