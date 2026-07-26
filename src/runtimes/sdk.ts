@@ -89,10 +89,12 @@ export class SdkRuntime implements AgentRuntime {
   }
 
   resumeSession(sessionId: string): AgentSession {
-    // The SDK supports resume via `options.resume`, but resumption needs
-    // a fresh `query()` call — there is no persistent handle to attach
-    // to. We construct an empty session pointed at the SDK and wait for
-    // the caller's first input to actually re-open it via `sendInput`.
+    // Reattaching to a session by id is not supported on this transport.
+    // The SDK's `options.resume` reopens a transcript in a fresh `query()`
+    // call; it does not hand back a live handle to a session already
+    // running, and this runtime holds its sessions as in-memory `Query`
+    // objects that end with the process. The returned stand-in exists to
+    // fail loudly on first use rather than hand back a silent no-op.
     return new ResumedSdkAgentSession(sessionId);
   }
 }
@@ -293,20 +295,22 @@ class SdkAgentSession implements AgentSession {
 }
 
 /**
- * Stand-in for a resumed session before its first input fires. Once input
- * arrives it transitions into a live `SdkAgentSession`. We keep this
- * separate from {@link SdkAgentSession} because the SDK requires a fresh
- * `query()` call with `options.resume` — there is no way to attach to an
- * already-running process by id.
+ * What `SdkRuntime.resumeSession` returns: a session that reports its id,
+ * streams nothing, and throws on input. It does not become a live session.
+ *
+ * Reattaching by id has no implementation on this transport — the SDK
+ * offers no handle to an already-running `query()`, and workflow code drives
+ * continuation by starting a new role session with the prior transcript as
+ * context rather than by reattaching. This type keeps that a stated refusal
+ * instead of an empty stream a caller could mistake for an idle session.
  */
 class ResumedSdkAgentSession implements AgentSession {
   constructor(public readonly id: string) {}
 
   get events(): AsyncIterable<AgentEvent> {
     return (async function* () {
-      // Empty stream until the caller sends an input. Workflow code drives
-      // resume through `runRoleSession`, not through standalone reattach,
-      // so this is a deliberate no-op rather than a half-built reopen path.
+      // Nothing to stream — there is no session behind this id on this
+      // transport. `sendInput` is where the refusal surfaces.
     })();
   }
 

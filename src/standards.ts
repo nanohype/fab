@@ -179,6 +179,42 @@ Applies to: APPROVE and REQUEST_CHANGES verdicts. REJECT verdicts may ship witho
 The anti-pattern this prevents: gate saying "42 tests passing" when zero tests exist; artifact-auditor saying "all 11 artifacts verified" when 10 don't exist on disk; threat-model citing an ACL SQL fragment that appears nowhere in the codebase. All three were real Dispatch/Chorus slip-throughs. Citation-bound verdicts and pipeline-level evidence enforcement stop them.`;
 
 // ── Quality rubric (10 dimensions, imported from /quality-check) ───
+//
+// The dimension list and its per-role assignment are declared here as data,
+// not only as prose, because three things have to agree for the rubric to
+// mean anything: the text below, the QUALITY_GRADES: block each gate role
+// declares in its own prompt, and parseQualityGrades in gate.ts. When they
+// drift the grades parse to nothing and the external-reviewer calibration
+// has nothing to compare — silently, since an empty grade map reads the same
+// as a workflow that never reached the gate. `__tests__/quality-contract`
+// holds all three to these constants.
+
+export const QUALITY_DIMENSIONS = [
+  'architecture',
+  'patterns',
+  'systems',
+  'testing',
+  'frontend',
+  'security',
+  'code_quality',
+  'documentation',
+  'consistency',
+  'ai_systems',
+] as const;
+
+export type QualityDimension = (typeof QUALITY_DIMENSIONS)[number];
+
+/**
+ * Which gate role grades which dimensions. The values partition
+ * QUALITY_DIMENSIONS: every dimension has exactly one owner, so the internal
+ * grade map the external reviewer is calibrated against is complete.
+ */
+export const QUALITY_DIMENSION_OWNERS: Record<string, readonly QualityDimension[]> = {
+  'pr-reviewer': ['architecture', 'patterns', 'frontend', 'code_quality'],
+  'qa-security': ['systems', 'security', 'ai_systems'],
+  'build-verifier': ['testing'],
+  'artifact-auditor': ['documentation', 'consistency'],
+};
 
 export const QUALITY_RUBRIC = `## Quality rubric
 
@@ -209,7 +245,7 @@ QUALITY_GRADES:
   frontend: N/A
 \`\`\`
 
-Use snake_case keys: \`architecture, patterns, systems, testing, frontend, security, code_quality, documentation, consistency, ai_systems\`.
+Use snake_case keys: \`${QUALITY_DIMENSIONS.join(', ')}\`. One dimension per indented line under a \`QUALITY_GRADES:\` header that stands alone — the parser reads that shape and nothing else, so an inline \`dimension=letter\` list is read as no grades at all.
 
 Quoting the source: "Assign grades honestly. A is exceptional. B is solid. C is adequate. D has significant issues. F is broken. Most production code is B-/C+ — grade inflation helps no one."`;
 
@@ -371,7 +407,7 @@ Claude is the primary LLM for every factory build. Preferred delivery: AWS Bedro
 
 export const PRODUCTION_BAR = `## Production bar (non-negotiable)
 
-Every factory build must meet all nine dimensions. Explicit waivers go in the architecture artifact with the role + rationale.
+Every factory build must meet all nine requirements below. These are not the QUALITY_RUBRIC dimensions — that rubric grades, this bar passes or fails. Explicit waivers go in the architecture artifact with the role + rationale.
 
 **Stubs don't count as done.** A function that returns \`[]\`, throws \`'not implemented'\`, has a \`// TODO: implement\` comment, or reads from a hardcoded fixture instead of the real source is a prototype — not a shipped build. If the intake brief did not request a prototype, stub implementations mean you self-REJECT your own work before the gate runs and fix it. Connector shims that return empty results, adapters that only handle the happy path, "we'll wire this up next sprint" functions — all prototype territory. The only acceptable stubs are ones explicitly waived in the architecture artifact with a migration plan and a ticketed follow-up.
 
@@ -494,7 +530,7 @@ Verdict merge rules:
 - all APPROVE → workflow advances to external-reviewer calibration
 
 **External-reviewer calibration** (post-gate, pre-release):
-After the four gate roles approve, \`external-reviewer\` runs in a fresh session with no factory context — only the intake brief and the post-merge tree. It grades all nine QUALITY_RUBRIC dimensions cold. The pipeline compares its grades against the internal gate roles' QUALITY_GRADES. Any dimension where external and internal differ by >1 letter (e.g., internal B, external D) blocks release and re-invokes the diverged role. Only when external grades align within ±1 letter does release-manager open the PR.
+After the four gate roles approve, \`external-reviewer\` runs in a fresh session with no factory context — only the intake brief and the post-merge tree. It grades all ten QUALITY_RUBRIC dimensions cold. The pipeline compares its grades against the internal gate roles' QUALITY_GRADES. Any dimension where external and internal differ by >1 letter (e.g., internal B, external D) blocks release and re-invokes the diverged role. Only when external grades align within ±1 letter does release-manager open the PR.
 
 **Self-review downgrade:** if the PR diff touches a gate role's own definition, that vote downgrades to advisory and the remaining three must approve unanimously (handled by \`applySelfReviewDowngrade\` in \`gate.ts\`).`;
 

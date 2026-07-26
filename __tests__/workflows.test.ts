@@ -4,7 +4,9 @@ import {
   listWorkflows,
   executeWorkflow,
   runMergeGate,
+  renderWorkflowContext,
   type RoleRunner,
+  type ContextEntry,
 } from '../src/workflows.js';
 import type { AnthropicAgents } from '../src/api.js';
 import type { AgentRuntime } from '../src/runtime.js';
@@ -18,7 +20,7 @@ vi.mock('../src/quality.js', async (importOriginal) => ({
 
 // Workflow is internal to workflows.ts; recover its type from executeWorkflow's
 // signature so test workflows are contextually typed (roles checked as TeamRole).
-type TestWorkflow = Parameters<typeof executeWorkflow>[2];
+type TestWorkflow = Parameters<typeof executeWorkflow>[1];
 
 describe('workflows', () => {
   it('listWorkflows returns the built-in catalog', () => {
@@ -175,7 +177,7 @@ describe('executeWorkflow resilience', () => {
     };
 
     await expect(
-      executeWorkflow(api, 'sid', workflow, 'brief', {
+      executeWorkflow(api, workflow, 'brief', {
         runRole,
         onGate: async (_s, _i, output) => {
           gateOutput = output;
@@ -204,7 +206,7 @@ describe('executeWorkflow resilience', () => {
     };
 
     await expect(
-      executeWorkflow(api, 'sid', workflow, 'brief', {
+      executeWorkflow(api, workflow, 'brief', {
         runRole,
         onGate: async (_s, _i, output) => {
           gateOutput = output;
@@ -229,7 +231,7 @@ describe('executeWorkflow resilience', () => {
       steps: [{ role: 'product', instruction: 'plan' }],
     };
 
-    await executeWorkflow(api, 'sid', workflow, 'brief', {
+    await executeWorkflow(api, workflow, 'brief', {
       runRole,
       onGate: async () => {
         gateCalls += 1;
@@ -252,7 +254,7 @@ describe('executeWorkflow resilience', () => {
     };
 
     await expect(
-      executeWorkflow(api, 'sid', workflow, 'brief', {
+      executeWorkflow(api, workflow, 'brief', {
         runRole,
         onGate: async () => ({ decision: 'reject' }),
       }),
@@ -482,7 +484,7 @@ describe('executeWorkflow code-profile fail-fast', () => {
 
     // No intake JSON and no primary repo configured (FAB_STATE_FILE points at
     // a throwaway temp path) — branch pre-creation cannot succeed.
-    await executeWorkflow(api, 'sid', workflow, 'a plain prose brief', { runRole });
+    await executeWorkflow(api, workflow, 'a plain prose brief', { runRole });
 
     expect(runRole).not.toHaveBeenCalled();
     const logged = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('\n');
@@ -638,5 +640,75 @@ describe('streamSessionWithAdvisor', () => {
     expect(output).toBe('done');
     const written = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
     expect(written).toContain('1.2300');
+  });
+});
+
+describe('renderWorkflowContext', () => {
+  const head = 'INTAKE BRIEF (untrusted)';
+  const entry = (label: string, size: number): ContextEntry => ({
+    label,
+    text: label.toUpperCase().repeat(Math.max(1, Math.floor(size / label.length))),
+  });
+
+  it('keeps everything when it fits', () => {
+    const out = renderWorkflowContext(head, [entry('product', 100), entry('design-lead', 100)]);
+    expect(out).toContain(head);
+    expect(out).toContain('--- product ---');
+    expect(out).toContain('--- design-lead ---');
+    expect(out).not.toContain('elided');
+  });
+
+  it('never evicts the head', () => {
+    // The intake brief is the ground truth every later role reasons from, and
+    // it carries the spotlight fence that marks it untrusted. Dropping it would
+    // both lose the task and unmark the untrusted span.
+    const entries = Array.from({ length: 40 }, (_, i) => entry(`role-${i}`, 5_000));
+    expect(renderWorkflowContext(head, entries)).toContain(head);
+  });
+
+  it('evicts oldest first and says what it dropped', () => {
+    const entries = Array.from({ length: 40 }, (_, i) => entry(`role-${i}`, 5_000));
+    const out = renderWorkflowContext(head, entries);
+
+    expect(out).toContain('--- role-39 ---'); // newest survives
+    expect(out).not.toContain('--- role-0 ---'); // oldest evicted
+    expect(out).toContain('elided to bound context');
+    // A downstream role has to know the step happened and where its work went,
+    // or the elision reads as the step never having run.
+    expect(out).toContain('role-0');
+    expect(out).toContain('/workspace/artifacts/');
+  });
+
+  it('bounds total size regardless of how many steps ran', () => {
+    const budget = 10_000;
+    const few = renderWorkflowContext(head, [entry('a', 3_000)], budget);
+    const many = renderWorkflowContext(
+      head,
+      Array.from({ length: 200 }, (_, i) => entry(`role-${i}`, 3_000)),
+      budget,
+    );
+    // The whole point: 200 steps must not cost 200x. Allow generous slack for
+    // the head and the elision notice.
+    expect(many.length).toBeLessThan(budget * 2);
+    expect(few.length).toBeLessThan(many.length + budget);
+  });
+
+  it('truncates a single oversized output instead of dropping the rest', () => {
+    // One role dumping a large file must not evict the entire workflow.
+    const entries = [entry('product', 500), entry('dump', 200_000)];
+    const out = renderWorkflowContext(head, entries, 10_000);
+    expect(out).toContain('truncated');
+    expect(out).toContain('--- dump ---');
+    expect(out.length).toBeLessThan(30_000);
+  });
+
+  it('keeps the newest entry even when it alone exceeds the budget', () => {
+    const out = renderWorkflowContext(head, [entry('huge', 50_000)], 1_000);
+    expect(out).toContain('--- huge ---');
+    expect(out).toContain(head);
+  });
+
+  it('handles an empty run', () => {
+    expect(renderWorkflowContext(head, [])).toBe(head);
   });
 });

@@ -119,8 +119,8 @@ src/team/
 The merge gate uses four specialist roles plus an out-of-band calibration:
 
 - `pr-reviewer` — architecture, patterns, frontend craft, code quality dimensions of the quality rubric.
-- `qa-security` — security + systems dimensions.
-- `build-verifier` — testing + devops + version_currency dimensions; runs the four-phase contract.
+- `qa-security` — security, systems and ai_systems dimensions.
+- `build-verifier` — the testing dimension; runs the four-phase contract + version-currency check.
 - `artifact-auditor` — documentation + consistency dimensions; verifies scope-ledger + link integrity.
 - `external-reviewer` — cold-context calibration. Grades all 10 dimensions without seeing internal verdicts. Drift > 1 letter blocks the merge.
 

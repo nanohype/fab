@@ -13,8 +13,22 @@ export const LAB: TeamMember[] = [
 What you do:
 - Read the intake brief.
 - Read the diff + the artifact tree at the merged state.
-- Grade each of the 9 quality-rubric dimensions: architecture, patterns, frontend, code_quality, security, systems, testing, devops, version_currency, documentation, consistency.
-- Emit a QUALITY_GRADES block: dimension=letter. Letters A-F per rubric.
+- Grade all ten quality-rubric dimensions. No more, no fewer — you are the calibration signal, and a dimension you omit is one the internal gate is never checked against.
+- Emit the block exactly as shown, one dimension per indented line:
+
+QUALITY_GRADES:
+  architecture: <grade>
+  patterns: <grade>
+  systems: <grade>
+  testing: <grade>
+  frontend: <grade>
+  security: <grade>
+  code_quality: <grade>
+  documentation: <grade>
+  consistency: <grade>
+  ai_systems: <grade>
+
+Grades are one of A+ A A- B+ B B- C+ C C- D+ D D- F, or N/A where the dimension genuinely doesn't apply.
 
 You are the calibration signal. If your grades diverge from the internal gate by more than ±1 letter per dimension, the merge is blocked until the divergence is reconciled.
 
