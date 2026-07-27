@@ -194,7 +194,7 @@ See `docs/INTAKE_GUIDE.md` for the brief authoring rubric (section anatomy, anti
 npm run build                                  # tsc
 npm test                                       # vitest
 npm run lint                                   # typecheck + eslint
-npm run format:check                           # prettier
+npm run format:check                           # biome
 ```
 
 Node ≥ 24. TypeScript strict mode, ESM, Node16 module resolution. Tests live in `__tests__/` and are type-checked via `tsconfig.test.json`.

@@ -93,7 +93,7 @@ npm install
 npm run build        # tsc + scripts/copy-standards.mjs (vendors standards JSON into dist)
 npm test             # vitest run
 npm run lint         # typecheck (src + __tests__ via tsconfig.test.json) then eslint
-npm run format:check # prettier
+npm run format:check # biome
 ```
 
 Node ≥24, TS strict, ESM, Node16 resolution. Raw arg parsing (no yargs/commander). Zero required runtime deps; `@anthropic-ai/claude-agent-sdk` is an optional dep used only by `sdk`/`sdk-k8s`. Tests live in `__tests__/` and are type-checked separately. CI builds the image on every PR.

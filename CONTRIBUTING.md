@@ -68,7 +68,7 @@ npm run build          # tsc + vendored-standards copy into dist/
 npm run lint           # tsc --noEmit (src + tests) + eslint
 npm test               # vitest
 npm run docs           # typedoc
-npm run format:check   # prettier, org identity
+npm run format:check   # biome, org identity
 ```
 
 Coverage is a gate, not a report:
