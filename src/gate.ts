@@ -225,7 +225,7 @@ export function parseCitations(output: string): Citation[] {
   let fragment: string[] = [];
 
   const flush = () => {
-    if (cur && cur.file) {
+    if (cur?.file) {
       cur.quotedFragment = dedent(fragment);
       citations.push(cur);
     }
@@ -495,8 +495,7 @@ export function parseQualityGrades(output: string): Record<string, Grade> {
 
   const grades: Record<string, Grade> = {};
   const lineRe = /^\s*([a-z][a-z0-9_]*)\s*:\s*(A\+|A-|A|B\+|B-|B|C\+|C-|C|D\+|D-|D|F|N\/A)\s*$/gm;
-  let m: RegExpExecArray | null;
-  while ((m = lineRe.exec(block)) !== null) {
+  for (const m of block.matchAll(lineRe)) {
     const dim = m[1].toLowerCase();
     const grade = m[2] as Grade;
     if (GRADE_VALUES.has(grade)) grades[dim] = grade;

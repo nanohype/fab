@@ -92,7 +92,7 @@ Every `group:'factory'` role gets `FACTORY_PREAMBLE` injected by `buildSystemPro
 npm install
 npm run build        # tsc + scripts/copy-standards.mjs (vendors standards JSON into dist)
 npm test             # vitest run
-npm run lint         # typecheck (src + __tests__ via tsconfig.test.json) then eslint
+npm run lint         # typecheck (src + __tests__ via tsconfig.test.json) then biome lint
 npm run format:check # biome
 ```
 

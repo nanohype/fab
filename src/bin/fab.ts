@@ -607,7 +607,7 @@ async function usage(args: ParsedArgs): Promise<void> {
   const sinceStr = typeof args.flags.since === 'string' ? args.flags.since : undefined;
   if (sinceStr) {
     since = new Date(sinceStr);
-    if (isNaN(since.getTime())) {
+    if (Number.isNaN(since.getTime())) {
       console.error(`Invalid date: ${sinceStr}`);
       process.exit(1);
     }
@@ -1239,7 +1239,7 @@ async function budget(args: ParsedArgs): Promise<void> {
 
   if (sub === 'set') {
     const val = parseFloat(args.positional[0]);
-    if (isNaN(val) || val <= 0) {
+    if (Number.isNaN(val) || val <= 0) {
       console.error('Usage: fab budget set <dollars>');
       process.exit(1);
     }

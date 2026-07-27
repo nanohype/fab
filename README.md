@@ -193,7 +193,7 @@ See `docs/INTAKE_GUIDE.md` for the brief authoring rubric (section anatomy, anti
 ```sh
 npm run build                                  # tsc
 npm test                                       # vitest
-npm run lint                                   # typecheck + eslint
+npm run lint                                   # typecheck + biome lint
 npm run format:check                           # biome
 ```
 

@@ -16,7 +16,13 @@
     "lineWidth": 100
   },
   "linter": {
-    "enabled": false
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
   },
   "javascript": {
     "formatter": {
@@ -28,6 +34,14 @@
   "json": {
     "formatter": {
       "trailingCommas": "none"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
     }
   }
 }

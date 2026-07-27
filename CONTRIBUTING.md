@@ -65,7 +65,7 @@ The four phases plus formatting, from a clean checkout — all must exit 0:
 ```sh
 npm install
 npm run build          # tsc + vendored-standards copy into dist/
-npm run lint           # tsc --noEmit (src + tests) + eslint
+npm run lint           # tsc --noEmit (src + tests) + biome lint
 npm test               # vitest
 npm run docs           # typedoc
 npm run format:check   # biome, org identity
