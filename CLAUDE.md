@@ -29,7 +29,7 @@ Groups (`group` field):
 - `src/standards.ts` — factory production policies. Two layers: (1) **public bar** loaded at module init from the vendored `standards/*.json` (`LANGUAGE_TOOLCHAIN` only at present; future structured facts join via the same loader); (2) **private choreography** declared here as markdown blobs: `FOUR_PHASE_CONTRACT`, `VERSION_CURRENCY_POLICY`, `EVIDENCE_CONTRACT`, `QUALITY_RUBRIC` (dimension weights + per-role assignments + N/A criteria — the depth behind the public dimension names), `IAC_BY_TARGET`, `PLATFORM_TENANT_CONTRACT`, `LLM_POLICY`, `PRODUCTION_BAR` (9 pass-fail requirements with the specific REJECT criteria), `COMMIT_PR_POLICY`, `MERGE_GATE_CONTRACT`, `FACTORY_PREAMBLE` (assembled), `CODE_GATE_ROLES`, `DOCS_GATE_ROLES`. The public bar JSON is the [Platform Reference](../nanohype/docs/platform-reference.md); external clients see the guardrails, only fab knows the depth.
 - `src/gate.ts` — pure helpers `parseGateVerdict`, `mergeGateVerdicts`, `applySelfReviewDowngrade` (merge-gate revision loop), plus `parseQualityGrades` + `compareGrades` (external-reviewer calibration). Verdicts without `TRANSCRIPTS:` + `CITATIONS:` blocks are auto-downgraded to REJECT per `EVIDENCE_CONTRACT`.
 - `src/mcp.ts` — MCP server registry. Third-party servers (github, linear, slack, notion, sentry, figma, hunter) hit public endpoints directly. Gateway-hosted services (hubspot, gdrive, analytics, gcalendar, gcse, stripe) route through `${MCP_GATEWAY_BASE_URL}/mcp/{service}`. Auth is injected by the vault at session time (no inline headers). Private MCP servers reachable through an MCP tunnel (the `mcp-tunnel` addon in `eks-gitops`) are registered via the `FAB_MCP_TUNNEL` env knob — comma-separated `name=url` pairs — by `parseTunnelRegistry`.
-- `src/skills.ts` — loads domain skills from the overlay chain (env → user → project → bundled) with nanohype brief templates as a default fallback when no overlay base exists
+- `src/skills.ts` — loads domain skills from the overlay chain (env → user → project → bundled) with nanohype brief templates as a default fallback when no overlay base exists. Two skill types: `brief` (a nanohype template's `skeleton/brief.md`, placeholders replaced with their descriptions) and `generated` (a thin wrapper around the SkillDef description, with the depth in the system prompt or an overlay)
 - `src/overlay.ts` — overlay resolver. Exports `resolveSkillPath`, `loadSkillWithOverlay`, `appendOverlays`. Priority: `$FAB_SKILLS_DIR` > `~/.fab/skills/` > `<cwd>/.fab/skills/` > bundled `fab/skills/`. Two override styles: `<skill>.md` (replace) and `<skill>.append.md` (concatenate). See [`skills/README.md`](skills/README.md) for the user-facing explanation
 - `src/workflows.ts` — 18 built-in workflows tagged `factory | firm | lab`, with parallel groups, review gates, revision support, and workflow-level merge gates (`gateProfile: 'code' | 'docs'`). `streamWithAdvisor` is the shared stream consumer. `runMergeGate` is the merge-gate finalizer.
 - `src/repl.ts` — interactive REPL with `/quit`, `/status`, `/threads`, `/switch`. Prompts for tool confirmation when `always_ask` policy fires.
@@ -46,7 +46,7 @@ Groups (`group` field):
 - TypeScript strict mode, ES2022 target, Node16 module resolution
 - Raw arg parsing (no yargs/commander)
 - 2-space indent everywhere
-- ESLint + Prettier configured
+- Biome owns lint and format
 - Tests with Vitest in `__tests__/`
 
 ## Factory Production Standards
@@ -99,8 +99,8 @@ npm install
 npm run build        # tsc
 npm test             # vitest
 npm run test:coverage # vitest + v8 coverage floors (vitest.config.ts thresholds)
-npm run lint         # tsc --noEmit + eslint
-npm run format:check # prettier
+npm run lint         # tsc --noEmit + biome lint
+npm run format:check # biome format
 ```
 
 `Dockerfile` builds a runtime image (entrypoint `node dist/bin/fab.js`); `deploy/` holds example k8s manifests for running workflows as Jobs with Bedrock inference via an IRSA ServiceAccount — operator guide in [`docs/runbook.md`](docs/runbook.md). CI builds the image on every PR.

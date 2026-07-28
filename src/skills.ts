@@ -9,9 +9,8 @@ import type { TeamRole } from './types.js';
 interface SkillDef {
   name: string;
   description: string;
-  type: 'brief' | 'composed' | 'generated';
+  type: 'brief' | 'generated';
   briefTemplate?: string; // for type: brief — template dir name
-  referencePaths?: string[]; // for type: composed — additional files
 }
 
 const SKILL_DEFS: Record<TeamRole, SkillDef> = {
@@ -479,54 +478,39 @@ export function getAllSkillDefs(): [TeamRole, SkillDef][] {
  *   1. Skill overlay (`$FAB_SKILLS_DIR` → `~/.fab/skills/` →
  *      `<cwd>/.fab/skills/` → bundled `fab/skills/`). If a skill
  *      `<def.name>.md` lives in any of those layers it wins as the base.
- *   2. Type-specific loader (brief → nanohype template, composed →
- *      nanohype references, generated → built at runtime). Used when no
- *      overlay base is present.
+ *   2. Type-specific loader (brief → nanohype template, generated → built at
+ *      runtime). Used when no overlay base is present.
  *
  * Either way, `<def.name>.append.md` files from every layer are concatenated
  * onto the resolved content (low-priority appends first), so additive
  * overlays work regardless of where the base came from.
  *
- * Returns the SKILL.md content and optional reference files.
+ * Returns the SKILL.md content.
  */
-export async function loadSkillContent(
-  role: TeamRole,
-  nanohypePath: string,
-): Promise<{ content: string; referenceFiles: { name: string; content: string }[] }> {
+export async function loadSkillContent(role: TeamRole, nanohypePath: string): Promise<string> {
   const def = SKILL_DEFS[role];
 
   // Try the overlay first — a `<def.name>.md` anywhere in the chain
   // replaces the default loader entirely.
   const overlaid = await loadSkillWithOverlay(def.name);
-  if (overlaid !== null) {
-    return { content: overlaid, referenceFiles: [] };
-  }
+  if (overlaid !== null) return overlaid;
 
   // Fall through to the type-specific loader, then layer any appends
   // (so a user can ADD voice/style tweaks to a nanohype-backed brief
   // without replacing the brief itself).
   const baseline = await loadByType(def, nanohypePath);
-  const content = await appendOverlays(baseline.content, def.name);
-  return { content, referenceFiles: baseline.referenceFiles };
+  return appendOverlays(baseline, def.name);
 }
 
-async function loadByType(
-  def: SkillDef,
-  nanohypePath: string,
-): Promise<{ content: string; referenceFiles: { name: string; content: string }[] }> {
+async function loadByType(def: SkillDef, nanohypePath: string): Promise<string> {
   switch (def.type) {
     case 'brief':
       return loadBriefSkill(def, nanohypePath);
-    case 'composed':
-      return loadComposedSkill(def, nanohypePath);
     case 'generated':
       // Specialist roles — skill content is a thin wrapper around the
       // SkillDef description. The deep expertise lives in the system
       // prompt + any overlay at `fab/skills/<def.name>.md`.
-      return {
-        content: `---\nname: ${def.name}\ndescription: ${def.description}\n---\n\n${def.description}`,
-        referenceFiles: [],
-      };
+      return `---\nname: ${def.name}\ndescription: ${def.description}\n---\n\n${def.description}`;
   }
 }
 
@@ -534,8 +518,7 @@ async function loadByType(
  * Preview skill content without reference files (for `skills show`).
  */
 export async function previewSkillContent(role: TeamRole, nanohypePath: string): Promise<string> {
-  const { content } = await loadSkillContent(role, nanohypePath);
-  return content;
+  return loadSkillContent(role, nanohypePath);
 }
 
 /**
@@ -558,10 +541,7 @@ interface TemplateVariable {
   description: string;
 }
 
-async function loadBriefSkill(
-  def: SkillDef,
-  nanohypePath: string,
-): Promise<{ content: string; referenceFiles: { name: string; content: string }[] }> {
+async function loadBriefSkill(def: SkillDef, nanohypePath: string): Promise<string> {
   const templateDir = join(nanohypePath, 'templates', def.briefTemplate!);
   const briefPath = join(templateDir, 'skeleton', 'brief.md');
   const yamlPath = join(templateDir, 'template.yaml');
@@ -572,9 +552,7 @@ async function loadBriefSkill(
   ]);
 
   const variables = parseVariables(yamlRaw);
-  const content = wrapAsSkillMd(def, stripPlaceholders(briefRaw, variables));
-
-  return { content, referenceFiles: [] };
+  return wrapAsSkillMd(def, stripPlaceholders(briefRaw, variables));
 }
 
 /**
@@ -624,62 +602,6 @@ function parseVariables(yaml: string): TemplateVariable[] {
   }
 
   return variables;
-}
-
-// ── Composed skill loading ──────────────────────────────────────────
-
-async function loadComposedSkill(
-  def: SkillDef,
-  nanohypePath: string,
-): Promise<{ content: string; referenceFiles: { name: string; content: string }[] }> {
-  const referenceFiles: { name: string; content: string }[] = [];
-
-  for (const relPath of def.referencePaths ?? []) {
-    const absPath = join(nanohypePath, relPath);
-    const fileContent = await readFile(absPath, 'utf-8');
-    const fileName = relPath.split('/').pop()!;
-    referenceFiles.push({ name: fileName, content: fileContent });
-  }
-
-  const content = buildEngineeringSkill(referenceFiles.map((f) => f.name));
-
-  return { content, referenceFiles };
-}
-
-function buildEngineeringSkill(referenceFileNames: string[]): string {
-  const refs = referenceFileNames.map((f) => `- **${f}**`).join('\n');
-
-  return `---
-name: engineering-catalog
-description: Template selection decision matrix and production readiness checklist for composing nanohype templates into production systems.
----
-
-# Engineering Decision Guide
-
-You have access to the nanohype template catalog — a library of production-ready templates for building AI systems, applications, infrastructure, and composable modules.
-
-## How to Use This Skill
-
-When asked to build something:
-1. Consult the decision matrix in **catalog.md** to identify the right starting template
-2. Layer in composable modules based on technical requirements (auth, database, caching, etc.)
-3. Select infrastructure for the deployment target
-4. If 3+ templates are needed, wrap in monorepo
-5. Always add eval-harness alongside AI system templates
-6. Verify against the production readiness checklist before shipping
-
-## Key Composition Rules
-
-- AI systems provide intelligence, applications provide the interface
-- Modules are never standalone — they plug into applications or AI systems
-- Pick one deploy target per project
-- monorepo wraps multi-template projects (3+ templates)
-
-## Reference Files
-
-${refs}
-
-Consult these reference files for the full decision matrix, template profiles, module descriptions, and composition patterns.`;
 }
 
 // ── SKILL.md wrapper ────────────────────────────────────────────────

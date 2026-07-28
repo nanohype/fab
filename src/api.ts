@@ -401,7 +401,9 @@ export class AnthropicAgents {
             await new Promise((r) => setTimeout(r, delay));
             continue;
           }
-          throw new Error(`Stream failed (${status}): ${body}`);
+          // Typed, so the catch below can tell "the server already answered
+          // and the answer will not change" from "the socket died".
+          throw new HttpError(`Stream failed (${status}): ${body}`, status);
         }
 
         if (!res.body) throw new Error('No response body');
@@ -439,6 +441,13 @@ export class AnthropicAgents {
       } catch (err) {
         // AbortError from timeout — don't retry
         if (err instanceof DOMException && err.name === 'AbortError') throw err;
+
+        // An HTTP status the block above already ruled on: either a client
+        // error, which will answer the same way every time, or a retryable one
+        // that has exhausted its budget. Without this the generic retry below
+        // swallows that decision and a bad API key costs four requests and
+        // seven seconds of backoff before it reports the 401 it had at once.
+        if (err instanceof HttpError) throw err;
 
         // Network error — retry if attempts remain
         if (attempt < maxRetries) {

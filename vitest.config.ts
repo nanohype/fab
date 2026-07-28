@@ -24,13 +24,20 @@ export default defineConfig({
       // Honest floors set just below the measured actuals (see the numbers in
       // the comment on each threshold) so the gate catches a regression — a
       // new untested module dragging the denominator down — without flaking
-      // on minor fluctuation. Raise these as the runtime + workflow tests
-      // grow. Run via `npm run test:coverage`.
+      // on minor fluctuation. Run via `npm run test:coverage`.
+      //
+      // The gap to the org floor (branches 60 / functions 75 / lines 75 /
+      // statements 75 in nanohype/standards/testing-rubric.json) is the three
+      // alternate transports — `runtimes/sdk.ts`, `runtimes/sdk-k8s.ts`,
+      // `runtimes/claude-cli.ts` — plus the in-cluster `k8s.ts` client they
+      // depend on. Each needs either the optional Agent SDK, a subprocess, or
+      // a live apiserver to exercise honestly; they are not excluded, so they
+      // count against these numbers rather than being hidden by them.
       thresholds: {
-        lines: 53, // measured 55.31
-        functions: 40, // measured 41.94
-        branches: 55, // measured 57.38
-        statements: 52, // measured 54.88
+        lines: 70, // measured 71.09
+        functions: 61, // measured 61.95
+        branches: 66, // measured 67.07
+        statements: 70, // measured 70.73
       },
     },
   },

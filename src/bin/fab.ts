@@ -244,12 +244,11 @@ async function deploy(args: ParsedArgs): Promise<void> {
     else console.log('  uploading skills...');
 
     for (const [role, def] of getAllSkillDefs()) {
-      const { content, referenceFiles } = await loadSkillContent(role, nanohypePath);
+      const content = await loadSkillContent(role, nanohypePath);
       const skillPayload = {
         name: def.name,
         description: def.description,
         content,
-        reference_files: referenceFiles.length > 0 ? referenceFiles : undefined,
       };
 
       if (dryRun) {
@@ -819,12 +818,11 @@ async function skillsUpload(args: ParsedArgs): Promise<void> {
       continue;
     }
 
-    const { content, referenceFiles } = await loadSkillContent(role, nanohypePath);
+    const content = await loadSkillContent(role, nanohypePath);
     const skill = await api.createSkill({
       name: def.name,
       description: def.description,
       content,
-      reference_files: referenceFiles.length > 0 ? referenceFiles : undefined,
     });
     await addSkill(role, skill.id);
     console.log(`${padRole(role)} ${skill.id}`);
