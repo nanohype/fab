@@ -11,3 +11,8 @@ service-account.json
 *.key
 .DS_Store
 docs/api/
+
+# Working notes. Planning state, campaign status, and remediation ledgers stay
+# out of the repo — a published record of what a repo scored and how it got
+# fixed is the accretion evidence the greenfield doctrine exists to prevent.
+.plans/

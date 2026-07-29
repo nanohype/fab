@@ -1800,4 +1800,11 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+// `main` catches inside its command switch, but `parseArgs` and `printHelp` run
+// before that try — a throw there rejects this promise with nobody holding it,
+// and the operator gets a raw stack trace instead of the one-line message every
+// other failure path prints. Same handler, so both regions report identically.
+main().catch((err) => {
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});
