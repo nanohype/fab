@@ -24,6 +24,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The vendored standard has to still be the file it claims to be a copy
+      # of. Reads upstream at the PINNED ref, never at its head, so this stays
+      # a verdict about the commit under test — a push to nanohype cannot turn
+      # it red. `standards:freshness` asks that separate question on its own
+      # schedule.
+      - run: npm run standards:check
 
   lint:
     runs-on: ubuntu-latest

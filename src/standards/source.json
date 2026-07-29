@@ -1,0 +1,14 @@
+{
+  "_README": "Where language-toolchain.json comes from. It is a byte-identical copy of nanohype/standards/language-toolchain.json at `upstream.ref` — never hand-edit it. The digest is verified by __tests__/standards-pin.test.ts, and `npm run standards:check` re-verifies it against upstream at that same ref. `npm run standards:sync -- <sha>` moves the pin and rewrites the digest together. See README.md in this directory.",
+  "upstream": {
+    "repository": "nanohype/nanohype",
+    "path": "standards",
+    "ref": "200dc881ddadeaaf7c21163e928705870544db7d"
+  },
+  "files": [
+    {
+      "file": "language-toolchain.json",
+      "sha256": "d672c0bfc8c39069979476ba020bf6cefa02b570762269051d2eb5444d09ea1e"
+    }
+  ]
+}

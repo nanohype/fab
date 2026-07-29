@@ -1,6 +1,6 @@
 # Per-session human attribution
 
-By default every fab session acts as the pod's tenant IRSA role — so every
+By default every fab session acts as the pod's tenant role — so every
 Bedrock call and every `aws` / `kubectl` the agent runs is bound to a role, not
 a person. That is the platform default, and it is exactly the gap an evidence
 engine surfaces: _"a production action that traces to no named human."_
@@ -20,7 +20,7 @@ Two mechanisms, one operator (`$FAB_OPERATOR`):
 
 | Cloud          | Mechanism                                                                                                                        | What the record carries                                                                                                                         | Crossbearing binding                |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **AWS**        | Assume a session role with the operator as STS `SourceIdentity`, using the pod's IRSA creds as the caller; export the temp creds | CloudTrail `userIdentity.sessionContext...sourceIdentity = <operator>` on the Bedrock `InvokeModel` call **and** every `aws` the Bash tool runs | `AttrSTSSourceIdentity` (strongest) |
+| **AWS**        | Assume a session role with the operator as STS `SourceIdentity`, using the pod's tenant-role creds as the caller; export the temp creds | CloudTrail `userIdentity.sessionContext...sourceIdentity = <operator>` on the Bedrock `InvokeModel` call **and** every `aws` the Bash tool runs | `AttrSTSSourceIdentity` (strongest) |
 | **Kubernetes** | Point `kubectl` at a kubeconfig that authenticates with the SA token but impersonates the operator                               | apiserver audit `impersonatedUser.username = <operator>`                                                                                        | `AttrK8sImpersonation`              |
 
 Because the assumed credentials are exported into the process environment, the

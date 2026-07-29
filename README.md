@@ -115,7 +115,7 @@ That path runs every role-session in one fab pod. For per-session pod isolation,
 
 ## Kubernetes-dispatched sessions (sdk-k8s)
 
-`FAB_RUNTIME=sdk-k8s` runs the same `sdk` agent loop but dispatches each role-session as its own isolated pod. fab creates an `AgentSandbox` resource; the [eks-agent-platform](https://github.com/nanohype/eks-agent-platform) operator turns it into a hardened, single-use pod — Pod Security `restricted`, default-deny networking, the tainted sandbox node pool, the Platform's tenant IRSA role, and an optional gVisor/Kata RuntimeClass. Paired with `FAB_INFERENCE=bedrock` it is the regulated-enterprise end state: every role-session a separately-isolated pod, inferring on your own Bedrock.
+`FAB_RUNTIME=sdk-k8s` runs the same `sdk` agent loop but dispatches each role-session as its own isolated pod. fab creates an `AgentSandbox` resource; the [eks-agent-platform](https://github.com/nanohype/eks-agent-platform) operator turns it into a hardened, single-use pod — Pod Security `restricted`, default-deny networking, the tainted sandbox node pool, the Platform's tenant role bound by a Pod Identity association, and an optional gVisor/Kata RuntimeClass. Paired with `FAB_INFERENCE=bedrock` it is the regulated-enterprise end state: every role-session a separately-isolated pod, inferring on your own Bedrock.
 
 It must run inside the cluster. Apply `deploy/rbac.yaml` for the AgentSandbox + pod-log permissions, set `NODE_EXTRA_CA_CERTS` to the cluster CA on fab's pod, and configure the dispatch target:
 
@@ -129,7 +129,7 @@ export FAB_K8S_RUNTIME_CLASS=gvisor           # optional isolation dial
 
 Full details in [`docs/transports.md`](docs/transports.md#per-session-pod-isolation-sdk-k8s).
 
-Set `FAB_OPERATOR=<human>` to bind each dispatched session's AWS and Kubernetes actions to a named human (STS `SourceIdentity` + apiserver impersonation), instead of the anonymous tenant IRSA role — see [`docs/attribution.md`](docs/attribution.md).
+Set `FAB_OPERATOR=<human>` to bind each dispatched session's AWS and Kubernetes actions to a named human (STS `SourceIdentity` + apiserver impersonation), instead of the anonymous tenant role — see [`docs/attribution.md`](docs/attribution.md).
 
 ## Configuration
 

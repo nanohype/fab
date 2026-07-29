@@ -45,7 +45,7 @@ The quality bar per field lives in [`docs/INTAKE_GUIDE.md`](docs/INTAKE_GUIDE.md
 
 - **`managed-agents`** (default) — Anthropic-hosted REST API; durable/listable sessions, native Memory at `/mnt/memory/`; needs `fab deploy`; billed per-token on `ANTHROPIC_API_KEY`.
 - **`sdk`** — `@anthropic-ai/claude-agent-sdk` (optional dep) runs the loop in fab's process; no deploy; no shared memory.
-- **`sdk-k8s`** — the sdk loop, each role-session dispatched as its own isolated pod via an `AgentSandbox` CR the eks-agent-platform operator hardens (restricted PSS, default-deny NetworkPolicy, tenant IRSA SA, optional gVisor/Kata). In-cluster only.
+- **`sdk-k8s`** — the sdk loop, each role-session dispatched as its own isolated pod via an `AgentSandbox` CR the eks-agent-platform operator hardens (restricted PSS, default-deny NetworkPolicy, the tenant ServiceAccount bound by a Pod Identity association, optional gVisor/Kata). In-cluster only.
 - **`claude-cli`** — drives `claude -p` per session; subscription-billable via your Claude Code login (`claude setup-token`).
 
 `FAB_INFERENCE` is **orthogonal** and read **only by the `sdk` runtime**: `api` (default) | `bedrock` (`CLAUDE_CODE_USE_BEDROCK`, AWS cred chain incl. Pod Identity, no token reaches Anthropic) | `anthropic-aws` (Claude Platform on AWS). `sdk-k8s` + `bedrock` is the regulated-enterprise end state. Parity matrix in [`docs/transports.md`](docs/transports.md).
@@ -70,7 +70,7 @@ Every `group:'factory'` role gets `FACTORY_PREAMBLE` injected by `buildSystemPro
 - **Latest-versions-first** — a manifest entry ≥1 major stale without an adjacent `@pin <reason>` is a REJECT; EOL runtimes REJECT regardless. Org-wide hold: TypeScript stays at `^6` (annotated `@pin`) until `typescript-eslint` supports TS 7 (expected TS 7.1) — TS 7 before then breaks the lint phase.
 - **Language dispatch** — every factory command flows through `LANGUAGE_TOOLCHAIN[language]`, never a baked-in `npm run X`.
 - **IaC by `deploy_target`** — k8s-native is default: a Helm chart + an ApplicationSet entry into `nanohype/eks-gitops` + a `Platform` CR on `eks-agent-platform`. Cloud-substrate gaps land in `landing-zone`; cluster addons in the gitops repo. `aws-lambda`/`fly`/`vercel`/`cloudflare` are escape hatches needing architecture justification.
-- **Platform-tenant contract** — ship `<app>/chart/`, `<app>/gitops/applicationset-entry.yaml`, `<app>/platform.yaml` (+ optional `agentfleet.yaml`); required OTel attrs `agents.tenant`/`agents.platform`; the reconciler owns IRSA — agents never scaffold IAM inline.
+- **Platform-tenant contract** — ship `<app>/chart/`, `<app>/gitops/applicationset-entry.yaml`, `<app>/platform.yaml` (+ optional `agentfleet.yaml`); required OTel attrs `agents.tenant`/`agents.platform`; the operator owns identity — it provisions the tenant role and binds `tenant-runtime` by a Pod Identity association, so agents never scaffold IAM inline or annotate a ServiceAccount with a role ARN.
 - **LLM policy** — Claude via Bedrock, IAM auth, default `claude-sonnet-4-6`, prompt caching mandatory.
 
 ## Extend fab

@@ -1,7 +1,7 @@
 {
   "name": "@nanohype/fab",
   "version": "0.2.0",
-  "description": "Reference factory for orchestrating Claude managed agents — open-source production-grade software pipeline with file-based skill overlays for personal recipes",
+  "description": "Reference factory for orchestrating Claude managed agents \u2014 open-source production-grade software pipeline with file-based skill overlays for personal recipes",
   "license": "Apache-2.0",
   "homepage": "https://github.com/nanohype/fab",
   "repository": {
@@ -52,7 +52,10 @@
     "lint": "npm run typecheck && biome lint .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "docs": "typedoc"
+    "docs": "typedoc",
+    "standards:check": "node scripts/standards.mjs check",
+    "standards:sync": "node scripts/standards.mjs sync",
+    "standards:freshness": "node scripts/standards.mjs freshness"
   },
   "optionalDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.161"
