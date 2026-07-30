@@ -86,7 +86,11 @@ export AWS_REGION=us-east-1
 fab workflow feature-build '<intake-json>'
 ```
 
-Under `bedrock` the `sdk` runtime sets `CLAUDE_CODE_USE_BEDROCK` for the Agent SDK and resolves AWS credentials through the standard chain — environment variables, shared config, IRSA, or EKS Pod Identity. Role model ids map to the calling region's **cross-region inference-profile id** automatically (`claude-sonnet-5` in `us-west-2` → `us.anthropic.claude-sonnet-5`; the geo prefix is `us.`/`eu.`/`apac.`/`us-gov.` per the region) — the current Claude models are served _only_ through these profiles, so `AWS_REGION` is load-bearing for the model id itself, not just for routing. A role pointed at a full Bedrock id — a bare `anthropic.` id or a `<geo>.anthropic.` profile id — passes through untouched. The AWS account must have [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) granted for the Claude models in use, and `AWS_REGION` set to a region the profiles cover (`us-*`, `eu-*`, `ap-*`, `us-gov-*`).
+Under `bedrock` the `sdk` runtime sets `CLAUDE_CODE_USE_BEDROCK` for the Agent SDK and resolves AWS credentials through the standard chain — environment variables, shared config, IRSA, or EKS Pod Identity. Role model ids map to the calling region's **cross-region inference-profile id** automatically (`claude-sonnet-5` in `us-west-2` → `us.anthropic.claude-sonnet-5`; the geo prefix is `us.` in `us-*`, `eu.` in `eu-*`, `us-gov.` in `us-gov-*`, and `au.` in `ap-southeast-2`) — the current Claude models are served _only_ through these profiles, so `AWS_REGION` is load-bearing for the model id itself, not just for routing. A role pointed at a full Bedrock id — a bare `anthropic.` id or a `<geo>.anthropic.` profile id — passes through untouched.
+
+Asia Pacific outside `ap-southeast-2` has no in-geography profile for the current Claude models: `apac.` profiles exist but carry only Claude 3.x, so those regions reach the current family through `global.` alone. `resolveModelId` refuses to select `global.` for you — it routes worldwide, and the whole point of this backend is that inference stays in a chosen boundary — so it throws with the reason and you set the role's model to the `global.` profile id if that trade is acceptable. Confirm what a region carries with `aws bedrock list-inference-profiles --region <region>`.
+
+The AWS account must have [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) granted for the Claude models in use.
 
 ```sh
 export FAB_RUNTIME=sdk

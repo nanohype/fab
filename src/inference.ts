@@ -65,25 +65,67 @@ const BEDROCK_MODEL_IDS: Readonly<Record<string, string>> = {
   'claude-haiku-4-5': 'anthropic.claude-haiku-4-5-20251001-v1:0',
 };
 
-/** A Bedrock model id, optionally carrying a cross-region inference-profile geo prefix (`us.`, `eu.`, `apac.`, `us-gov.`). */
+/**
+ * Every cross-region inference-profile geo prefix Bedrock issues.
+ *
+ * `au.` and `jp.` are single-country geographies and `global.` routes worldwide;
+ * all three are as real as `us.`, and a role may be pointed at any of them
+ * directly. Omitting one here does not make it unsupported — it makes
+ * `resolveModelId` mistake a perfectly good profile id for a canonical id and
+ * fail to find it in `BEDROCK_MODEL_IDS`, which is how the escape hatch the error
+ * message recommends stopped working for exactly the regions that need it.
+ */
+const GEO_PREFIXES = ['us', 'eu', 'apac', 'us-gov', 'au', 'jp', 'global'] as const;
+
+/** A Bedrock model id, optionally carrying a cross-region inference-profile geo prefix. */
 function isBedrockModelId(model: string): boolean {
-  return /^(?:(?:us|eu|apac|us-gov)\.)?anthropic\./.test(model);
+  return new RegExp(`^(?:(?:${GEO_PREFIXES.join('|')})\\.)?anthropic\\.`).test(model);
 }
 
 /**
  * The Bedrock cross-region inference-profile geography for an AWS region.
  *
- * Bedrock groups regions into us / eu / apac / us-gov, and a model is invoked
- * through a `<geo>.`-prefixed profile id. The current Claude models are served
- * ONLY through these profiles — the bare on-demand id returns "on-demand
- * throughput isn't supported" — so the bedrock backend resolves to the region's
- * profile id rather than the base id.
+ * A model is invoked through a `<geo>.`-prefixed profile id; the current Claude
+ * models are served ONLY through these profiles (Bedrock reports
+ * `inferenceTypesSupported: [INFERENCE_PROFILE]`, with no ON_DEMAND and no
+ * PROVISIONED), so the bedrock backend resolves to the region's profile id
+ * rather than the base id.
+ *
+ * The mapping is not region-prefix-to-geo-name, which is the shape it looks
+ * like it should be. Asia Pacific is the exception, and it is a real one rather
+ * than a naming quirk: `apac.` profiles exist but carry only Claude 3.x and
+ * `claude-sonnet-4-20250514`. Read off `aws bedrock list-inference-profiles`:
+ *
+ *   ap-southeast-2  ->  au. and global.   (apac. present, no current model)
+ *   ap-northeast-1  ->  global.           (apac. and jp. present, likewise)
+ *   ap-southeast-1  ->  global.           (apac. present, likewise)
+ *
+ * So `ap-*` cannot resolve to `apac.` for any model fab can be set to. Only
+ * ap-southeast-2 has an in-geography option; the rest reach the current family
+ * through `global.` alone.
+ *
+ * `global.` is not returned automatically. It routes requests worldwide, which
+ * is a jurisdiction decision — and the bedrock backend exists so that no
+ * inference token leaves the adopter's chosen boundary. Choosing to leave it is
+ * the operator's call to make explicitly, by setting the role's model to the
+ * `global.` profile id, not something inferred from `AWS_REGION`.
  */
 function bedrockGeoPrefix(region: string): string {
   if (region.startsWith('us-gov-')) return 'us-gov';
   if (region.startsWith('us-')) return 'us';
   if (region.startsWith('eu-')) return 'eu';
-  if (region.startsWith('ap-')) return 'apac';
+  if (region === 'ap-southeast-2') return 'au';
+  if (region.startsWith('ap-')) {
+    throw new Error(
+      `AWS Bedrock has no in-geography inference profile for the current Claude models in ` +
+        `"${region}". The apac. profiles cover only Claude 3.x, and ap-southeast-2 is the one ` +
+        `Asia Pacific region with a country profile (au.). Reach the current models from ` +
+        `"${region}" by setting the role's model to a global. profile id ` +
+        `(e.g. global.anthropic.claude-sonnet-5) — note that global. routes worldwide, so it is ` +
+        `a deliberate choice rather than a default. Confirm what is available with ` +
+        `\`aws bedrock list-inference-profiles --region ${region}\`.`,
+    );
+  }
   throw new Error(
     `No AWS Bedrock cross-region inference-profile geography for region "${region}". ` +
       `Profiles cover us-*, eu-*, ap-*, and us-gov-* regions — set AWS_REGION to one of those, ` +

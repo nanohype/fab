@@ -61,12 +61,27 @@ describe('model id resolution', () => {
     expect(resolveModelId('claude-opus-4-6', 'bedrock', 'eu-west-1')).toBe(
       'eu.anthropic.claude-opus-4-6-v1',
     );
-    expect(resolveModelId('claude-haiku-4-5', 'bedrock', 'ap-southeast-1')).toBe(
-      'apac.anthropic.claude-haiku-4-5-20251001-v1:0',
+    // ap-southeast-2 resolves to the au. country profile, the one in-geography
+    // option Asia Pacific has for the current models.
+    expect(resolveModelId('claude-sonnet-5', 'bedrock', 'ap-southeast-2')).toBe(
+      'au.anthropic.claude-sonnet-5',
     );
     expect(resolveModelId('claude-opus-4-7', 'bedrock', 'us-gov-west-1')).toBe(
       'us-gov.anthropic.claude-opus-4-7',
     );
+  });
+
+  it('refuses to guess a geography for an Asia Pacific region that has none', () => {
+    // apac. profiles exist in these regions but carry only Claude 3.x, so
+    // resolving ap-* to apac. produced an id that does not exist for any model
+    // this map holds. The current family is reachable there only through
+    // global., which routes worldwide — a jurisdiction choice the operator makes
+    // explicitly, not one inferred from AWS_REGION.
+    for (const region of ['ap-southeast-1', 'ap-northeast-1', 'ap-south-1']) {
+      expect(() => resolveModelId('claude-sonnet-5', 'bedrock', region)).toThrow(
+        /no in-geography inference profile/,
+      );
+    }
   });
 
   it('reads AWS_REGION when no region arg is passed', () => {
@@ -104,6 +119,19 @@ describe('model id resolution', () => {
     expect(
       resolveModelId('apac.anthropic.claude-haiku-4-5-20251001-v1:0', 'bedrock', 'ap-south-1'),
     ).toBe('apac.anthropic.claude-haiku-4-5-20251001-v1:0');
+    // The geographies a shorter prefix list silently dropped. Each is a real
+    // profile namespace, and each is the documented way out of a region the geo
+    // map cannot resolve — so failing to recognise one broke the workaround the
+    // error message hands the operator.
+    expect(resolveModelId('global.anthropic.claude-sonnet-5', 'bedrock', 'ap-northeast-1')).toBe(
+      'global.anthropic.claude-sonnet-5',
+    );
+    expect(resolveModelId('au.anthropic.claude-opus-5', 'bedrock', 'ap-southeast-2')).toBe(
+      'au.anthropic.claude-opus-5',
+    );
+    expect(resolveModelId('jp.anthropic.claude-sonnet-4-6', 'bedrock', 'ap-northeast-1')).toBe(
+      'jp.anthropic.claude-sonnet-4-6',
+    );
   });
 
   it('fails fast on a model with no Bedrock mapping', () => {
