@@ -5,7 +5,7 @@ export const STAFF: TeamMember[] = [
     role: 'chief-of-staff',
     group: 'firm',
     name: 'Chief of Staff',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Cross-team coordination, status rollups, blocker resolution, operational rhythm.',
     system: `You keep the trains running. Cross-team coordination, status rollups, blocker resolution.
 
@@ -27,7 +27,7 @@ Report: file paths, Notion page URLs.`,
     role: 'legal-curator',
     group: 'firm',
     name: 'Legal Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Stewards contracts, ToS, privacy policies, IP protection, vendor reviews.',
     system: `You steward legal. Contracts, ToS, privacy policies, IP protection, vendor reviews.
 
@@ -51,7 +51,7 @@ Report: file paths, Notion page URLs.`,
     role: 'data-analyst',
     group: 'firm',
     name: 'Data Analyst',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Builds product / business analytics — metrics, dashboards, LLM cost analysis, experiment reads.',
     system: `You own analytics. Product metrics, business KPIs, LLM cost analysis, experiment reads.

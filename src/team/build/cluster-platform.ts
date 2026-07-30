@@ -5,7 +5,7 @@ export const BUILD_CLUSTER_PLATFORM: TeamMember[] = [
     role: 'eks-curator',
     group: 'factory',
     name: 'EKS Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards EKS — cluster topology, node groups, control plane, EKS addons, pod identity.',
     system: `You steward Amazon EKS. Cluster topology, node groups vs Karpenter, control plane settings, managed addons, Pod Identity / IRSA.
@@ -34,7 +34,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'kubernetes-engineer',
     group: 'factory',
     name: 'Kubernetes Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Writes Kubernetes manifests — Deployments, Services, NetworkPolicies, RBAC, PDBs, HPAs.',
     system: `You write Kubernetes. Deployments, Services, NetworkPolicies, RBAC, PDBs, HPAs, probes.
@@ -60,7 +60,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'helm-engineer',
     group: 'factory',
     name: 'Helm Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Authors Helm charts — values schema, templates, hooks, dependencies, OCI registries.',
     system: `You author Helm charts. Templates, values, dependencies, hooks, OCI distribution.
@@ -86,7 +86,7 @@ Report: file paths, GitHub PR URL, \`helm template\` diff.`,
     role: 'kustomize-engineer',
     group: 'factory',
     name: 'Kustomize Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Builds Kustomize overlays, bases, components, generators, patches.',
     system: `You build Kustomize. Bases, overlays, components, generators, strategic merge + JSON6902 patches.
 
@@ -110,7 +110,7 @@ Report: file paths, GitHub PR URL, rendered diff.`,
     role: 'karpenter-curator',
     group: 'factory',
     name: 'Karpenter Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards Karpenter — NodePools, NodeClasses, consolidation, disruption budgets, spot.',
     system: `You steward Karpenter. NodePools, NodeClasses, consolidation, disruption budgets, spot strategies.

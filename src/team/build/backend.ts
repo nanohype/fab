@@ -5,7 +5,7 @@ export const BUILD_BACKEND: TeamMember[] = [
     role: 'node-engineer',
     group: 'factory',
     name: 'Node.js Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Builds Node.js services, APIs, and workers — Hono, Fastify, queue consumers, cron jobs.',
     system: `You build the Node.js layer. HTTP services, background workers, queue consumers, cron jobs.
@@ -35,7 +35,7 @@ Report: file paths, GitHub PR URL, API doc path.`,
     role: 'python-engineer',
     group: 'factory',
     name: 'Python Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Builds Python services and data pipelines — FastAPI, Pydantic, Celery, async stacks.',
     system: `You build the Python layer. FastAPI services, async pipelines, data workloads.
@@ -61,7 +61,7 @@ Report: file paths, GitHub PR URL, OpenAPI doc path.`,
     role: 'go-engineer',
     group: 'factory',
     name: 'Go Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Builds Go services, CLIs, and infra components — chi, net/http, gRPC.',
     system: `You build the Go layer. HTTP services, CLIs, infra components.
 

@@ -5,7 +5,7 @@ export const LAB: TeamMember[] = [
     role: 'external-reviewer',
     group: 'lab',
     name: 'External Reviewer',
-    model: 'claude-opus-4-8',
+    model: 'claude-opus-5',
     description:
       'Cold-context code audit against the 10-dimension quality rubric. Calibration check for the internal merge gate.',
     system: `You audit the post-merge tree cold. You don't see internal verdicts. You don't see prior context. You grade the work as if you were a senior reviewer hired to second-opinion.
@@ -45,7 +45,7 @@ Report: file path, grade summary.`,
     role: 'prompt-optimizer',
     group: 'lab',
     name: 'Prompt Optimizer',
-    model: 'claude-opus-4-8',
+    model: 'claude-opus-5',
     description:
       'Analyzes agent output for prompt failure patterns. Recommends prompt improvements with measurable rationale.',
     system: `You audit agent prompts. You look at failure patterns across sessions and recommend prompt changes with rationale.
@@ -68,7 +68,7 @@ Report: file paths, Linear issue IDs.`,
     role: 'learner',
     group: 'lab',
     name: 'Learner',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       "Cross-project pattern extraction. Curates company memory — what worked, what didn't, why.",
     system: `You extract patterns across projects. What worked, what didn't, why. The company's institutional memory.

@@ -40,7 +40,7 @@ export function resolveInferenceBackend(): InferenceBackend {
 /**
  * fab's canonical model ids -> the AWS Bedrock base id.
  *
- * Roles declare canonical Anthropic ids (`claude-sonnet-4-6`); the Anthropic
+ * Roles declare canonical Anthropic ids (`claude-sonnet-5`); the Anthropic
  * API accepts those directly, but Bedrock requires its own `anthropic.`-prefixed
  * ids. Values are the "AWS Bedrock ID" column of the Claude models overview —
  * https://platform.claude.com/docs/en/about-claude/models/overview — pinned
@@ -48,8 +48,16 @@ export function resolveInferenceBackend(): InferenceBackend {
  * these with the calling region's cross-region inference-profile geography
  * (`us.` / `eu.` / `apac.`) at resolve time, so the values here are the
  * un-prefixed base ids.
+ *
+ * The suffixes are irregular and there is no rule that produces them: Opus 5 and
+ * Sonnet 5 are bare, Opus 4.6 carries `-v1`, Haiku 4.5 carries a release date
+ * *and* `-v1:0`. Every value here was read off `aws bedrock
+ * list-foundation-models --by-provider anthropic`. Derive one and it will be
+ * wrong; check it against the API when adding a model.
  */
 const BEDROCK_MODEL_IDS: Readonly<Record<string, string>> = {
+  'claude-opus-5': 'anthropic.claude-opus-5',
+  'claude-sonnet-5': 'anthropic.claude-sonnet-5',
   'claude-opus-4-8': 'anthropic.claude-opus-4-8',
   'claude-opus-4-7': 'anthropic.claude-opus-4-7',
   'claude-sonnet-4-6': 'anthropic.claude-sonnet-4-6',
@@ -79,7 +87,7 @@ function bedrockGeoPrefix(region: string): string {
   throw new Error(
     `No AWS Bedrock cross-region inference-profile geography for region "${region}". ` +
       `Profiles cover us-*, eu-*, ap-*, and us-gov-* regions — set AWS_REGION to one of those, ` +
-      `or set the role's model to a full inference-profile id (e.g. us.anthropic.claude-sonnet-4-6).`,
+      `or set the role's model to a full inference-profile id (e.g. us.anthropic.claude-sonnet-5).`,
   );
 }
 
@@ -89,7 +97,7 @@ function bedrockGeoPrefix(region: string): string {
  * `api` and `anthropic-aws` pass through — both take fab's canonical ids
  * directly. `bedrock` maps the canonical id to its Bedrock base id AND prefixes
  * it with the calling region's cross-region inference-profile geography
- * (`claude-sonnet-4-6` + `us-west-2` -> `us.anthropic.claude-sonnet-4-6`),
+ * (`claude-sonnet-5` + `us-west-2` -> `us.anthropic.claude-sonnet-5`),
  * because the current Claude models are invoked only through those profiles. An
  * id that is already a Bedrock id — a bare `anthropic.` id or a full
  * `<geo>.anthropic.` profile id set straight on a role — passes through

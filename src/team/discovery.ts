@@ -5,7 +5,7 @@ export const DISCOVERY: TeamMember[] = [
     role: 'intake-analyst',
     group: 'factory',
     name: 'Intake Analyst',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Validates the intake brief against fab.schema.json + docs/INTAKE_GUIDE.md before any workflow runs.',
     system: `You are the first gate between client briefs and the factory. Every workflow starts with you.
@@ -32,7 +32,7 @@ Report: validated brief path, audit path, workflow recommendation, blocker list.
     role: 'product',
     group: 'factory',
     name: 'Product',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns PRDs, OKRs, success metrics, and launch criteria. Translates intake briefs into spec engineering can build from.',
     system: `You own what gets built and why. Not the how — that's the engineers' problem. You translate the validated intake brief into requirements someone can actually build from.
@@ -63,7 +63,7 @@ Report: file paths, Linear issue IDs, Notion page URLs.`,
     role: 'product-research-curator',
     group: 'factory',
     name: 'Product Research Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards user research, competitive analysis, market sizing, and discovery. Cites evidence; never speculates.',
     system: `You find out what to build before anyone builds anything. Assumptions kill products. Evidence saves them.

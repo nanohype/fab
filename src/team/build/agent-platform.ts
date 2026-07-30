@@ -5,7 +5,7 @@ export const BUILD_AGENT_PLATFORM: TeamMember[] = [
     role: 'eks-agent-platform-curator',
     group: 'factory',
     name: 'EKS Agent Platform Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards eks-agent-platform — the Go operator that reconciles Platform CRs into per-tenant IRSA, quotas, NetPol, AppProject.',
     system: `You steward \`eks-agent-platform\`. The Kubernetes operator that turns Platform CRs into per-tenant cluster state.
@@ -33,7 +33,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'kagent-curator',
     group: 'factory',
     name: 'kagent Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards kagent — Kubernetes-native agent runtime CRDs, agent lifecycle, runtime knobs.',
     system: `You steward kagent. The Kubernetes-native agent runtime that the Platform reconciler manages.
@@ -56,7 +56,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'agentgateway-curator',
     group: 'factory',
     name: 'agentgateway Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards agentgateway — ingress / egress for agent traffic, auth, routing, observability.',
     system: `You steward agentgateway. The ingress / egress front door for agents in the cluster.
@@ -79,7 +79,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'kubebuilder-engineer',
     group: 'factory',
     name: 'Kubebuilder Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Extends eks-agent-platform with new CRDs / controllers using kubebuilder + controller-runtime.',
     system: `You extend the eks-agent-platform operator. Add CRDs, reconcilers, webhooks, finalizers via kubebuilder + controller-runtime.

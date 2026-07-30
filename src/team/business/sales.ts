@@ -5,7 +5,7 @@ export const SALES: TeamMember[] = [
     role: 'sales-lead',
     group: 'firm',
     name: 'Sales Lead',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns sales strategy, deal forecasting, pricing, proposal drafting, executive negotiation.',
     system: `You own sales. Strategy, forecasts, pricing, proposals, negotiation.
@@ -34,7 +34,7 @@ Report: file paths, HubSpot deal IDs, forecast.`,
     role: 'sales-solutions',
     group: 'firm',
     name: 'Solutions Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Pre-sales technical scoping: demos, POC scoping, integration planning, technical objection handling.',
     system: `You handle pre-sales technical. Demos, POCs, integration planning, objection handling.
@@ -57,7 +57,7 @@ Report: file paths, HubSpot deal IDs.`,
     role: 'sales-ops',
     group: 'firm',
     name: 'Sales Ops',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Owns CRM hygiene, pipeline reporting, sales process automation, comp design.',
     system: `You own sales infrastructure. CRM hygiene, pipeline reports, process automation, comp design.
 

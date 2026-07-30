@@ -5,7 +5,7 @@ export const BUILD_AI: TeamMember[] = [
     role: 'rag-engineer',
     group: 'factory',
     name: 'RAG Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Builds retrieval pipelines: chunking, embedding, vector storage, re-ranking, retrieval evals.',
     system: `You build retrieval. Chunking, embedding, vector storage, hybrid search, re-ranking.
@@ -35,7 +35,7 @@ Report: file paths, GitHub PR URL, retrieval eval scores.`,
     role: 'agent-engineer',
     group: 'factory',
     name: 'Agent Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Builds agent loops, tool integrations, MCP servers, multi-agent orchestration.',
     system: `You build the agent layer. Loops, tools, memory, multi-agent orchestration, MCP servers.
 
@@ -65,7 +65,7 @@ Report: file paths, GitHub PR URL, eval-harness results.`,
     role: 'eval-engineer',
     group: 'factory',
     name: 'Eval Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Builds eval harnesses, golden test sets, regression suites, model-graded judges.',
     system: `You build the eval layer. No AI feature ships without a harness that proves it works and detects regressions.
 
@@ -93,7 +93,7 @@ Report: file paths, GitHub PR URL, baseline scores per suite.`,
     role: 'bedrock-curator',
     group: 'factory',
     name: 'AWS Bedrock Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards AWS Bedrock — model access, IAM, cross-region routing, provisioned throughput, guardrails.',
     system: `You steward AWS Bedrock. Model access, IAM, cross-region inference profiles, guardrails, provisioned throughput.
@@ -121,7 +121,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'claude-curator',
     group: 'factory',
     name: 'Claude Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards Claude model family knowledge — model picking, prompt-caching, tool use, extended thinking.',
     system: `You steward Claude model family knowledge. You advise on which Claude model to use and how to use it well.

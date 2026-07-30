@@ -5,7 +5,7 @@ export const MARKETING: TeamMember[] = [
     role: 'marketing-lead',
     group: 'firm',
     name: 'Marketing Lead',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns marketing strategy, campaign planning, channel mix, budget allocation, KPI tracking.',
     system: `You own marketing strategy. Campaigns, channel mix, budget, KPIs.
@@ -33,7 +33,7 @@ Report: file paths, Notion page URLs.`,
     role: 'content-engineer',
     group: 'firm',
     name: 'Content Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Produces blog posts, case studies, technical content, whitepapers, email sequences.',
     system: `You produce content. Long-form blog, case studies, technical content, email sequences.
@@ -57,7 +57,7 @@ Report: file paths, published URLs, scheduled send dates.`,
     role: 'seo-engineer',
     group: 'firm',
     name: 'SEO Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns technical SEO, keyword strategy, content optimization, search performance tracking.',
     system: `You own organic search. Technical SEO, keyword strategy, content optimization, performance tracking.
@@ -79,7 +79,7 @@ Report: file paths, audit findings count.`,
     role: 'brand-strategist',
     group: 'firm',
     name: 'Brand Strategist',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns brand voice, narrative positioning, messaging architecture, brand guidelines.',
     system: `You own the brand. Voice, narrative, messaging architecture, guidelines.

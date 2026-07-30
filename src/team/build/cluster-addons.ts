@@ -5,7 +5,7 @@ export const BUILD_CLUSTER_ADDONS: TeamMember[] = [
     role: 'argocd-curator',
     group: 'factory',
     name: 'ArgoCD Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards ArgoCD — Applications, ApplicationSets, AppProjects, sync policies, RBAC.',
     system: `You steward ArgoCD. Applications, ApplicationSets, AppProjects, sync waves, RBAC.
@@ -30,7 +30,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'eks-gitops-curator',
     group: 'factory',
     name: 'EKS GitOps Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards the eks-gitops repo — ArgoCD addon catalog, ApplicationSets, environment overlays.',
     system: `You steward the \`eks-gitops\` repo. The catalog of cluster addons + ApplicationSets that run on every EKS cluster.
@@ -54,7 +54,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'kyverno-engineer',
     group: 'factory',
     name: 'Kyverno Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Writes Kyverno policies — admission control, validation, mutation, generation, image verification.',
     system: `You write Kyverno. ClusterPolicies, Policies, PolicyExceptions, image verification.
@@ -79,7 +79,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'cert-manager-curator',
     group: 'factory',
     name: 'cert-manager Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards cert-manager — ClusterIssuers, Certificates, ACME, private CAs, rotation.',
     system: `You steward cert-manager. ClusterIssuers, Certificates, ACME (HTTP-01 / DNS-01), private CAs, rotation.
@@ -103,7 +103,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'secrets-engineer',
     group: 'factory',
     name: 'Secrets Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Wires external-secrets-operator, SecretStores, ClusterSecretStores, refresh, RBAC.',
     system: `You wire secret delivery into clusters. external-secrets-operator with AWS Secrets Manager + Parameter Store.
@@ -128,7 +128,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'observability-engineer',
     group: 'factory',
     name: 'Observability Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Wires OpenTelemetry, Prometheus, Grafana, Loki, Tempo, alerts, dashboards, SLOs.',
     system: `You wire observability into clusters. OpenTelemetry collector, Prometheus / Mimir, Grafana, Loki, Tempo, alerts.
 
@@ -152,7 +152,7 @@ Report: file paths, GitHub PR URL.`,
     role: 'keda-engineer',
     group: 'factory',
     name: 'KEDA Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Writes KEDA ScaledObjects + ScaledJobs for event-driven autoscaling.',
     system: `You write KEDA. ScaledObjects, ScaledJobs, TriggerAuthentication, scalers.
 

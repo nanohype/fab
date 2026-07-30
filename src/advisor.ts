@@ -1,3 +1,4 @@
+import { MODEL_TIERS } from './standards.js';
 import type { CustomTool, TeamRole } from './types.js';
 
 // ── Senior advisor escalation — fab's own mechanism, deliberately NOT the
@@ -28,7 +29,13 @@ import type { CustomTool, TeamRole } from './types.js';
 // Managed Agents support.
 
 const BASE = 'https://api.anthropic.com';
-const ADVISOR_MODEL = 'claude-opus-4-8';
+/**
+ * The advisor is the escalation tier by definition, so it reads the tier rather
+ * than restating an id. A hardcoded copy here is a second place to forget on a
+ * model bump — and the one place where forgetting is silent, since the advisor
+ * is consulted mid-session rather than at deploy time.
+ */
+export const ADVISOR_MODEL = MODEL_TIERS.escalation;
 
 /**
  * Roles with access to the Opus advisor tool. Restricting this set keeps

@@ -1,25 +1,38 @@
-# The vendored standard
+# The vendored standards
 
-`language-toolchain.json` is a byte-identical copy of the file of the same name
-in [nanohype/nanohype](https://github.com/nanohype/nanohype)'s `standards/`
+Each `.json` here is a byte-identical copy of the file of the same name in
+[nanohype/nanohype](https://github.com/nanohype/nanohype)'s `standards/`
 directory, at the commit recorded in `source.json`.
 
-## Why exactly one
+## Why these two
 
 fab has no dependency on any nanohype package, deliberately: the reference
 client has to be cloneable and runnable on its own. That means the standards it
 needs at runtime have to travel with it.
 
-Only the ones it *reads* travel with it. `standards.ts` loads
-`language-toolchain.json` to dispatch the four-phase contract per language, and
-that is the whole of fab's runtime need. The rest of the production bar reaches
-agents as prose in `FACTORY_PREAMBLE` and `skills/quality-check.md`, which name
-the standards without loading them.
+Only the ones it *reads* travel with it:
+
+- **`language-toolchain.json`** — `standards.ts` loads it to dispatch the
+  four-phase contract per language.
+- **`llm-policy.json`** — `standards.ts` reads `models` into `LLM_MODELS` and
+  `MODEL_TIERS`. Those are not just prose: every role's `model` in `src/team/`,
+  the escalation model in `src/advisor.ts`, and the tier list rendered into
+  `LLM_POLICY` all resolve against them, and `__tests__/model-policy.test.ts`
+  fails if any of the three disagrees.
+
+The rest of the production bar reaches agents as prose in `FACTORY_PREAMBLE` and
+`skills/quality-check.md`, which name the standards without loading them.
 
 The rule is vendor what you load, name the rest — and the test enforces it, so
 a copy cannot be added here without a call site. A copy nobody reads is a copy
 nobody notices going stale, and this package publishes `src/`, so a stale one
 would travel to every consumer.
+
+`llm-policy.json` is here because the prose version was not holding. fab
+restated the model tiers by hand, and the hand-written copy named a bare
+`anthropic.`-prefixed foundation-model id as the default — a form the current
+Claude family refuses outright — while the published standard had moved to
+inference-profile ids. Nothing compared them, so nothing said so.
 
 ## Keeping the copy honest
 

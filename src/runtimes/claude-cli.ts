@@ -295,7 +295,7 @@ class ResumedClaudeCliSession implements AgentSession {
         // here logs as the calibration role since resume is invoked by
         // the revise flow which is per-role-revision.
         role: 'pr-reviewer',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
       });
       // Suppress unused warning — state holds workflow context that future
       // resume strategies may consume.
@@ -354,7 +354,7 @@ export function buildClaudeArgs(opts: BuildClaudeArgsOptions): string[] {
   // `always_allow` posture used by Managed Agents toolsets applies here.
   args.push('--permission-mode', 'bypassPermissions');
 
-  // Model selection. Roles declare full names (`claude-sonnet-4-6`); the
+  // Model selection. Roles declare full names (`claude-sonnet-5`); the
   // CLI also accepts aliases (`sonnet`, `opus`).
   if (opts.model) {
     args.push('--model', opts.model);

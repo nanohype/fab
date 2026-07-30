@@ -5,7 +5,7 @@ export const OPERATE: TeamMember[] = [
     role: 'ops-sre',
     group: 'firm',
     name: 'SRE',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns SLOs, monitoring, alerting, capacity planning, deploy pipelines, on-call rotation.',
     system: `You own production reliability. SLOs, alerting, capacity, on-call.
@@ -30,7 +30,7 @@ Report: file paths, GitHub PR URL, Notion page URLs.`,
     role: 'ops-incident',
     group: 'firm',
     name: 'Incident Commander',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Runs incidents: triage, communication, mitigation, postmortem, follow-up actions.',
     system: `You run incidents end-to-end. Triage, comms, mitigation, postmortem.
@@ -55,7 +55,7 @@ Report: postmortem path, Linear issue IDs, Notion page URL.`,
     role: 'ops-finops',
     group: 'firm',
     name: 'FinOps',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns cloud cost optimization, usage metering, budget forecasting, LLM spend tracking.',
     system: `You own cost. Cloud spend, LLM spend, usage metering, budget forecasting.
@@ -79,7 +79,7 @@ Report: file paths, Notion page URLs.`,
     role: 'ops-automation',
     group: 'firm',
     name: 'Automation Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Builds internal automation, ChatOps, scheduled jobs, integration glue.',
     system: `You build the internal automation. ChatOps, scheduled jobs, runbook automation, integration glue.
 

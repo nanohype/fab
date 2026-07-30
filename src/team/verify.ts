@@ -5,7 +5,7 @@ export const VERIFY: TeamMember[] = [
     role: 'fidelity-engineer',
     group: 'factory',
     name: 'Fidelity Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Audits + extends frontend builds for visual density, interactive coverage, and design-system completeness. Rejects sparse-but-correct output.',
     system: `You are the fidelity pass. The frontend works — your job is to make it feel done.
@@ -112,7 +112,7 @@ Report: verdict file path, GitHub PR URL, count of gaps found vs fixed.`,
     role: 'pr-reviewer',
     group: 'factory',
     name: 'PR Reviewer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Diff-level code review: architecture, design patterns, frontend craft, code quality. Grades 4 of the 10 quality dimensions.',
     system: `You review pull requests as a senior engineer would. Diff-level review, not theoretical.
@@ -150,7 +150,7 @@ Report: verdict file path, GitHub review URL (if posted).`,
     role: 'qa-security',
     group: 'factory',
     name: 'Security Reviewer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Security review: OWASP top 10, dependency CVEs, auth boundaries, secret hygiene, threat surface. Grades security, systems and ai_systems.',
     system: `You review the diff for security issues. OWASP top 10, dependency CVEs, auth boundaries, secret hygiene.
@@ -189,7 +189,7 @@ Report: verdict file path, Linear issue IDs.`,
     role: 'build-verifier',
     group: 'factory',
     name: 'Build Verifier',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Runs the four-phase contract (install/build/lint/test/docs) + version-currency check. Grades the testing dimension.',
     system: `You execute the four-phase contract. Install, build, lint, test, docs — plus the version-currency check.
@@ -225,7 +225,7 @@ Report: verdict file path, per-phase pass/fail summary.`,
     role: 'artifact-auditor',
     group: 'factory',
     name: 'Artifact Auditor',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Audits artifact completeness: doc paths, scope-ledger correctness, internal links, markdown integrity. Grades documentation + consistency.',
     system: `You audit the artifact tree post-workflow. Completeness, accuracy, link integrity.
@@ -259,7 +259,7 @@ Report: verdict file path, list of artifacts checked.`,
     role: 'compliance-curator',
     group: 'factory',
     name: 'Compliance Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards SOC 2 / GDPR / HIPAA / ISO 27001 requirements, audit evidence collection, policy-as-code.',
     system: `You steward compliance frameworks. SOC 2, GDPR, HIPAA, ISO 27001 — whatever applies to the workload.

@@ -64,7 +64,7 @@
         },
         "model": {
           "type": "string",
-          "description": "Preferred Claude model (e.g., 'claude-sonnet-4-6', 'claude-opus-4-8')."
+          "description": "Preferred Claude model (e.g., 'claude-sonnet-5', 'claude-opus-5')."
         }
       },
       "additionalProperties": true

@@ -35,7 +35,7 @@ spec:
   replicas: 3
   model:
     family: claude
-    id: anthropic.claude-sonnet-4-6
+    id: us.anthropic.claude-sonnet-5
     via: bedrock # or "direct" for the Messages API
     region: us-west-2
   tools:
@@ -56,7 +56,7 @@ spec:
     advisor:
       enabled: true
       maxCallsPerSession: 3
-      model: anthropic.claude-opus-4-8
+      model: us.anthropic.claude-opus-5
   observability:
     otelEndpoint: otel-collector.observability:4317
     sampleRate: 0.1

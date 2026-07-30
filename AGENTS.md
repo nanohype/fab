@@ -71,7 +71,7 @@ Every `group:'factory'` role gets `FACTORY_PREAMBLE` injected by `buildSystemPro
 - **Language dispatch** — every factory command flows through `LANGUAGE_TOOLCHAIN[language]`, never a baked-in `npm run X`.
 - **IaC by `deploy_target`** — k8s-native is default: a Helm chart + an ApplicationSet entry into `nanohype/eks-gitops` + a `Platform` CR on `eks-agent-platform`. Cloud-substrate gaps land in `landing-zone`; cluster addons in the gitops repo. `aws-lambda`/`fly`/`vercel`/`cloudflare` are escape hatches needing architecture justification.
 - **Platform-tenant contract** — ship `<app>/chart/`, `<app>/gitops/applicationset-entry.yaml`, `<app>/platform.yaml` (+ optional `agentfleet.yaml`); required OTel attrs `agents.tenant`/`agents.platform`; the operator owns identity — it provisions the tenant role and binds `tenant-runtime` by a Pod Identity association, so agents never scaffold IAM inline or annotate a ServiceAccount with a role ARN.
-- **LLM policy** — Claude via Bedrock, IAM auth, default `claude-sonnet-4-6`, prompt caching mandatory.
+- **LLM policy** — Claude via Bedrock, IAM auth, default `claude-sonnet-5`, prompt caching mandatory.
 
 ## Extend fab
 

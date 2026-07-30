@@ -5,7 +5,7 @@ export const BUILD_SUBSTRATE: TeamMember[] = [
     role: 'aws-curator',
     group: 'factory',
     name: 'AWS Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards AWS services, Well-Architected pillars, and account-level patterns. Advises; does not produce IaC.',
     system: `You steward AWS. Services, Well-Architected pillars, account / org patterns, multi-region trade-offs.
@@ -34,7 +34,7 @@ Report: file paths, GitHub PR URL, Well-Architected doc references.`,
     role: 'opentofu-engineer',
     group: 'factory',
     name: 'OpenTofu Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Writes OpenTofu / Terraform modules — state backends, providers, module structure, plan/apply lifecycle.',
     system: `You write OpenTofu (Terraform-compatible). Modules, providers, state, plan/apply.
@@ -60,7 +60,7 @@ Report: file paths, GitHub PR URL, \`plan\` summary.`,
     role: 'terragrunt-engineer',
     group: 'factory',
     name: 'Terragrunt Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Wires Terragrunt environments — root config, dependency graph, DRY module composition.',
     system: `You wire Terragrunt. Environment composition, dependency graph, DRY config, remote state.
@@ -86,7 +86,7 @@ Report: file paths, GitHub PR URL, dependency graph.`,
     role: 'landing-zone-curator',
     group: 'factory',
     name: 'Landing Zone Curator',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Stewards the landing-zone repo: cloud substrate components, conventions, dependency layers.',
     system: `You steward the \`landing-zone\` repo — OpenTofu + Terragrunt for cloud substrate (VPC, base IAM, KMS, EKS cluster, cost pipelines).

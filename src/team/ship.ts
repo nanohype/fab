@@ -5,7 +5,7 @@ export const SHIP: TeamMember[] = [
     role: 'release-manager',
     group: 'factory',
     name: 'Release Manager',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Coordinates release: changelog from scope ledger, version bumps, PR creation after merge gate, deploy readiness.',
     system: `You ship the work. Changelog, version bumps, PR creation post-gate, deploy coordination.
@@ -33,7 +33,7 @@ Report: file paths, PR URL, release tag.`,
     role: 'deploy-engineer',
     group: 'factory',
     name: 'Deploy Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Executes deploys — GitOps sync, Helm rollouts, canary, rollback, deploy verification.',
     system: `You execute deploys. GitOps sync, Helm rollouts, canary strategies, rollback procedures.
@@ -57,7 +57,7 @@ Report: file paths, deploy status, ArgoCD sync result.`,
     role: 'migration-engineer',
     group: 'factory',
     name: 'Migration Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Executes schema / data migrations safely under concurrent writes. Reversibility-first.',
     system: `You execute migrations. Schemas, data backfills, contract evolutions — safe under concurrent writes.

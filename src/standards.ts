@@ -57,6 +57,29 @@ type LanguageToolchainStandard = PublicStandard<
   { toolchains: Record<Language, PublicToolchain> }
 >;
 
+/**
+ * The published LLM policy — the model tiers every role and every factory
+ * deliverable invokes through, plus the regions, SDKs and requirements.
+ *
+ * `models` holds cross-region inference-profile ids (`us.anthropic.…`), which
+ * is the only invokable form for the current Claude family — see the standard's
+ * `inference-profile-required` requirement. Role definitions in `src/team/`
+ * declare the canonical short id instead (`claude-sonnet-5`), because the `api`
+ * and `anthropic-aws` backends take those directly; `resolveModelId` in
+ * `inference.ts` maps a canonical id to the profile form for `bedrock`.
+ * `__tests__/model-policy.test.ts` holds the two representations to each other.
+ */
+type LlmPolicyStandard = PublicStandard<
+  'nanohype/standards/llm-policy',
+  {
+    primary_provider: string;
+    models: { default: string; escalation: string; light: string };
+    regions_preferred: string[];
+    sdk_by_language: Record<string, string>;
+    requirements: { id: string; summary: string }[];
+  }
+>;
+
 function loadPublicStandard<T>(name: string): T {
   const path = resolve(NANOHYPE_STANDARDS, `${name}.json`);
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
@@ -64,12 +87,54 @@ function loadPublicStandard<T>(name: string): T {
 
 const PUBLIC_LANGUAGE_TOOLCHAIN =
   loadPublicStandard<LanguageToolchainStandard>('language-toolchain');
+const PUBLIC_LLM_POLICY = loadPublicStandard<LlmPolicyStandard>('llm-policy');
 
 // Re-exported so existing call sites (prompts.ts, build verification dispatch)
 // keep working unchanged. The `Toolchain` shape mirrors the public JSON.
 export type Toolchain = PublicToolchain;
 export const LANGUAGE_TOOLCHAIN: Record<Language, Toolchain> =
   PUBLIC_LANGUAGE_TOOLCHAIN.content.toolchains;
+
+/**
+ * The three model tiers, as inference-profile ids, from the public standard.
+ *
+ * Read by `MODEL_TIERS` below for the canonical short ids the roster declares,
+ * and rendered into `LLM_POLICY` so the prose every factory agent receives and
+ * the ids fab itself invokes cannot disagree.
+ */
+export const LLM_MODELS = PUBLIC_LLM_POLICY.content.models;
+
+/**
+ * The canonical short id for each tier — the form `src/team/` roles declare and
+ * the `api` backend takes directly.
+ *
+ * Derived from `LLM_MODELS` rather than restated: a hand-kept second list is
+ * exactly the drift this loader exists to remove.
+ *
+ * Three things separate the two representations, and all three come off: the
+ * profile geo prefix (`us.`), the `anthropic.` vendor prefix, and Bedrock's
+ * date/version suffix. That last one is easy to miss because only one tier has
+ * it — the light tier is `us.anthropic.claude-haiku-4-5-20251001-v1:0` on
+ * Bedrock and plain `claude-haiku-4-5` on the Anthropic API, while the other two
+ * carry no date at all. Leaving it on would hand the `api` backend an id it
+ * rejects. `BEDROCK_MODEL_IDS` in `inference.ts` maps back the other way.
+ */
+export const MODEL_TIERS: Readonly<Record<'default' | 'escalation' | 'light', string>> = {
+  default: canonicalModelId(LLM_MODELS.default),
+  escalation: canonicalModelId(LLM_MODELS.escalation),
+  light: canonicalModelId(LLM_MODELS.light),
+};
+
+/**
+ * A Bedrock inference-profile id reduced to the canonical Anthropic API id:
+ * `us.anthropic.claude-haiku-4-5-20251001-v1:0` -> `claude-haiku-4-5`.
+ */
+function canonicalModelId(profileId: string): string {
+  return profileId
+    .replace(/^(?:us|eu|apac|us-gov|jp|ap|global)\./, '')
+    .replace(/^anthropic\./, '')
+    .replace(/(?:-\d{8})?(?:-v\d+(?::\d+)?)?$/, '');
+}
 
 // ── Four-phase contract ────────────────────────────────────────────
 
@@ -382,26 +447,41 @@ See IAC_BY_TARGET for the escape-hatch policy (when k8s is the wrong shape and a
 
 // ── LLM policy — Claude-primary, Bedrock-preferred ─────────────────
 
+// Assembled from the vendored `llm-policy.json` rather than restated. The model
+// ids, regions, per-language SDKs and requirements below are the public
+// standard's own fields, so the policy every factory agent receives cannot drift
+// from the policy the org publishes — and cannot drift from the ids fab itself
+// invokes, which come from the same constant.
+//
+// It used to be a hand-written blob, and it had drifted: it named
+// `anthropic.claude-sonnet-4-6` as the default, a bare foundation-model id that
+// the current Claude family refuses outright, and carried nothing at all about
+// inference profiles. Every agent reading it was being taught a form that does
+// not work.
+
+const SDK_LINES = Object.entries(PUBLIC_LLM_POLICY.content.sdk_by_language)
+  .map(([lang, pkg]) => `  - ${lang}: \`${pkg}\``)
+  .join('\n');
+
+const REQUIREMENT_LINES = PUBLIC_LLM_POLICY.content.requirements
+  .map((r) => `- **${r.id}** — ${r.summary}`)
+  .join('\n');
+
 export const LLM_POLICY = `## LLM policy
 
-Claude is the primary LLM for every factory build. Preferred delivery: AWS Bedrock (keeps data in the client's AWS trust boundary, simplifies enterprise compliance posture).
+Claude is the primary LLM for every factory build. Preferred delivery: ${PUBLIC_LLM_POLICY.content.primary_provider} (keeps data in the client's AWS trust boundary, simplifies enterprise compliance posture).
 
+- Models — invoke these ids verbatim; they are cross-region inference-profile ids, which is the only form the current Claude family accepts:
+  - Default: \`${LLM_MODELS.default}\` — most work
+  - Escalation: \`${LLM_MODELS.escalation}\` — complex reasoning, architecture decisions
+  - Light: \`${LLM_MODELS.light}\` — classification, routing, filter steps
 - SDK per language (pick to match \`constraints.language\`):
-  - TypeScript: \`@aws-sdk/client-bedrock-runtime\`
-  - Python: \`boto3\` (\`bedrock-runtime\` client)
-  - Go: \`github.com/aws/aws-sdk-go-v2/service/bedrockruntime\`
-  - Rust: \`aws-sdk-bedrockruntime\`
-  - Java: \`software.amazon.awssdk:bedrockruntime\`
-  - C#: \`AWSSDK.BedrockRuntime\`
-  - Auth: IAM role-based. No API keys in code or env.
-- Models:
-  - Default: \`anthropic.claude-sonnet-4-6\` — most work
-  - Escalation: \`anthropic.claude-opus-4-8\` — complex reasoning, architecture decisions
-  - Light: \`anthropic.claude-haiku-4-5\` — classification, routing, filter steps
-- Regions (in order of preference): \`us-west-2\`, \`us-east-1\`, \`eu-central-1\`. Verify the chosen model is live in the region before committing IaC.
-- Prompt caching is mandatory. Use Bedrock \`cachePoint\` markers on the system prompt and any stable context prefix. Measure cache-hit ratio and surface it in the architecture artifact.
-- Direct Anthropic SDK (\`@anthropic-ai/sdk\`, \`anthropic\` Python, etc.) is permitted ONLY if the intake brief explicitly requires it, or Bedrock lacks the required model variant. Document the exception in the architecture artifact.
-- OpenAI / other providers: only if the brief names them as a requirement. Never default to GPT.`;
+${SDK_LINES}
+- Regions (in order of preference): ${PUBLIC_LLM_POLICY.content.regions_preferred.map((r) => `\`${r}\``).join(', ')}.
+
+### Requirements
+
+${REQUIREMENT_LINES}`;
 
 // ── Non-negotiable production bar ─────────────────────────────────
 

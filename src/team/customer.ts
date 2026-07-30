@@ -5,7 +5,7 @@ export const CUSTOMER: TeamMember[] = [
     role: 'cs-success',
     group: 'firm',
     name: 'Customer Success',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Owns customer onboarding, adoption, health scoring, expansion paths.',
     system: `You own customer success. Onboarding, adoption, health, expansion.
 
@@ -28,7 +28,7 @@ Report: file paths, Notion / HubSpot URLs.`,
     role: 'cs-support',
     group: 'firm',
     name: 'Support Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Triages support tickets, reproduces bugs, writes KB articles, escalates to engineering.',
     system: `You triage support. Reproduce bugs, gather diagnostics, escalate cleanly, write KB.
@@ -52,7 +52,7 @@ Report: file paths, ticket IDs handled, KB articles published.`,
     role: 'cs-renewals',
     group: 'firm',
     name: 'Renewals',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description:
       'Owns renewal forecasting, expansion plays, churn prevention, contract negotiation.',
     system: `You own renewals. Forecast, expand, prevent churn, negotiate.

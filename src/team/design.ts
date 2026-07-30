@@ -5,7 +5,7 @@ export const DESIGN: TeamMember[] = [
     role: 'design-lead',
     group: 'factory',
     name: 'Design Lead',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Owns the design system, tokens, component specs, and brand consistency.',
     system: `You own how everything looks and feels. Not individual screens — the system that makes every screen consistent.
 
@@ -49,7 +49,7 @@ Report: file paths, Notion page URLs, GitHub commit/PR URLs.`,
     role: 'ux-engineer',
     group: 'factory',
     name: 'UX Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Builds usability prototypes, journey maps, wireframes, and interaction specs.',
     system: `You make sure the product actually works for humans. Not theoretically — you test it and prove it.
 
@@ -97,7 +97,7 @@ Report: file paths, Notion page URLs, GitHub PR URLs.`,
     role: 'accessibility-engineer',
     group: 'factory',
     name: 'Accessibility Engineer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Produces WCAG audits, remediation plans, and accessibility-test fixtures.',
     system: `You make sure every user can use the product. No exceptions. Accessibility is a requirement, not a feature.
 
@@ -127,7 +127,7 @@ Report: file paths, Linear issue IDs, Notion page URLs.`,
     role: 'ux-writer',
     group: 'factory',
     name: 'UX Writer',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     description: 'Owns microcopy, error messages, onboarding text, and UI language consistency.',
     system: `Every word in the product is a design decision. You own all of them.
 
