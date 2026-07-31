@@ -1,15 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { Citation, FileReader, GateVerdict, Grade } from '../src/gate.js';
 import {
-  parseGateVerdict,
-  mergeGateVerdicts,
-  applySelfReviewDowngrade,
-  parseQualityGrades,
-  compareGrades,
   aggregateGrades,
+  applySelfReviewDowngrade,
+  compareGrades,
+  mergeGateVerdicts,
   parseCitations,
+  parseGateVerdict,
+  parseQualityGrades,
   verifyCitations,
 } from '../src/gate.js';
-import type { GateVerdict, Grade, Citation, FileReader } from '../src/gate.js';
 import type { TeamRole } from '../src/types.js';
 
 // Helper: wrap a verdict body with the TRANSCRIPTS+CITATIONS+QUALITY_GRADES
@@ -258,6 +258,19 @@ describe('applySelfReviewDowngrade', () => {
     expect(result.decision).toBe('approve');
     expect(result.feedback).toContain('Advisory:');
   });
+
+  it('returns the verdicts untouched when no role is conflicted', () => {
+    // The ordinary case — no PR touches a gate role's own definition. Pinned
+    // because it is the arm that must not mark anything advisory: a downgrade
+    // applied by accident here turns a real REJECT into a note.
+    const verdicts: GateVerdict[] = [
+      { role: 'pr-reviewer', verdict: 'APPROVE', feedback: '' },
+      { role: 'qa-security', verdict: 'REJECT', feedback: 'big issue' },
+    ];
+    const out = applySelfReviewDowngrade(verdicts, new Set<TeamRole>());
+    expect(out).toEqual(verdicts);
+    expect(out.every((v) => v.advisory === undefined)).toBe(true);
+  });
 });
 
 describe('parseQualityGrades', () => {
@@ -281,6 +294,24 @@ describe('parseQualityGrades', () => {
 
   it('returns empty object when block is absent', () => {
     expect(parseQualityGrades('GATE_VERDICT: APPROVE')).toEqual({});
+  });
+
+  it('stops at the next header rather than reading into the block after it', () => {
+    // The grades block is not always last. Reading past it would pull
+    // `line_range: 42-57` and similar `key: value` lines out of CITATIONS, and
+    // a stray match there would invent a dimension nobody graded.
+    const out = [
+      'GATE_VERDICT: APPROVE',
+      '',
+      'QUALITY_GRADES:',
+      '  architecture: B+',
+      '',
+      'CITATIONS:',
+      '  - claim: unrelated',
+      '    file: src/x.ts',
+      '    security: A',
+    ].join('\n');
+    expect(parseQualityGrades(out)).toEqual({ architecture: 'B+' });
   });
 
   it('skips unknown grade values silently', () => {
@@ -325,6 +356,20 @@ describe('compareGrades', () => {
     expect(d.maxDrift).toBe(3);
   });
 
+  it('treats a grade outside the known letters as maximum drift, blocking release', () => {
+    // `Grade` keeps this out of reach in typed code, so the cast is the point:
+    // the letter scale has a defensive arm, and it fails closed. An
+    // unrecognized grade scores below F, so it drifts past the one-letter
+    // tolerance and blocks the release rather than being quietly skipped.
+    // Worth pinning — the opposite reading is just as plausible to a reader,
+    // and it would let a garbled calibration block ship silently.
+    const i: Record<string, Grade> = { security: 'A' };
+    const e: Record<string, Grade> = { security: 'Z+' as Grade };
+    const d = compareGrades(i, e);
+    expect(d.drifted).toEqual(['security']);
+    expect(d.maxDrift).toBe(5);
+  });
+
   it('ignores dimensions where either side is N/A', () => {
     const i: Record<string, Grade> = { frontend: 'N/A' };
     const e: Record<string, Grade> = { frontend: 'F' };
@@ -351,6 +396,70 @@ describe('compareGrades', () => {
 });
 
 describe('parseCitations', () => {
+  it('ignores key/value lines that appear before any list item', () => {
+    // A model that emits the fields without the leading `- ` has produced no
+    // citation at all. Attaching those values to a phantom entry would
+    // manufacture evidence that was never structured as a citation.
+    const out = [
+      'CITATIONS:',
+      '  claim: floating, not in a list item',
+      '  file: src/nowhere.ts',
+    ].join('\n');
+    expect(parseCitations(out)).toEqual([]);
+  });
+
+  it('ignores keys outside the citation schema', () => {
+    const out = [
+      'CITATIONS:',
+      '  - claim: real claim',
+      '    file: src/a.ts',
+      '    line_range: 1-1',
+      '    confidence: high',
+      '    quoted_fragment: "const a = 1;"',
+    ].join('\n');
+    const cits = parseCitations(out);
+    expect(cits).toHaveLength(1);
+    expect(cits[0].claim).toBe('real claim');
+    expect(cits[0].quotedFragment).toBe('const a = 1;');
+  });
+
+  it('yields an empty fragment when a block scalar holds only blank lines', () => {
+    // Reaches the dedent path with nothing to measure an indent from. It must
+    // produce an empty fragment, which verifyCitations then rejects as
+    // malformed — not throw partway through parsing the verdict.
+    const out = [
+      'CITATIONS:',
+      '  - claim: c',
+      '    file: src/a.ts',
+      '    quoted_fragment: |',
+      '',
+      '',
+    ].join('\n');
+    const cits = parseCitations(out);
+    expect(cits).toHaveLength(1);
+    expect(cits[0].quotedFragment).toBe('');
+  });
+
+  it('parses a quoted_fragment given inline rather than as a block scalar', () => {
+    // The prompt asks for a block scalar, but a single-line fragment is the
+    // shape a model most often emits instead. Dropping it would silently strip
+    // the evidence off an otherwise well-formed citation, and the verdict would
+    // then be auto-downgraded for having no evidence it did in fact supply.
+    const out = [
+      'GATE_VERDICT: APPROVE',
+      '',
+      'CITATIONS:',
+      '  - claim: the timeout is bounded',
+      '    file: src/api.ts',
+      '    line_range: 12-12',
+      '    quoted_fragment: "const TIMEOUT_MS = 20_000;"',
+    ].join('\n');
+    const cits = parseCitations(out);
+    expect(cits).toHaveLength(1);
+    expect(cits[0].file).toBe('src/api.ts');
+    expect(cits[0].quotedFragment).toBe('const TIMEOUT_MS = 20_000;');
+  });
+
   it('parses a block-scalar citation and stops at the next header', () => {
     const out = [
       'GATE_VERDICT: APPROVE',
@@ -434,10 +543,65 @@ describe('verifyCitations', () => {
     expect(verifyCitations([multi], reader)[0].ok).toBe(true);
   });
 
+  it('fails when the fragment is longer than the whole cited file', () => {
+    // Cheap rejection before scanning, and the clearest sign of a fabricated
+    // quote: more lines claimed than the file contains.
+    const long: Citation = { ...cit, quotedFragment: 'a\nb\nc\nd\ne' };
+    const check = verifyCitations([long], () => 'a\nb')[0];
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('fragment-not-found');
+  });
+
   it('requires the fragment lines to be contiguous and in order', () => {
     const multi: Citation = { ...cit, quotedFragment: 'const a = 1;\nconst b = 2;' };
     const reader: FileReader = () => 'const a = 1;\nsomething else;\nconst b = 2;';
     expect(verifyCitations([multi], reader)[0].ok).toBe(false);
+  });
+
+  it('rejects a citation with no file path as malformed', () => {
+    // A citation naming no file cannot be checked against anything. Treating it
+    // as passing would make the empty string the cheapest way past the evidence
+    // contract.
+    const check = verifyCitations([{ ...cit, file: '' }], () => 'whatever')[0];
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('malformed');
+    expect(check.reason).toContain('no file path');
+  });
+
+  it.each([
+    ['empty', ''],
+    ['whitespace only', '   \n\t '],
+  ])('rejects a citation whose quoted_fragment is %s', (_label, quotedFragment) => {
+    // Same shape of hole as the missing file: an empty fragment trivially
+    // "appears" in any file, so it has to be refused before the search rather
+    // than matched by it.
+    const check = verifyCitations([{ ...cit, quotedFragment }], () => 'anything')[0];
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('malformed');
+  });
+
+  it('reports file-unreadable when the reader throws rather than returning null', () => {
+    // A reader can fail with EACCES or EISDIR instead of reporting absence. The
+    // distinction that matters is fabrication versus an unreadable tree — a
+    // thrown error is the latter, and must not escape as an unhandled exception
+    // that takes down the whole gate run.
+    const reader: FileReader = () => {
+      throw new Error('EACCES: permission denied');
+    };
+    const check = verifyCitations([cit], reader)[0];
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('file-unreadable');
+    expect(check.reason).toContain('EACCES');
+  });
+
+  it('reports file-unreadable when the reader throws a non-Error value', () => {
+    const reader: FileReader = () => {
+      throw 'just a string';
+    };
+    const check = verifyCitations([cit], reader)[0];
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('file-unreadable');
+    expect(check.reason).toContain('just a string');
   });
 });
 

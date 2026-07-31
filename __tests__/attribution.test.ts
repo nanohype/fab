@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
 import {
-  resolveSessionIdentity,
-  sanitizeForSts,
-  assumeWithSourceIdentity,
-  writeImpersonationKubeconfig,
   applySessionIdentity,
+  assumeWithSourceIdentity,
   type CliRunner,
+  resolveSessionIdentity,
   type SessionIdentity,
+  sanitizeForSts,
+  writeImpersonationKubeconfig,
 } from '../src/attribution.js';
 
 const ROLE = 'arn:aws:iam::111111111111:role/fab-session';
@@ -145,6 +145,30 @@ describe('assumeWithSourceIdentity', () => {
   it('throws when STS returns no credentials', async () => {
     const empty: CliRunner = async () => ({ stdout: JSON.stringify({}) });
     await expect(assumeWithSourceIdentity(id, 'fab-build', empty)).rejects.toThrow(
+      /no usable credentials/,
+    );
+  });
+
+  it('throws a distinct error when STS output is not JSON at all', async () => {
+    // Separate from the no-credentials case: a CLI that fails early can write a
+    // human-readable error to stdout, and `JSON.parse` throwing there must not
+    // escape as a raw SyntaxError. The two failures point an operator at
+    // different things — a broken invocation versus an unexpected response.
+    const garbage: CliRunner = async () => ({ stdout: 'Unable to locate credentials\n' });
+    await expect(assumeWithSourceIdentity(id, 'fab-build', garbage)).rejects.toThrow(
+      /unparseable output/,
+    );
+  });
+
+  it.each([
+    ['no access key', { SecretAccessKey: 'secret', SessionToken: 'token' }],
+    ['no secret key', { AccessKeyId: 'AKIAFAKE', SessionToken: 'token' }],
+    ['no session token', { AccessKeyId: 'AKIAFAKE', SecretAccessKey: 'secret' }],
+  ])('rejects a partial credential set (%s)', async (_label, Credentials) => {
+    // A partial set is worse than an empty one: it would be exported into the
+    // environment and fail later, somewhere with no connection to attribution.
+    const partial: CliRunner = async () => ({ stdout: JSON.stringify({ Credentials }) });
+    await expect(assumeWithSourceIdentity(id, 'fab-build', partial)).rejects.toThrow(
       /no usable credentials/,
     );
   });

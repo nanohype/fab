@@ -51,10 +51,10 @@
  */
 
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
@@ -90,6 +90,12 @@ export interface SessionIdentity {
 /** A minimal `aws` runner — injectable so callers can test without the CLI. */
 export type CliRunner = (file: string, args: string[]) => Promise<{ stdout: string }>;
 
+// Excluded from this file's 100% coverage floor: it binds execFile with a
+// timeout and holds no logic of its own. Every caller injects a runner, so
+// covering it would mean either shelling out to the real `aws` from a unit test
+// or widening production surface for the test's benefit. The floor exists to
+// prove the credential handling around it, which is fully covered.
+/* v8 ignore next */
 const defaultRunner: CliRunner = (file, args) => execFileAsync(file, args, { timeout: 20_000 });
 
 /**

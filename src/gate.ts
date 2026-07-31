@@ -256,7 +256,11 @@ export function parseCitations(output: string): Citation[] {
     if (key === 'claim') cur.claim = stripQuotes(valueRaw);
     else if (key === 'file') cur.file = stripQuotes(valueRaw);
     else if (key === 'line_range') cur.lineRange = stripQuotes(valueRaw);
-    else if (key === 'quoted_fragment') {
+    // Plain `else`, not `else if (key === 'quoted_fragment')`: the regex above
+    // admits exactly these four keys, so re-testing the last one would add a
+    // branch that cannot be false and a fifth key would silently do nothing
+    // rather than land here.
+    else {
       if (isBlockScalar(valueRaw)) {
         collecting = true;
         keyIndent = indent.length;
@@ -278,8 +282,11 @@ function normalizeLines(text: string): string[] {
     .filter((l) => l.length > 0);
 }
 
+// The caller guarantees a non-empty needle (verifyCitations rejects an empty
+// fragment before it gets here), so this only has to reject a fragment longer
+// than the file.
 function containsRun(haystack: string[], needle: string[]): boolean {
-  if (needle.length === 0 || needle.length > haystack.length) return false;
+  if (needle.length > haystack.length) return false;
   for (let i = 0; i + needle.length <= haystack.length; i++) {
     let match = true;
     for (let j = 0; j < needle.length; j++) {
@@ -331,6 +338,12 @@ export function verifyCitations(citations: Citation[], readFile: FileReader): Ci
         reason: `cited file not found: ${citation.file}`,
       };
     const needle = normalizeLines(citation.quotedFragment);
+    // Unreachable while the `.trim()` guard above stands: anything that survives
+    // it has a non-whitespace character, and normalizeLines only drops
+    // whitespace. Kept as the guarantee `containsRun` relies on rather than
+    // deleted, and excluded from the floor rather than tested through a
+    // contrived input that would not represent anything a role can emit.
+    /* v8 ignore next */
     if (needle.length === 0)
       return {
         citation,
@@ -448,6 +461,12 @@ const VALID_GRADES: ReadonlyArray<Grade> = [
 const GRADE_VALUES = new Set<string>(VALID_GRADES);
 
 function letterLevel(grade: Grade): number {
+  // Unreachable from the sole caller, which filters N/A before comparing — kept
+  // because this function's contract is "map any Grade to a level", and a future
+  // caller that skips the filter should get -1 rather than the level of the
+  // letter 'N'. Excluded from the file's 100% floor rather than deleted: the
+  // gate is not the place to trade a redundant guard for a coverage number.
+  /* v8 ignore next */
   if (grade === 'N/A') return -1;
   const letter = grade.charAt(0);
   switch (letter) {
@@ -498,6 +517,12 @@ export function parseQualityGrades(output: string): Record<string, Grade> {
   for (const m of block.matchAll(lineRe)) {
     const dim = m[1].toLowerCase();
     const grade = m[2] as Grade;
+    // Redundant against the regex above, which already enumerates the valid
+    // grades — the false arm is unreachable while the two agree. That is the
+    // point: the regex and VALID_GRADES are separate declarations of the same
+    // set, and this is what stops a widened regex from admitting a grade the
+    // rest of the calibration path cannot score.
+    /* v8 ignore next */
     if (GRADE_VALUES.has(grade)) grades[dim] = grade;
   }
   return grades;

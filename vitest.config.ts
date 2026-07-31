@@ -38,6 +38,24 @@ export default defineConfig({
         functions: 61, // measured 61.95
         branches: 66, // measured 67.07
         statements: 70, // measured 70.73
+
+        // Per-file 100%, above the global floor, on the two files where an
+        // uncovered branch is an unproven control rather than a coverage
+        // number. The floor above is deliberately low because of the alternate
+        // transports, which makes an average an especially bad guardian for
+        // these two — the package could sit comfortably above 70 with the gap
+        // sitting in the approval gate.
+        //
+        // gate.ts decides whether a factory PR ships: it parses each role's
+        // verdict, enforces the evidence contract by verifying that every
+        // cited fragment appears verbatim at the cited location, and blocks
+        // release on calibration drift.
+        //
+        // attribution.ts binds a session's cloud actions to a named human via
+        // STS SourceIdentity. A gap here is an action nobody is accountable
+        // for.
+        'src/gate.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+        'src/attribution.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },
