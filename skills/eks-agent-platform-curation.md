@@ -84,7 +84,7 @@ Two constraints worth knowing before you author one:
 
 ### AgentFleet
 
-A fleet of agents running under a Platform. Composes with `kagent`.
+A fleet of agents running under a Platform. Each agent becomes a Deployment.
 
 ```yaml
 apiVersion: agents.nanohype.dev/v1alpha1
@@ -102,15 +102,17 @@ spec:
     queueDepthTrigger: 10 # KEDA scales on SQS depth when queueUrl is set
   agents:
     - name: coordinator
+      image: ghcr.io/nanohype/my-agent:v1 # required — the agent's runtime
       systemPrompt: |
         Coordinate the work. Push back on ambiguous requests.
       modelRoute: primary # a route name on the Platform's ModelGateway
-      tools:
-        - name: knowledge-base-search # a kagent ToolServer, referenced by name
 ```
 
-The model comes from the ModelGateway route, not from a container image — the
-fleet declares behavior and the gateway declares which model serves it.
+An agent is an image plus the name of a route. The operator runs the image as a
+Deployment and resolves the route to a base URL and a wire format, so the agent
+framework is whatever the image carries — the platform's contract is the route,
+not the runtime. Which model answers is the gateway's business, which is what
+lets a model change without touching the fleet.
 
 ### The rest
 
@@ -123,8 +125,9 @@ Every one of these references its Platform through `spec.platformRef.name`:
 - **AgentSandbox** / **SandboxPool** — attributable single-session and pooled sandboxes.
 - **BatchJob** — a Bedrock batch inference run over an S3 prefix.
 
-Tools are kagent `ToolServer` CRs, referenced by name from a fleet agent's
-`tools[]`. There is no per-tool or per-skill CRD in this operator.
+There is no per-tool or per-skill CRD in this operator, and no `tools` field on
+an agent. Whatever an agent can reach is a property of its image and the
+NetworkPolicy around it — the CR describes the boundary, not the toolbox.
 
 ## Reconcile boundary
 
@@ -236,7 +239,7 @@ that deletes tenant data.
 - Extend the operator with new CRDs (`kubebuilder-engineer`).
 - Provision the cluster (`landing-zone-curator`).
 - Configure ArgoCD itself (`argocd-curator`).
-- Build agent runtimes (`agent-engineer` + `kagent-curator`).
+- Build agent runtimes (`agent-engineer`).
 
 ## Output for the workflow
 

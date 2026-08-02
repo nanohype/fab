@@ -450,8 +450,6 @@ export type TeamRole =
   | 'keda-engineer'
   // ── Build · Agent Platform ──────────────────────────────────────────
   | 'eks-agent-platform-curator'
-  | 'kagent-curator'
-  | 'agentgateway-curator'
   | 'kubebuilder-engineer'
   // ── Verify ──────────────────────────────────────────────────────────
   | 'fidelity-engineer'

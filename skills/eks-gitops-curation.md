@@ -32,7 +32,7 @@ eks-gitops/
 │   └── external-dns/
 ├── platforms/                # Cluster-level Platform infrastructure
 │   ├── eks-agent-platform/   # The operator + its CRDs
-│   └── kagent/
+│   └── envoy-ai-gateway/     # The model plane the operator renders into
 ├── environments/             # Per-env overlays
 │   ├── dev/
 │   ├── staging/

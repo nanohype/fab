@@ -325,7 +325,7 @@ The factory ships k8s-native by default. Every app lands as a Platform tenant un
 - Application chart in \`<app>/chart/\` (Helm, with per-env values files)
 - ApplicationSet entry registered with \`nanohype/eks-gitops\`
 - \`Platform\` CR (\`platform.nanohype.dev/v1alpha1\`) declaring the tenant boundary + its datastores (spec.datastores); the eks-agent-platform operator reconciles Namespace, ResourceQuota, NetworkPolicy, the tenant IAM role + generated datastore-access policy, and KMS grants, while the tenant-substrate module provisions the declared stores
-- Optional \`AgentFleet\` CR (\`agents.nanohype.dev/v1alpha1\`, AI workloads) composing kagent + KEDA
+- Optional \`AgentFleet\` CR (\`agents.nanohype.dev/v1alpha1\`, AI workloads) declaring agents — each an image bound to a named ModelGateway route — which the operator runs as a Deployment behind a KEDA scaler
 
 **Cloud substrate** (shared, slow-moving) — OpenTofu/Terragrunt against \`nanohype/landing-zone\`. VPC, base IAM, KMS keys, cost pipeline, EventBridge buses, Bedrock guardrail templates, WAF. Per-app substrate gaps land as new \`landing-zone\` components, NOT in-app tofu.
 
@@ -374,7 +374,7 @@ Every k8s-native factory deliverable lands as a Platform tenant — a self-conta
 Optional, AI workloads only:
 
 \`\`\`
-  agentfleet.yaml                  # AgentFleet CR composing kagent Agent + ModelConfig + KEDA scaler
+  agentfleet.yaml                  # AgentFleet CR — a Deployment per agent + KEDA scaler
 \`\`\`
 
 ### Platform CR shape (minimum)

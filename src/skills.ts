@@ -225,16 +225,6 @@ const SKILL_DEFS: Record<TeamRole, SkillDef> = {
       'eks-agent-platform operator: Platform CRDs, tenant identity, per-tenant scaffolding.',
     type: 'generated',
   },
-  'kagent-curator': {
-    name: 'kagent-curation',
-    description: 'kagent: agent CRDs, runtime knobs, lifecycle, composition with agentgateway.',
-    type: 'generated',
-  },
-  'agentgateway-curator': {
-    name: 'agentgateway-curation',
-    description: 'agentgateway: ingress / egress for agent traffic, auth, routing, observability.',
-    type: 'generated',
-  },
   'kubebuilder-engineer': {
     name: 'kubebuilder-engineering',
     description: 'Kubebuilder + controller-runtime: CRDs, reconcilers, webhooks, finalizers.',

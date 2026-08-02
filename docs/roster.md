@@ -1,6 +1,6 @@
 # Fab Roster
 
-The roster is 80 specialists organized around factory phases. Workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions; there is no top-level coordinator agent. Anthropic's Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
+The roster is 78 specialists organized around factory phases. Workflow code in `src/workflows.ts` fans out across phase-scoped multiagent sessions; there is no top-level coordinator agent. Anthropic's Managed Agents caps a multiagent roster at 20 unique agents and does not nest coordinators, so each phase runs as its own session and workflow code orchestrates across them.
 
 ## Naming convention
 
@@ -41,9 +41,8 @@ Workflow code (src/workflows.ts) — top-level routing
 │   │   argocd-curator · eks-gitops-curator · kyverno-engineer ·
 │   │   cert-manager-curator · secrets-engineer ·
 │   │   observability-engineer · keda-engineer
-│   └── Agent Platform (4)
-│       eks-agent-platform-curator · kagent-curator ·
-│       agentgateway-curator · kubebuilder-engineer
+│   └── Agent Platform (2)
+│       eks-agent-platform-curator · kubebuilder-engineer
 │
 ├── Verify (6)
 │   fidelity-engineer · pr-reviewer · qa-security · build-verifier ·
