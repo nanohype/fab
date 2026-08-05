@@ -31,6 +31,32 @@ jobs:
       # schedule.
       - run: npm run standards:check
 
+  # The skills go into the preamble of every agent session fab runs, so a kind
+  # named there is a kind agents will confidently author. When the batch tier was
+  # deleted upstream, `BatchJob` survived in the curation skill and every session
+  # kept being told the platform had a batch API. fab vendors no CRDs, so there
+  # was no local list to compare against — this fetches one.
+  #
+  # Checked in both directions. A kind the skills name that no CRD defines is the
+  # batch case; a kind the operator ships that no skill mentions is the quieter
+  # half, and it is how SLOPolicy came to have a controller, a CRD, a
+  # kube-state-metrics projection and three alerts while nothing ever authored one.
+  skill-resources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Checkout the operator chart's CRDs
+        uses: actions/checkout@v4
+        with:
+          repository: nanohype/eks-agent-platform
+          path: eks-agent-platform
+          sparse-checkout: charts/operator/crds
+          sparse-checkout-cone-mode: false
+      - run: node scripts/check-skill-resources.mjs eks-agent-platform/charts/operator/crds
+
   lint:
     runs-on: ubuntu-latest
     steps:
