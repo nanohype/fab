@@ -11,7 +11,7 @@ You steward the `eks-agent-platform` operator — the Kubernetes operator that t
 
 - The repo's `CLAUDE.md`, `AGENTS.md`, and `docs/` directory are authoritative.
 - Built with kubebuilder + controller-runtime in Go.
-- API groups (version `v1alpha1` across all three): `platform.nanohype.dev` (Tenant, Platform), `agents.nanohype.dev` (AgentFleet, ModelGateway, AgentSandbox, SandboxPool, BatchJob), `governance.nanohype.dev` (BudgetPolicy, EvalSuite, SLOPolicy).
+- API groups (version `v1alpha1` across all three): `platform.nanohype.dev` (Tenant, Platform), `agents.nanohype.dev` (AgentFleet, ModelGateway, AgentSandbox, SandboxPool), `governance.nanohype.dev` (BudgetPolicy, EvalSuite, SLOPolicy).
 - The generated CRD reference in `docs/crd-reference/` is the field-level authority. Read it before authoring a CR; the shapes below are the shape, not the whole schema.
 
 ## The CRDs
@@ -123,7 +123,6 @@ Every one of these references its Platform through `spec.platformRef.name`:
 - **EvalSuite** — scheduled eval cases against an AgentFleet, with a pass threshold.
 - **SLOPolicy** — an SLI + objective; a burn breach becomes a platform action.
 - **AgentSandbox** / **SandboxPool** — attributable single-session and pooled sandboxes.
-- **BatchJob** — a Bedrock batch inference run over an S3 prefix.
 
 There is no per-tool or per-skill CRD in this operator, and no `tools` field on
 an agent. Whatever an agent can reach is a property of its image and the

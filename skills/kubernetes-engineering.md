@@ -122,7 +122,7 @@ spec:
   ingress:
     - from:
         - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: argocd } }
-        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: observability } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
         - podSelector: { matchLabels: { app.kubernetes.io/name: ingress-nginx } }
       ports: [{ port: 8080 }]
   egress:
