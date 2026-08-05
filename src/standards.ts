@@ -379,7 +379,7 @@ Optional, AI workloads only:
 
 ### Platform CR shape (minimum)
 
-The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, the operator-owned tenant-runtime ServiceAccount, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores and a capability-access policy generated from spec.identity.capabilities — plus the Pod Identity association binding tenant-runtime to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration.
+The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, the operator-owned tenant-runtime ServiceAccount, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores and a capability-access policy generated from spec.identity.capabilities — plus the Pod Identity association binding tenant-runtime to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration. NOT YET WIRED END TO END: nothing currently carries a Platform CR's spec.datastores into that module's var.tenants input, which is empty in development, staging and production. Declare the stores — it is correct and forward-compatible — but do not build an app that assumes its database, bucket or queue exists at deploy time.
 
 \`\`\`yaml
 apiVersion: platform.nanohype.dev/v1alpha1
@@ -412,7 +412,7 @@ spec:
 
 ### Datastore vocabulary
 
-Declare stateful stores in spec.datastores; never hand-write a landing-zone component for them. Six kinds — relational (Aurora Serverless v2), keyValue (DynamoDB), objectStore (S3), queue (SQS), cache (ElastiCache), stream (MSK Serverless). Each entry carries at most the one typed config block matching its kind; omit it for the young/light defaults (keyValue requires its partitionKey; stream carries none). deletionPolicy defaults to Retain, so deleting the CR orphans the datastore intact. The tenant-substrate module provisions each store and the operator generates the scoped IAM to reach it — tenant count is unbounded because adding one is a declaration, not a new component.
+Declare stateful stores in spec.datastores; never hand-write a landing-zone component for them. Six kinds — relational (Aurora Serverless v2), keyValue (DynamoDB), objectStore (S3), queue (SQS), cache (ElastiCache), stream (MSK Serverless). Each entry carries at most the one typed config block matching its kind; omit it for the young/light defaults (keyValue requires its partitionKey; stream carries none). deletionPolicy defaults to Retain, so deleting the CR orphans the datastore intact. The tenant-substrate module provisions each store and the operator generates the scoped IAM to reach it — tenant count is unbounded because adding one is a declaration, not a new component. The module and the IAM generation both exist; the step that renders a Platform CR's declaration into the module's var.tenants input does not, so no declared store is provisioned in any environment today.
 
 ### Capability vocabulary
 
