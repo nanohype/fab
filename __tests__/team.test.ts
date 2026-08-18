@@ -61,14 +61,20 @@ describe('roster doc agrees with the roster', () => {
   // it, so when a role's model changes the prose silently goes stale — it had
   // drifted to claiming 78 sonnet-5 roles alongside "2 lab roles on Opus",
   // summing to 80 against a 78-role roster. Read the doc as the artifact it is
-  // and hold its numbers to TEAM.
+  // and hold every number it publishes to TEAM.
   const roster = readFileSync(join(import.meta.dirname, '..', 'docs', 'roster.md'), 'utf-8');
+
+  /** The one bullet line naming a model, so assertions can't match stray prose. */
+  function bullet(pattern: RegExp): string {
+    const line = roster.split('\n').find((l) => l.trimStart().startsWith('-') && pattern.test(l));
+    if (!line) throw new Error(`docs/roster.md has no bullet matching ${pattern}`);
+    return line;
+  }
 
   /** Headcount the doc claims for a model id, from "- **<n> roles on `<model>`**". */
   function claimed(model: string): number {
-    const m = roster.match(new RegExp(`\\*\\*(\\d+) roles? on \`${model}\``));
-    if (!m) throw new Error(`docs/roster.md states no headcount for ${model}`);
-    return Number(m[1]);
+    const re = new RegExp(`\\*\\*(\\d+) roles? on \\\`${model}\\\``);
+    return Number(bullet(re).match(re)?.[1]);
   }
 
   function actual(model: string): number {
@@ -83,11 +89,19 @@ describe('roster doc agrees with the roster', () => {
     expect(claimed('claude-haiku-4-5')).toBe(actual('claude-haiku-4-5'));
   });
 
-  it('names both Opus roles, and the per-model counts sum to the whole roster', () => {
+  it('states the real Opus headcount and names those roles in that same bullet', () => {
+    // Scoped to the Opus bullet on purpose: `external-reviewer` is backticked
+    // elsewhere in the doc, so a whole-file search would still pass if this
+    // bullet were deleted outright.
+    const opusBullet = bullet(/lab roles? on Opus/);
     const opus = TEAM.filter((x) => x.model === 'claude-opus-5');
-    expect(opus).toHaveLength(2);
-    for (const m of opus) expect(roster).toContain(`\`${m.role}\``);
-    expect(claimed('claude-sonnet-5') + opus.length + claimed('claude-haiku-4-5')).toBe(
+    expect(Number(opusBullet.match(/\*\*(\d+) lab roles? on Opus\*\*/)?.[1])).toBe(opus.length);
+    for (const m of opus) expect(opusBullet).toContain(`\`${m.role}\``);
+  });
+
+  it('the published counts account for every role', () => {
+    const opusClaimed = Number(bullet(/lab roles? on Opus/).match(/\*\*(\d+) lab/)?.[1]);
+    expect(claimed('claude-sonnet-5') + opusClaimed + claimed('claude-haiku-4-5')).toBe(
       TEAM.length,
     );
   });

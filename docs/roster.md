@@ -140,7 +140,7 @@ Curators and engineers have bundled baselines at `fab/skills/<def.name>.md`. Ove
 Every role declares a `model` in `src/team/<phase>/<area>.ts`. The current spread is deliberate but not yet cost-tuned:
 
 - **76 roles on `claude-sonnet-5`** — the default for all factory + firm work.
-- **2 lab roles on Opus** (`external-reviewer`, `prompt-optimizer`) plus the `consult_advisor` escalation (`src/advisor.ts`) — Opus where deep reasoning or cold calibration earns it. 76 + 2 is the whole roster.
+- **2 lab roles on Opus** (`external-reviewer`, `prompt-optimizer`) plus the `consult_advisor` escalation (`src/advisor.ts`) — Opus where deep reasoning or cold calibration earns it.
 - **0 roles on `claude-haiku-4-5`** — an open cost opportunity. Haiku is $1/$5 per MTok vs Sonnet's $3/$15 (3× cheaper), a good fit for classification / routing / filter / low-stakes-high-volume work.
 
 **Haiku candidates** (a shape, not a mandate — pilot before promoting): `lead-research-curator`, `lead-outbound`, `lead-events`, `seo-engineer`, and similar firm roles whose output is short-form, templated, or a filter step. Caveat: firm roles do **not** pass the merge gate, so a quality regression there isn't caught automatically — pilot deliberately rather than flipping defaults blind.
