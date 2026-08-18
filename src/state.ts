@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import type {
@@ -63,10 +63,35 @@ export async function loadState(): Promise<FabState> {
   }
 }
 
+/**
+ * Persist state, keeping it readable only by its owner.
+ *
+ * The file holds each configured repo's `authorization_token` — a live GitHub
+ * PAT — so it is a credential at rest, not just config.
+ *
+ * Two mechanisms, because one is not enough. `mode` on `writeFile` applies
+ * **only when the file is created**, so on its own it would leave every state
+ * file written before this was enforced sitting at its original umask (0644
+ * under the common 022) — the exposure would persist on exactly the machines
+ * that already have a PAT on disk. The explicit `chmod` is what repairs those,
+ * tightening an existing install on its next save.
+ *
+ * The directory gets `mode` on `mkdir` but no `chmod`: that mode applies only
+ * when fab creates the directory itself, which is the ~/.fab case worth
+ * tightening. `FAB_STATE_FILE` can point anywhere, including a shared
+ * directory fab does not own (the test suite puts it in the system temp dir),
+ * and unconditionally narrowing someone else's directory to 0700 is a
+ * side effect this has no business having. Confidentiality rests on the
+ * file's own 0600, which holds regardless of the directory's mode.
+ */
 export async function saveState(state: FabState): Promise<void> {
   const file = stateFilePath();
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+  await writeFile(file, JSON.stringify(state, null, 2) + '\n', {
+    encoding: 'utf-8',
+    mode: 0o600,
+  });
+  await chmod(file, 0o600);
 }
 
 // ── Agents ──────────────────────────────────────────────────────────

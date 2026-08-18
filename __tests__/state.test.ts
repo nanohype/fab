@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { readFile, unlink } from 'node:fs/promises';
+import { chmod, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import {
   loadState,
   saveState,
@@ -36,7 +37,7 @@ import {
   setProjectLanguage,
   setSourceDirs,
 } from '../src/state.js';
-import type { FabState, TeamRole } from '../src/types.js';
+import type { FabState, GitRepoResource, TeamRole } from '../src/types.js';
 
 const STATE_FILE = process.env.FAB_STATE_FILE!;
 
@@ -47,6 +48,54 @@ async function cleanup() {
     /* ignore */
   }
 }
+
+describe('state file permissions', () => {
+  beforeEach(cleanup);
+  afterEach(cleanup);
+
+  // The state file holds each repo's authorization_token (a live GitHub PAT),
+  // so its mode is a security control, not cosmetics.
+
+  it('creates the state file 0600', async () => {
+    await saveState({ ...(await loadState()) });
+    expect((await stat(STATE_FILE)).mode & 0o777).toBe(0o600);
+  });
+
+  it('leaves the containing directory alone', async () => {
+    // FAB_STATE_FILE can point into a directory fab does not own (here, the
+    // system temp dir). The 0700 belongs on mkdir, where it applies only to a
+    // directory fab creates; narrowing an existing shared one would be a side
+    // effect with real blast radius.
+    const dir = dirname(STATE_FILE);
+    const before = (await stat(dir)).mode & 0o777;
+    await saveState(await loadState());
+    expect((await stat(dir)).mode & 0o777).toBe(before);
+  });
+
+  it('tightens a pre-existing world-readable state file on the next save', async () => {
+    // The regression this guards: `mode` on writeFile applies only when the
+    // file is created, so a state file already on disk at 0644 — every install
+    // written before the mode was enforced — would keep leaking the PAT to
+    // every local account. Only an explicit chmod repairs it.
+    await writeFile(STATE_FILE, '{}\n', { encoding: 'utf-8', mode: 0o644 });
+    await chmod(STATE_FILE, 0o644);
+    expect((await stat(STATE_FILE)).mode & 0o777).toBe(0o644);
+
+    await saveState(await loadState());
+
+    expect((await stat(STATE_FILE)).mode & 0o777).toBe(0o600);
+  });
+
+  it('keeps the token out of any group- or world-readable bit', async () => {
+    await addRepo({
+      url: 'https://github.com/acme/widget',
+      authorization_token: 'ghp_livecredential',
+    } as GitRepoResource);
+    const mode = (await stat(STATE_FILE)).mode & 0o777;
+    expect(mode & 0o077).toBe(0);
+    expect(await readFile(STATE_FILE, 'utf-8')).toContain('ghp_livecredential');
+  });
+});
 
 describe('state', () => {
   beforeEach(cleanup);
