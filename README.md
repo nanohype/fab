@@ -95,21 +95,21 @@ The subprocess inherits `~/.claude/CLAUDE.md`, hooks, user-level skills, and aut
 
 ## Running in a cluster
 
-A `Dockerfile` and example manifests under `deploy/` run fab workflows as Kubernetes Jobs. The in-cluster path uses the `sdk` runtime with inference served from AWS Bedrock — the agent loop runs in the pod, and Bedrock auth comes from an IRSA-bound ServiceAccount rather than a static key.
+A `Dockerfile` and example manifests under `deploy/` run fab workflows as Kubernetes Jobs. The in-cluster path uses the `sdk` runtime with inference served from AWS Bedrock — the agent loop runs in the pod, and Bedrock auth comes from an EKS Pod Identity association on the ServiceAccount rather than a static key.
 
 ```sh
 # Build and push the image
 docker build -t <registry>/fab:<tag> .
 docker push <registry>/fab:<tag>
 
-# Create the namespace + IRSA ServiceAccount (set the role ARN first)
+# Create the namespace + ServiceAccount
 kubectl apply -f deploy/serviceaccount.yaml
 
 # Run a workflow as a Job (set the image, workflow, and intake JSON)
 kubectl apply -f deploy/job.yaml
 ```
 
-The IRSA role is an AWS resource: provision it in your cloud-infra layer with `bedrock:InvokeModel` permission on the Claude models you use, and put its ARN in `deploy/serviceaccount.yaml`. See [`docs/transports.md`](docs/transports.md#inference-backend) for the inference backend, and [`docs/runbook.md`](docs/runbook.md) for the operator guide — state seeding, cost controls, log retrieval, and what the common failure modes look like.
+The IAM role is an AWS resource: provision it in your cloud-infra layer with `bedrock:InvokeModel` permission on the Claude models you use, then bind it to the ServiceAccount with an EKS Pod Identity association (`aws eks create-pod-identity-association`). The role ARN stays out of the manifest — the ServiceAccount carries no `eks.amazonaws.com/role-arn` annotation. See [`docs/transports.md`](docs/transports.md#inference-backend) for the inference backend, and [`docs/runbook.md`](docs/runbook.md) for the operator guide — state seeding, cost controls, log retrieval, and what the common failure modes look like.
 
 That path runs every role-session in one fab pod. For per-session pod isolation, see below.
 

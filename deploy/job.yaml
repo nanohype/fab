@@ -3,7 +3,7 @@
 # Copy this, set the image, fill in the workflow name + intake JSON, then
 # `kubectl apply`. fab runs the sdk runtime with inference served from AWS
 # Bedrock — the agent loop executes in this pod and Bedrock auth comes from
-# the ServiceAccount's IRSA role, not a static key.
+# the ServiceAccount's Pod Identity association, not a static key.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -33,14 +33,15 @@ spec:
             - name: FAB_INFERENCE
               value: bedrock
             # Load-bearing for bedrock: roles resolve to this region's
-            # cross-region inference profile (e.g. us-west-2 -> us.anthropic.*).
+            # cross-region inference profile (e.g. us-east-1 -> us.anthropic.*).
             # Set it to where your Bedrock model access + cluster live, in a
             # region the profiles cover (us-*, eu-*, ap-*, us-gov-*).
             - name: AWS_REGION
-              value: us-west-2
+              value: us-east-1
             - name: FAB_STATE_FILE
               value: /work/.fab-state.json
-            # FAB_INFERENCE=bedrock authenticates via IRSA. The advisor
+            # FAB_INFERENCE=bedrock authenticates via the Pod Identity
+            # association on the fab ServiceAccount. The advisor
             # escalation still calls the Anthropic API — create this Secret
             # if your roles escalate, otherwise the var is skipped.
             - name: ANTHROPIC_API_KEY
