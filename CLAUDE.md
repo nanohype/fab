@@ -96,10 +96,10 @@ Optional per-server URL overrides: `MCP_GITHUB_URL`, `MCP_LINEAR_URL`, `MCP_SLAC
 
 ```sh
 npm install
-npm run build        # tsc
+npm run build        # tsc, then copy-standards.mjs vendors src/standards/
 npm test             # vitest
 npm run test:coverage # vitest + v8 coverage floors (vitest.config.ts thresholds)
-npm run lint         # tsc --noEmit + biome lint
+npm run lint         # npm run typecheck (src and __tests__), then biome lint
 npm run format:check # biome format
 ```
 
