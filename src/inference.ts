@@ -139,7 +139,7 @@ function bedrockGeoPrefix(region: string): string {
  * `api` and `anthropic-aws` pass through — both take fab's canonical ids
  * directly. `bedrock` maps the canonical id to its Bedrock base id AND prefixes
  * it with the calling region's cross-region inference-profile geography
- * (`claude-sonnet-5` + `us-west-2` -> `us.anthropic.claude-sonnet-5`),
+ * (`claude-sonnet-5` + `us-east-1` -> `us.anthropic.claude-sonnet-5`),
  * because the current Claude models are invoked only through those profiles. An
  * id that is already a Bedrock id — a bare `anthropic.` id or a full
  * `<geo>.anthropic.` profile id set straight on a role — passes through
@@ -164,7 +164,7 @@ export function resolveModelId(
   if (!region) {
     throw new Error(
       `FAB_INFERENCE=bedrock needs AWS_REGION set to resolve "${model}" to a cross-region ` +
-        `inference-profile id. Set AWS_REGION (e.g. us-west-2), or set the role's model to a full profile id.`,
+        `inference-profile id. Set AWS_REGION (e.g. us-east-1), or set the role's model to a full profile id.`,
     );
   }
   return `${bedrockGeoPrefix(region)}.${bedrockId}`;

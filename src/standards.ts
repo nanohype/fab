@@ -463,6 +463,16 @@ const SDK_LINES = Object.entries(PUBLIC_LLM_POLICY.content.sdk_by_language)
   .map(([lang, pkg]) => `  - ${lang}: \`${pkg}\``)
   .join('\n');
 
+// `regions_preferred` is a deliberate one-element list, not a ranking (see the
+// `region-single` requirement, which renders into the preamble below). Calling a
+// single entry a preference order reads as an invitation to add a second, and
+// this text reaches agents that have no gate to catch that. Label it for what
+// the list actually is at whatever length it has.
+const REGION_LABEL =
+  PUBLIC_LLM_POLICY.content.regions_preferred.length === 1
+    ? 'Region'
+    : 'Regions (in order of preference)';
+
 const REQUIREMENT_LINES = PUBLIC_LLM_POLICY.content.requirements
   .map((r) => `- **${r.id}** — ${r.summary}`)
   .join('\n');
@@ -477,7 +487,7 @@ Claude is the primary LLM for every factory build. Preferred delivery: ${PUBLIC_
   - Light: \`${LLM_MODELS.light}\` — classification, routing, filter steps
 - SDK per language (pick to match \`constraints.language\`):
 ${SDK_LINES}
-- Regions (in order of preference): ${PUBLIC_LLM_POLICY.content.regions_preferred.map((r) => `\`${r}\``).join(', ')}.
+- ${REGION_LABEL}: ${PUBLIC_LLM_POLICY.content.regions_preferred.map((r) => `\`${r}\``).join(', ')}.
 
 ### Requirements
 
