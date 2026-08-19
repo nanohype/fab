@@ -3,7 +3,7 @@
   "upstream": {
     "repository": "nanohype/nanohype",
     "path": "standards",
-    "ref": "35bbe154b0512153e462ba6b1684ce3c351ac68b"
+    "ref": "e57c2485f483fc1260e29990df61e497c71137f0"
   },
   "files": [
     {
@@ -12,7 +12,7 @@
     },
     {
       "file": "llm-policy.json",
-      "sha256": "b39d14b70dbfa421f9e9f7836260c975b6871c5cfcb5450296c9e36c2eadb5ab"
+      "sha256": "8a56920bb6fdd718ad08c626d1bd7ea0d6e7b311355ad9d5600545ee5115e8f0"
     }
   ]
 }

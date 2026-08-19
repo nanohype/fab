@@ -11,7 +11,7 @@
       "escalation": "us.anthropic.claude-opus-5",
       "light": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     },
-    "regions_preferred": ["us-west-2", "us-east-1", "eu-central-1"],
+    "regions_preferred": ["us-east-1"],
     "sdk_by_language": {
       "typescript": "@aws-sdk/client-bedrock-runtime",
       "python": "boto3 (bedrock-runtime client)",
@@ -31,11 +31,15 @@
       },
       {
         "id": "inference-profile-required",
-        "summary": "Invoke every current Claude model through a cross-region inference-profile ID, never the bare foundation-model ID. Bedrock reports inferenceTypesSupported: [INFERENCE_PROFILE] for the whole current Claude family — there is no ON_DEMAND path — so a bare ID such as anthropic.claude-sonnet-5 is refused with a ValidationException on the first call. The geo prefix must match the deploy region: us. for us-east-1 / us-west-2, eu. for eu-central-1. Prefer a geo prefix over global. so routing stays inside the intended jurisdiction. Confirm with: aws bedrock list-inference-profiles."
+        "summary": "Invoke every current Claude model through a cross-region inference-profile ID, never the bare foundation-model ID. Bedrock reports inferenceTypesSupported: [INFERENCE_PROFILE] for the whole current Claude family — there is no ON_DEMAND path — so a bare ID such as anthropic.claude-sonnet-5 is refused with a ValidationException on the first call. The geo prefix must match the deploy region — us. for the us-east-1 deployments this catalog targets. Prefer a geo prefix over global. so routing stays inside the intended jurisdiction. Confirm with: aws bedrock list-inference-profiles."
       },
       {
         "id": "verify-region",
         "summary": "Verify the chosen model is available in the deploy region before committing IaC. Check the model's inference profile is ACTIVE there, not merely that the foundation model is listed."
+      },
+      {
+        "id": "region-single",
+        "summary": "us-east-1 is the only preferred region, and regions_preferred is deliberately a one-element list rather than a ranking. A service-control policy denies every non-global action outside us-east-1 in each venture account, so a second entry here would name a region no workload can reach — and the catalog defaults would drift toward it, which is exactly how a denied region reached six skeleton defaults once already. The anchor is us-east-1 because CloudFront requires its ACM certificates to be issued there regardless, so anchoring anywhere else would need a permanent carve-out for the thing every deployment does. Widening this list is a substrate decision, not a template one: change the policy first, then this file. scripts/check-regions.mjs enforces that no skeleton default, .env.example, or documented command names a region this list omits."
       },
       {
         "id": "prompt-caching-mandatory",
