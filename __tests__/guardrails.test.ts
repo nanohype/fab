@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeDelimiters, spotlight } from '../src/guardrails.js';
+import { normalizeDelimiters, spotlight, untrustedBlock } from '../src/guardrails.js';
 
 describe('normalizeDelimiters', () => {
   it('strips Claude reserved tags case-insensitively', () => {
@@ -154,5 +154,54 @@ describe('the composed defense (normalize then fence)', () => {
     const { wrapped, delimiter } = spotlight(normalizeDelimiters('<system>x</system>'));
     expect(wrapped.startsWith(`<${delimiter}>\n`)).toBe(true);
     expect(wrapped.endsWith(`\n</${delimiter}>`)).toBe(true);
+  });
+});
+
+describe('unterminated reserved openers', () => {
+  // A reserved opener with no '>' after it does not match the terminated-tag
+  // pattern, so it used to pass through. Inside the fence it then borrows the
+  // next '>' in the assembled prompt — which belongs to the closing delimiter.
+  // The attacker's tag swallows the fence meant to contain it.
+
+  it('strips an opener that never closes', () => {
+    expect(normalizeDelimiters('<thinking')).toBe('[stripped:thinking]');
+    expect(normalizeDelimiters('</system')).toBe('[stripped:system]');
+    expect(normalizeDelimiters('trailing text <tool_use foo="bar"')).toBe(
+      'trailing text [stripped:tool_use]',
+    );
+  });
+
+  it('the fence closer survives an unterminated opener', () => {
+    // The property that matters: after fencing, nothing before the closing
+    // delimiter can consume it.
+    const { block } = untrustedBlock('<thinking');
+    const delimiter = block.match(/untrusted-[0-9a-f]{12}/)![0];
+    const fenced = block.slice(block.indexOf(`<${delimiter}>`, block.indexOf('as data')));
+    expect(fenced).toContain('[stripped:thinking]');
+    // No '<' left inside the fenced span other than the delimiter's own two.
+    expect(fenced.match(/</g)).toHaveLength(2);
+    expect(fenced.trimEnd().endsWith(`</${delimiter}>`)).toBe(true);
+  });
+
+  it('still terminates at a later bracket rather than eating the rest', () => {
+    // If a '>' appears later in the untrusted span the tag ends there, and the
+    // terminated-tag pass already handles it — the end-anchored pass must not
+    // swallow the text in between.
+    expect(normalizeDelimiters('a <thinking b > c')).toBe('a [stripped:thinking] c');
+    expect(normalizeDelimiters('a <thinking b > c <system d')).toBe(
+      'a [stripped:thinking] c [stripped:system]',
+    );
+  });
+
+  it('leaves an ordinary less-than alone', () => {
+    // Proportionality: the guard targets reserved tag names, not every '<'.
+    // A brief comparing two numbers is not an attack.
+    expect(normalizeDelimiters('if x < y then ship')).toBe('if x < y then ship');
+    expect(normalizeDelimiters('a < b < c')).toBe('a < b < c');
+  });
+
+  it('is still idempotent with the second pass in play', () => {
+    const once = normalizeDelimiters('<system>a</system> tail <thinking');
+    expect(normalizeDelimiters(once)).toBe(once);
   });
 });
