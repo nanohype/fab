@@ -177,7 +177,7 @@ Strong (Brief, web-app shape — adds frontend + design):
 ]
 ```
 
-See [`docs/roster.md`](roster.md) for the full role list (83 roles total, organized by factory phase).
+See [`docs/roster.md`](roster.md) for the full role list (78 roles total, organized by factory phase).
 
 Weak: a single engineer role (one role can't ship a feature) or omitting the field entirely on a feature-build (workflow engages all 40+ factory roles, output suffers from mixed signals).
 
