@@ -9,15 +9,22 @@ file references point at the behavior described.
 The manifests under `deploy/` run one workflow per Job. The in-cluster path
 uses the `sdk` runtime with inference served from AWS Bedrock: the agent loop
 executes inside the pod, and Bedrock auth comes from the ServiceAccount's
-IRSA role, not a static key (`deploy/job.yaml`).
+EKS Pod Identity association, not a static key (`deploy/job.yaml`).
 
 ```sh
 # 1. Build and push the image (pin a digest in production, not a moving tag)
 docker build -t <registry>/fab:<tag> .
 docker push <registry>/fab:<tag>
 
-# 2. Namespace + IRSA ServiceAccount — set the role ARN first
+# 2. Namespace + ServiceAccount (no role ARN goes in the manifest)
 kubectl apply -f deploy/serviceaccount.yaml
+
+# 2b. Bind the workload IAM role to it with a Pod Identity association
+aws eks create-pod-identity-association \
+  --cluster-name <cluster> \
+  --namespace fab \
+  --service-account fab \
+  --role-arn arn:aws:iam::<account-id>:role/<fab-bedrock-role>
 
 # 3. Copy deploy/job.yaml, set the image + workflow name + intake JSON, apply
 kubectl apply -f deploy/job.yaml
@@ -36,7 +43,7 @@ Shape of the Job (`deploy/job.yaml`):
   `/tmp`; `FAB_STATE_FILE=/work/.fab-state.json` points fab's state at the
   writable volume.
 - `AWS_REGION` is load-bearing for Bedrock: roles resolve to that region's
-  cross-region inference profile (e.g. `us-west-2` → `us.anthropic.*`). Set
+  cross-region inference profile (e.g. `us-east-1` → `us.anthropic.*`). Set
   it to a region your Bedrock model access covers (`src/inference.ts`).
 - `ANTHROPIC_API_KEY` (Secret `fab-anthropic`, `optional: true`) — Bedrock
   serves the role sessions, but the Opus advisor escalation still calls the
@@ -91,19 +98,23 @@ provisioning + image pull), and a 30-minute cap on a single session's log
 follow to bound a hung pod. Interrupting a session deletes its AgentSandbox
 CR — that is the only channel back into the pod.
 
-## Bedrock / IRSA prerequisites
+## Bedrock prerequisites
 
 From `deploy/serviceaccount.yaml`:
 
 1. Bedrock model access enabled in `AWS_REGION` for the Claude models the
    roster uses.
-2. A workload IAM role: trust policy scoped to the `fab/fab` ServiceAccount
-   via the cluster's OIDC provider; permission policy granting
-   `bedrock:InvokeModel` + `bedrock:InvokeModelWithResponseStream` on those
-   models. Provision it in your cloud-infra layer.
-3. The role ARN in the `eks.amazonaws.com/role-arn` annotation on the
-   ServiceAccount. That is the credential `FAB_INFERENCE=bedrock`
-   authenticates with — there is no static key.
+2. The EKS Pod Identity Agent addon installed on the cluster
+   (`aws eks create-addon --addon-name eks-pod-identity-agent`).
+3. A workload IAM role: trust policy for the `pods.eks.amazonaws.com` service
+   principal (with `sts:AssumeRole` + `sts:TagSession`); permission policy
+   granting `bedrock:InvokeModel` + `bedrock:InvokeModelWithResponseStream` on
+   those models. Provision it in your cloud-infra layer.
+4. A Pod Identity association binding that role to the `fab/fab`
+   ServiceAccount (step 2b above). That association is the credential
+   `FAB_INFERENCE=bedrock` authenticates with — there is no static key, and no
+   role ARN in cluster state. The ServiceAccount carries no
+   `eks.amazonaws.com/role-arn` annotation.
 
 `FAB_INFERENCE=bedrock` rejects a missing/empty `AWS_REGION` and maps
 canonical model ids to the region's inference profile (`src/inference.ts`).
