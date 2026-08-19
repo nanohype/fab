@@ -3,6 +3,12 @@ export { TEAM } from './team.js';
 export { formatEvent } from './stream.js';
 export { startRepl } from './repl.js';
 export { buildSystemPrompt } from './prompts.js';
+export {
+  normalizeDelimiters,
+  spotlight,
+  untrustedBlock,
+  type UntrustedBlock,
+} from './guardrails.js';
 export { resolveMcpServers, getRegistry } from './mcp.js';
 export {
   getWorkflow,
