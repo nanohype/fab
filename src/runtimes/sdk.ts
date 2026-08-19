@@ -123,7 +123,48 @@ async function loadSdk(): Promise<AgentSdkModule> {
   }
 }
 
-class SdkAgentSession implements AgentSession {
+/** Inputs to {@link buildSdkQueryOptions} — everything the query call varies on. */
+export interface SdkQueryOptionsInput {
+  readonly model: string;
+  readonly systemPrompt: string;
+  readonly budgetUsd?: number | null;
+  readonly mcpServers?: Record<string, HttpMcpServer>;
+  readonly effort?: EffortLevel;
+  readonly backendEnv?: NodeJS.ProcessEnv | null;
+  readonly metadata?: Record<string, unknown>;
+}
+
+/**
+ * The `options` bag handed to the Agent SDK's `query()`.
+ *
+ * Split out from the call so the shape is assertable without starting a
+ * session — the same reason `buildClaudeArgs` is separate in the claude-cli
+ * transport. Every field but `model`, `systemPrompt` and `permissionMode` is
+ * conditional, and a key present with an undefined value is not the same as
+ * an absent key to the SDK, so the omissions are the part worth testing.
+ */
+export function buildSdkQueryOptions(input: SdkQueryOptionsInput): Record<string, unknown> {
+  const mcpServers = input.mcpServers ?? {};
+  return {
+    model: input.model,
+    systemPrompt: input.systemPrompt,
+    permissionMode: 'bypassPermissions',
+    ...(input.budgetUsd != null && { maxBudgetUsd: input.budgetUsd }),
+    // Role's MCP servers, scoped strictly to fab's set (not the user's
+    // ambient ~/.claude MCP config) — matches claude-cli's --strict-mcp-config.
+    ...(Object.keys(mcpServers).length > 0 && { mcpServers, strictMcpConfig: true }),
+    ...(input.effort && { effort: input.effort }),
+    ...(input.backendEnv && { env: { ...process.env, ...input.backendEnv } }),
+    // Resources hint: the SDK uses cwd for filesystem-bound tools;
+    // workflows.ts pre-creates branches on the cloud-mounted repos
+    // for managed-agents mode. The sdk runtime operates against the
+    // caller's cwd; the user is responsible for cloning the repos
+    // beforehand.
+    ...(input.metadata && { metadata: input.metadata }),
+  };
+}
+
+export class SdkAgentSession implements AgentSession {
   private inputQueue: { resolve: (value: IteratorResult<unknown>) => void }[] = [];
   private pendingInputs: unknown[] = [];
   private closed = false;
@@ -166,26 +207,15 @@ class SdkAgentSession implements AgentSession {
     // 0.3.x types, 2026-06.
     this.sdkQuery = this.sdk.query({
       prompt: inputs,
-      options: {
+      options: buildSdkQueryOptions({
         model: this.model,
         systemPrompt: this.systemPrompt,
-        permissionMode: 'bypassPermissions',
-        ...(this.budgetUsd != null && { maxBudgetUsd: this.budgetUsd }),
-        // Role's MCP servers, scoped strictly to fab's set (not the user's
-        // ambient ~/.claude MCP config) — matches claude-cli's --strict-mcp-config.
-        ...(Object.keys(this.mcpServers).length > 0 && {
-          mcpServers: this.mcpServers,
-          strictMcpConfig: true,
-        }),
-        ...(this.effort && { effort: this.effort }),
-        ...(backendEnv && { env: { ...process.env, ...backendEnv } }),
-        // Resources hint: the SDK uses cwd for filesystem-bound tools;
-        // workflows.ts pre-creates branches on the cloud-mounted repos
-        // for managed-agents mode. The sdk runtime operates against the
-        // caller's cwd; the user is responsible for cloning the repos
-        // beforehand.
-        ...(this.options?.metadata && { metadata: this.options.metadata }),
-      },
+        budgetUsd: this.budgetUsd,
+        mcpServers: this.mcpServers,
+        effort: this.effort,
+        backendEnv,
+        metadata: this.options?.metadata,
+      }),
     });
   }
 
@@ -304,7 +334,7 @@ class SdkAgentSession implements AgentSession {
  * context rather than by reattaching. This type keeps that a stated refusal
  * instead of an empty stream a caller could mistake for an idle session.
  */
-class ResumedSdkAgentSession implements AgentSession {
+export class ResumedSdkAgentSession implements AgentSession {
   constructor(public readonly id: string) {}
 
   get events(): AsyncIterable<AgentEvent> {
