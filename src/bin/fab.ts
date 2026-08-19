@@ -52,6 +52,8 @@ import {
   reviseWorkflow,
   streamWithAdvisor,
   buildIntakeMessage,
+  buildScaffoldMessage,
+  buildStandupMessage,
 } from '../workflows.js';
 import { resolveRuntimeKind } from '../runtimes/index.js';
 import { executeRoleSession } from '../runtimes/role-session.js';
@@ -434,6 +436,18 @@ async function session(args: ParsedArgs): Promise<void> {
   console.log(`Status: ${sess.status}`);
 }
 
+/**
+ * `fab send` — deliberately unfenced.
+ *
+ * Every other path that puts text into a session fences it, because the text
+ * is a brief, a backlog, or a document: content the operator is relaying, not
+ * speaking. Here the operator IS the speaker, addressing the session directly.
+ * Wrapping it would tell the role to treat its own operator's instructions as
+ * data to be examined rather than followed, which is both wrong and corrosive
+ * — an agent trained to distrust its operator has no one left to trust.
+ *
+ * This is a decision, not an omission. Do not "fix" it.
+ */
 async function send(args: ParsedArgs): Promise<void> {
   const sessionId = args.sub;
   const message = args.positional.join(' ');
@@ -1380,7 +1394,7 @@ async function scaffold(args: ParsedArgs): Promise<void> {
   const sess = await createSession(api, entry.agentId, `scaffold: ${description.slice(0, 60)}`);
   console.log(`Session: ${sess.id}\n`);
 
-  await api.sendMessage(sess.id, JSON.stringify(intake, null, 2));
+  await api.sendMessage(sess.id, buildScaffoldMessage(intake));
   const output = await streamWithAdvisor(api, sess.id);
 
   if (webhookUrl) {
@@ -1436,14 +1450,10 @@ async function sprint(args: ParsedArgs): Promise<void> {
               .join('\n')
           : '(empty backlog)';
 
-      const prompt = `Sprint ${config.currentSprint} standup (${config.cadence}).
-
-Current backlog:
-${backlogSummary}
-
-Run a team standup. Query each agent for status. Report blocked items and recommended next actions.`;
-
-      await api.sendMessage(config.sessionId, prompt);
+      await api.sendMessage(
+        config.sessionId,
+        buildStandupMessage(config.currentSprint, config.cadence, backlogSummary),
+      );
       await streamWithAdvisor(api, config.sessionId);
       break;
     }
