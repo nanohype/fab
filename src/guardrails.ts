@@ -30,6 +30,15 @@ export function normalizeDelimiters(text: string): string {
   let working = text;
   for (const tag of RESERVED_TAGS) {
     working = working.replace(new RegExp(`<\\s*/?\\s*${tag}\\s*[^>]*>`, 'gi'), `[stripped:${tag}]`);
+    // An opener with no '>' after it anywhere survives the pass above, because
+    // that pattern requires the closing bracket. Left alone it borrows the next
+    // '>' in the assembled prompt — and inside spotlight's fence the next '>'
+    // belongs to the closing delimiter, so `<thinking` with no bracket
+    // swallows the fence that was supposed to contain it. Anchoring to the end
+    // of the text is what makes this precise: if a '>' appears later in the
+    // untrusted span the tag terminates there and the pass above already
+    // caught it, so this only fires on the genuinely unterminated case.
+    working = working.replace(new RegExp(`<\\s*/?\\s*${tag}\\b[^>]*$`, 'i'), `[stripped:${tag}]`);
   }
   return working;
 }
