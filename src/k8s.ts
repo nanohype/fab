@@ -137,14 +137,19 @@ export class K8sClient {
   }
 
   /**
-   * Stream a pod's container log, following until the container exits. The
-   * caller passes an `AbortSignal` to bound the overall wait — a `follow`
-   * connection has no natural timeout.
+   * Stream a pod's container log, following until the container exits.
+   *
+   * `signal` is required, not optional. A `follow` connection has no natural
+   * timeout — the apiserver holds it open as long as the container lives, and
+   * a pod that hangs holds it open forever. Making the bound part of the
+   * signature means a caller cannot start an unbounded follow by omission;
+   * the only way to get one is to pass a signal that never aborts, which is a
+   * decision rather than an oversight.
    */
   async *followPodLog(
     namespace: string,
     name: string,
-    signal?: AbortSignal,
+    signal: AbortSignal,
   ): AsyncGenerator<string> {
     const path = `/api/v1/namespaces/${namespace}/pods/${name}/log?follow=true&timestamps=false`;
     const res = await fetch(`${this.base}${path}`, { headers: this.headers(), signal });

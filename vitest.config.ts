@@ -26,23 +26,24 @@ export default defineConfig({
       // new untested module dragging the denominator down — without flaking
       // on minor fluctuation. Run via `npm run test:coverage`.
       //
-      // Statements and lines now clear the org floor (branches 60 / functions
-      // 75 / lines 75 / statements 75 in nanohype/standards/testing-rubric.json);
+      // Statements and lines clear the org floor (branches 60 / functions 75 /
+      // lines 75 / statements 75 in nanohype/standards/testing-rubric.json);
       // functions still sits under it. What remains of the gap is
-      // `runtimes/sdk-k8s.ts` and `runtimes/claude-cli.ts` plus the in-cluster
-      // `k8s.ts` client they depend on — each needs a live apiserver or a
-      // subprocess to exercise honestly. They are not excluded, so they count
-      // against these numbers rather than being hidden by them.
+      // `runtimes/sdk-k8s.ts` and `runtimes/claude-cli.ts` — one needs a live
+      // apiserver to dispatch against, the other a `claude` subprocess to
+      // drive. They are not excluded, so they count against these numbers
+      // rather than being hidden by them.
       //
-      // `runtimes/sdk.ts` is no longer part of that gap: its query-options
-      // builder is a pure function and its session takes the SDK module as a
-      // constructor argument, so both are exercised with an injected fake
-      // rather than a mock of the package.
+      // `runtimes/sdk.ts` and `k8s.ts` are no longer part of that gap. The sdk
+      // runtime's query-options builder is a pure function and its session
+      // takes the SDK module as a constructor argument; the k8s client's log
+      // follow is exercised against a stubbed `fetch`. Both go through seams
+      // the production code already has, not mocks of the packages under test.
       thresholds: {
-        lines: 74, // measured 75.25
-        functions: 68, // measured 69.72
-        branches: 71, // measured 72.30
-        statements: 74, // measured 75.01
+        lines: 75, // measured 76.42
+        functions: 70, // measured 70.73
+        branches: 72, // measured 73.23
+        statements: 75, // measured 76.22
 
         // Per-file 100%, above the global floor, on the two files where an
         // uncovered branch is an unproven control rather than a coverage
