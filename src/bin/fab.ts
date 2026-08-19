@@ -51,6 +51,7 @@ import {
   executeWorkflow,
   reviseWorkflow,
   streamWithAdvisor,
+  buildIntakeMessage,
 } from '../workflows.js';
 import { resolveRuntimeKind } from '../runtimes/index.js';
 import { executeRoleSession } from '../runtimes/role-session.js';
@@ -659,10 +660,7 @@ async function workflow(args: ParsedArgs): Promise<void> {
       const api = client();
       console.log(`\x1b[2mRunning intake analysis...\x1b[0m\n`);
       const intakeSess = await createSession(api, intakeEntry.agentId, `intake: ${name}`);
-      await api.sendMessage(
-        intakeSess.id,
-        `Validate and enrich this intake for the "${name}" workflow. Return the validated intake as a structured block downstream phases can parse directly.\n\nINTAKE:\n${prompt}`,
-      );
+      await api.sendMessage(intakeSess.id, buildIntakeMessage(name, prompt));
       const intakeOutput = await streamWithAdvisor(api, intakeSess.id);
       if (intakeOutput.trim()) {
         enrichedPrompt = `INTAKE ANALYSIS (from intake-analyst):\n${intakeOutput}\n\nORIGINAL INTAKE:\n${prompt}`;
