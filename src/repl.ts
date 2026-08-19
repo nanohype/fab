@@ -83,6 +83,12 @@ export async function startRepl(options: ReplOptions): Promise<void> {
     }
 
     // Send message and stream response (with advisor support + tool confirmation)
+    //
+    // Unfenced by design, on the same grounds as `fab send`: what the operator
+    // types at this prompt is the operator addressing the session directly,
+    // not text they are relaying. Fencing it would instruct the role to treat
+    // its own operator as untrusted input. Relayed content — briefs, intake
+    // documents, backlogs — is fenced where it enters, in workflows.ts.
     try {
       await api.sendMessage(sessionId, input);
       process.stdout.write('\n');
