@@ -398,7 +398,10 @@ export function mergeGateVerdicts(verdicts: GateVerdict[]): GateResult {
       feedback:
         `Merge gate ran with no binding verdict — all ${verdicts.length} voter(s) were advisory, ` +
         `so nothing counted toward the decision.` +
-        (advisory.length > 0 ? '\n\nAdvisory:\n' + advisory.map(format).join('\n') : ''),
+        // Unconditional: the zero-verdict case returned above, so an empty
+        // binding set means every verdict is advisory and this list is never
+        // empty here.
+        `\n\nAdvisory:\n${advisory.map(format).join('\n')}`,
     };
   }
 
