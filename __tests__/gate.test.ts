@@ -709,3 +709,64 @@ describe('compareGrades reports what it could not compare', () => {
     expect(drift.drifted).toEqual([]);
   });
 });
+||||||| parent of 93c43b3 (fix(gate): the evidence contract was satisfied by the word "none")
+// ── Evidence must carry evidence ────────────────────────────────────
+//
+// EVIDENCE_CONTRACT requires captured output per command and a
+// {claim,file,line_range,quoted_fragment} tuple per claim. Checking only that
+// the header has a child line makes any single token satisfy it — including
+// the three phrases the contract itself names as auto-REJECT triggers. The
+// required keys come from the contract's own field names rather than a list of
+// placeholder words, so the check cannot be stepped around by inventing a new
+// way to say "none".
+
+describe("evidence blocks must contain the contract's own fields", () => {
+  const body = (t: string, c: string) =>
+    `GATE_VERDICT: APPROVE\nGATE_FEEDBACK: fine\n\nTRANSCRIPTS:\n${t}\n\nCITATIONS:\n${c}\n\nQUALITY_GRADES:\n  testing: A\n`;
+  const realTranscript = '  - command: npm test\n    exit: 0\n    stdout: |\n      ok';
+  const realCitation =
+    '  - claim: it builds\n    file: package.json\n    line_range: 1-1\n    quoted_fragment: |\n      {';
+
+  for (const placeholder of [
+    '  none',
+    '  n/a',
+    '  []',
+    '  -',
+    '  TODO',
+    '  ✓ all green',
+    '  Ran locally.',
+    '  Assumed to pass.',
+    '  same as last time',
+  ]) {
+    it(`rejects ${JSON.stringify(placeholder.trim())} as a transcript`, () => {
+      expect(parseGateVerdict('build-verifier', body(placeholder, realCitation)).verdict).toBe(
+        'REJECT',
+      );
+    });
+  }
+
+  it('rejects a citation block with no file key', () => {
+    expect(parseGateVerdict('build-verifier', body(realTranscript, '  none')).verdict).toBe(
+      'REJECT',
+    );
+  });
+
+  it('accepts genuine evidence at every indentation the roles emit', () => {
+    // Column-0 and tab-indented are as valid as the contract's two-space form;
+    // rejecting them would fail a role for formatting rather than for evidence.
+    for (const t of [
+      realTranscript,
+      '- command: npm test\n  exit: 0',
+      '\t- command: npm test\n\t  exit: 0',
+      '    - command: npm test',
+    ]) {
+      expect(parseGateVerdict('build-verifier', body(t, realCitation)).verdict).toBe('APPROVE');
+    }
+  });
+
+  it('still rejects a REJECT verdict without evidence, unchanged', () => {
+    // REJECT may ship without evidence — failing fast is the point there.
+    const out = 'GATE_VERDICT: REJECT\nGATE_FEEDBACK: the build is broken.\n';
+    expect(parseGateVerdict('build-verifier', out).verdict).toBe('REJECT');
+  });
+});

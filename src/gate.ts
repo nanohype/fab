@@ -64,12 +64,37 @@ const VERDICT_RE = /^\s*GATE_VERDICT:\s*(APPROVE|REJECT|REQUEST_CHANGES)\s*$/im;
 const FEEDBACK_RE =
   /^\s*GATE_FEEDBACK:\s*([\s\S]+?)(?=\n\s*(?:GATE_|TRANSCRIPTS:|CITATIONS:|QUALITY_GRADES:)|\n\s*$|$)/im;
 
-// Presence of the header plus at least one indented or dash-prefixed
-// child line. An empty `TRANSCRIPTS:` header with nothing under it does
-// not count as evidence.
+// The field each block must carry, taken from EVIDENCE_CONTRACT's own tuple
+// definitions rather than from a list of ways to write "nothing". A blocklist
+// of placeholder words is narrower than the class by construction — the next
+// spelling walks through it — while the required key is the thing the
+// downstream parser already needs: parseCitations keys entries on `file:`, and
+// a transcript with no `command:` names no command that was run.
+const EVIDENCE_KEY = {
+  TRANSCRIPTS: /^\s*(?:-\s*)?command\s*:/im,
+  CITATIONS: /^\s*(?:-\s*)?file\s*:/im,
+} as const;
+
+/**
+ * True when the block is present AND carries at least one of the fields the
+ * contract defines for it.
+ *
+ * Header-plus-any-child-line was the previous test, and it accepted every
+ * placeholder a role could type — `none`, `n/a`, `[]`, `-`, and the three
+ * phrases EVIDENCE_CONTRACT itself names as auto-REJECT triggers. Indentation
+ * is deliberately not constrained beyond locating the block: a role that
+ * writes its evidence at column zero or with tabs has still produced evidence,
+ * and failing it would be failing formatting rather than substance.
+ */
 function hasEvidenceBlock(output: string, header: 'TRANSCRIPTS' | 'CITATIONS'): boolean {
-  const re = new RegExp(`^\\s*${header}:\\s*\\n(?:\\s{2,}|\\s*-\\s)`, 'im');
-  return re.test(output);
+  const headerRe = new RegExp(`^[ \\t]*${header}:[ \\t]*$`, 'im');
+  const m = output.match(headerRe);
+  if (!m || m.index === undefined) return false;
+  const rest = output.slice(m.index + m[0].length);
+  // The block runs to the next top-level block header, or to the end.
+  const next = rest.match(/^[ \t]*(?:GATE_[A-Z]+|TRANSCRIPTS|CITATIONS|QUALITY_GRADES):/m);
+  const block = next && next.index !== undefined ? rest.slice(0, next.index) : rest;
+  return EVIDENCE_KEY[header].test(block);
 }
 
 /**
