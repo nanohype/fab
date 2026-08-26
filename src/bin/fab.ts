@@ -713,12 +713,21 @@ async function workflow(args: ParsedArgs): Promise<void> {
         });
       };
 
-  await executeWorkflow(client(), wf, enrichedPrompt, {
+  const outcome = await executeWorkflow(client(), wf, enrichedPrompt, {
     onGate,
     noGates,
     sequential,
   });
   if (sessionId) console.log(`\nSession: ${sessionId}`);
+  // A rejected gate, an exhausted revision loop, or an unresolvable target repo
+  // is a failed run, and the caller is usually not a human reading the log:
+  // `deploy/job.yaml` runs this as a Job with `backoffLimit: 0`, where a pod
+  // that exits 0 is a Job that Completed. Exit non-zero so the orchestrator sees
+  // what the transcript says.
+  if (!outcome.ok) {
+    console.error(outcome.reason ?? `Workflow ${wf.name} did not complete.`);
+    process.exitCode = 1;
+  }
 }
 
 async function workflows(): Promise<void> {

@@ -187,7 +187,7 @@ describe('executeWorkflow resilience', () => {
           return { decision: 'approve' };
         },
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ ok: true });
 
     // Both roles were attempted; the run continued past the one that failed.
     expect(calls).toContain('pr-reviewer');
@@ -216,7 +216,7 @@ describe('executeWorkflow resilience', () => {
           return { decision: 'approve' };
         },
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ ok: true });
 
     expect(gateOutput).toContain('ROLE SESSION FAILED: product');
   });
@@ -261,7 +261,10 @@ describe('executeWorkflow resilience', () => {
         runRole,
         onGate: async () => ({ decision: 'reject' }),
       }),
-    ).resolves.toBeUndefined();
+      // Stops without throwing — and says it stopped. The subject of this test
+      // is a rejection, so `ok` here is false; the value that fires it is the
+      // opposite of the two clean runs above.
+    ).resolves.toEqual({ ok: false, reason: 'test-reject rejected at the product step gate.' });
   });
 });
 
@@ -827,5 +830,65 @@ describe('every session-bound message that carries relayed text is fenced', () =
     const b = buildScaffoldMessage({ goal: 'x' }).match(/untrusted-[0-9a-f]{12}/)![0];
     const c = buildStandupMessage(1, 'weekly', 'x').match(/untrusted-[0-9a-f]{12}/)![0];
     expect(new Set([a, b, c]).size).toBe(3);
+  });
+});
+
+// ── A failed workflow must reach the process boundary ───────────────
+//
+// `executeWorkflow` returned void, so every way it stops early — a rejected
+// merge gate, a rejected step gate, an exhausted revision loop, an unresolvable
+// target repo — was indistinguishable from success to anything outside the
+// process. `deploy/job.yaml` runs a workflow as a Kubernetes Job with
+// `backoffLimit: 0`, and a pod that exits 0 is a Job that Completed.
+
+describe('executeWorkflow reports its outcome', () => {
+  const api = {} as AnthropicAgents;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it('reports ok on a clean run', async () => {
+    const workflow: TestWorkflow = {
+      name: 'clean',
+      description: 'no gate profile, one step',
+      steps: [{ role: 'pr-reviewer', instruction: 'review' }],
+    };
+    const outcome = await executeWorkflow(api, workflow, 'brief', {
+      runRole: async () => 'done',
+    });
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('reports failure when a step gate rejects', async () => {
+    const workflow: TestWorkflow = {
+      name: 'step-reject',
+      description: 'gate rejects the only step',
+      steps: [{ role: 'pr-reviewer', instruction: 'review' }],
+    };
+    const outcome = await executeWorkflow(api, workflow, 'brief', {
+      runRole: async () => 'done',
+      onGate: async () => ({ decision: 'reject', feedback: 'no' }),
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.reason).toMatch(/reject/i);
+  });
+
+  it('reports failure when a code workflow cannot resolve its target repo', async () => {
+    // The repo fail-fast halt is a stop, and a stop is not a success.
+    const workflow: TestWorkflow = {
+      name: 'needs-repo',
+      description: 'code profile with no intake JSON',
+      gateProfile: 'code',
+      steps: [{ role: 'pr-reviewer', instruction: 'review' }],
+    };
+    const outcome = await executeWorkflow(api, workflow, 'not json', {
+      runRole: async () => 'done',
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.reason).toMatch(/branch|repo/i);
   });
 });

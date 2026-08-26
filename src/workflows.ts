@@ -907,12 +907,28 @@ export function renderWorkflowContext(
   return parts.join('\n\n');
 }
 
+/**
+ * What a workflow run amounted to, for callers that have to act on it.
+ *
+ * The run reports its own outcome because every way it stops early — a rejected
+ * merge gate, a rejected step gate, an exhausted revision loop, a target repo
+ * it could not resolve — used to be indistinguishable from success to anything
+ * outside the process. The CLI turns `ok: false` into a non-zero exit, which is
+ * what `deploy/job.yaml` needs: it runs a workflow as a Job with
+ * `backoffLimit: 0`, and a pod that exits 0 is a Job that Completed.
+ */
+export interface WorkflowOutcome {
+  ok: boolean;
+  /** Why the run stopped. Absent on a clean run. */
+  reason?: string;
+}
+
 export async function executeWorkflow(
   api: AnthropicAgents,
   workflow: Workflow,
   userPrompt: string,
   options?: WorkflowOptions,
-): Promise<void> {
+): Promise<WorkflowOutcome> {
   console.log(`${BOLD}Workflow: ${workflow.name}${RESET}`);
   console.log(`${DIM}${workflow.description}${RESET}\n`);
 
@@ -980,7 +996,10 @@ export async function executeWorkflow(
       console.log(
         `${DIM}If no primary repo is configured: fab repo add <github-url> --token <github-pat>${RESET}`,
       );
-      return;
+      return {
+        ok: false,
+        reason: `${workflow.name} halted: no pre-created feature branch (missing intake JSON, missing context.product, no primary repo, or a GitHub API failure).`,
+      };
     }
     head = `${branchInfo.context}\n\n${head}`;
     citationSource = branchInfo.source;
@@ -1067,7 +1086,7 @@ ${step.instruction}`,
       if (gate.decision === 'approve') break;
       if (gate.decision === 'reject') {
         console.log(`${RED}Workflow rejected.${RESET}`);
-        return;
+        return { ok: false, reason: `${workflow.name} rejected at the ${roleNames} step gate.` };
       }
       // revise — loop continues with feedback in context
       console.log(`${YELLOW}Revising ${roleNames}...${RESET}\n`);
@@ -1088,14 +1107,17 @@ ${step.instruction}`,
     if (gateResult.decision === 'reject') {
       console.log(`${RED}${BOLD}Merge gate REJECTED: ${workflow.name}${RESET}`);
       if (gateResult.feedback) console.log(`${DIM}${gateResult.feedback}${RESET}`);
-      return;
+      return { ok: false, reason: `${workflow.name} rejected at the merge gate.` };
     }
     if (gateResult.decision === 'revise') {
       console.log(
         `${YELLOW}${BOLD}Merge gate requested revisions after 3 attempts — stopping.${RESET}`,
       );
       if (gateResult.feedback) console.log(`${DIM}${gateResult.feedback}${RESET}`);
-      return;
+      return {
+        ok: false,
+        reason: `${workflow.name} still had unresolved merge-gate revisions after 3 attempts.`,
+      };
     }
     console.log(`${GREEN}${BOLD}Merge gate APPROVED${RESET}`);
 
@@ -1134,6 +1156,7 @@ Return the PR URL prominently in your response.`,
   }
 
   console.log(`${GREEN}${BOLD}Workflow complete: ${workflow.name}${RESET}`);
+  return { ok: true };
 }
 
 /**
