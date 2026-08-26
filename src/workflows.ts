@@ -1452,18 +1452,40 @@ Apply the 10-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY
 
   const internalGrades = aggregateGrades(internalVerdicts);
 
-  const drift = compareGrades(internalGrades, externalGrades);
-  if (drift.drifted.length === 0) {
-    console.log(
-      `${GREEN}External calibration aligned (max drift ${drift.maxDrift} letter).${RESET}\n`,
-    );
-    return { block: null, internal: internalGrades, external: externalGrades, drift };
-  }
-
   const fmt = (g: Record<string, Grade>) =>
     Object.entries(g)
       .map(([k, v]) => `  ${k}: ${v}`)
       .join('\n');
+
+  const drift = compareGrades(internalGrades, externalGrades);
+
+  // A dimension the cold reviewer scored and the internal gate did not is an
+  // absence, not an agreement. Blocking on it is the same rule the shared
+  // merge-gate action applies to a skipped job: something that did not run has
+  // not passed. Without this, a role that omits its QUALITY_GRADES block — or
+  // marks its own dimension N/A — silently removes exactly the dimension it
+  // owns from the only check that exists to catch it, and the pipeline prints
+  // "aligned".
+  if (drift.uncompared.length > 0) {
+    return {
+      block: {
+        decision: 'reject',
+        feedback: `External-reviewer calibration could not compare ${drift.uncompared.length} dimension(s) the cold review graded: ${drift.uncompared.join(', ')}. The internal gate produced no grade for them (absent block, or N/A against a scored reference), so they were not examined rather than found to agree. Re-invoke the owning role(s) with a QUALITY_GRADES block covering their dimensions.\n\nInternal grades:\n${fmt(internalGrades)}\n\nExternal grades:\n${fmt(externalGrades)}`,
+      },
+      internal: internalGrades,
+      external: externalGrades,
+      drift,
+    };
+  }
+
+  if (drift.drifted.length === 0) {
+    // Print the count, not the verdict: "aligned" over zero comparisons and
+    // "aligned" over ten are otherwise the same line.
+    console.log(
+      `${GREEN}External calibration aligned across ${drift.compared.length} dimension(s) (max drift ${drift.maxDrift} letter).${RESET}\n`,
+    );
+    return { block: null, internal: internalGrades, external: externalGrades, drift };
+  }
 
   return {
     block: {

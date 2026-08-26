@@ -382,14 +382,28 @@ export function mergeGateVerdicts(verdicts: GateVerdict[]): GateResult {
     };
   }
 
+  const format = (v: GateVerdict) =>
+    `[${v.role}${v.advisory ? ' (advisory)' : ''}] ${v.verdict}: ${v.feedback}`;
+
   const binding = verdicts.filter((v) => !v.advisory);
   const advisory = verdicts.filter((v) => v.advisory);
 
+  // Every voter advisory means nothing counted. The `all APPROVE` arm below is
+  // vacuously true over an empty set, so without this a ballot of four REJECTs
+  // downgraded to advisory ships the PR. A gate with no binding voter has not
+  // examined the change; it has not passed it.
+  if (binding.length === 0) {
+    return {
+      decision: 'reject',
+      feedback:
+        `Merge gate ran with no binding verdict — all ${verdicts.length} voter(s) were advisory, ` +
+        `so nothing counted toward the decision.` +
+        (advisory.length > 0 ? '\n\nAdvisory:\n' + advisory.map(format).join('\n') : ''),
+    };
+  }
+
   const rejects = binding.filter((v) => v.verdict === 'REJECT');
   const changes = binding.filter((v) => v.verdict === 'REQUEST_CHANGES');
-
-  const format = (v: GateVerdict) =>
-    `[${v.role}${v.advisory ? ' (advisory)' : ''}] ${v.verdict}: ${v.feedback}`;
   const advisoryNotes =
     advisory.length > 0 ? '\n\nAdvisory:\n' + advisory.map(format).join('\n') : '';
 
@@ -531,6 +545,12 @@ export function parseQualityGrades(output: string): Record<string, Grade> {
 export interface GradeDrift {
   drifted: string[]; // dimensions where |internal - external| > 1 letter
   maxDrift: number; // largest letter-level gap observed
+  compared: string[]; // dimensions actually scored on both sides
+  // Dimensions the cold reviewer graded and the internal gate did not — absent
+  // block, or a one-sided N/A. Reported rather than skipped: the count of what
+  // was examined is derived here, from the grades themselves, so a caller
+  // cannot mistake an unexamined dimension for an agreeing one.
+  uncompared: string[];
 }
 
 /**
@@ -567,15 +587,27 @@ export function compareGrades(
 ): GradeDrift {
   const dims = new Set([...Object.keys(internal), ...Object.keys(external)]);
   const drifted: string[] = [];
+  const compared: string[] = [];
+  const uncompared: string[] = [];
   let maxDrift = 0;
   for (const d of dims) {
     const i = internal[d];
     const e = external[d];
-    if (!i || !e) continue;
-    if (i === 'N/A' || e === 'N/A') continue;
+    // The external reviewer declining to score a dimension leaves nothing to
+    // calibrate against, and it is the reference rather than the graded party —
+    // not an exemption the gate took for itself.
+    if (!e || e === 'N/A') continue;
+    // It did score it. An internal grade that is missing, or N/A against a
+    // scored reference, is the graded side excusing itself from the one check
+    // that exists to catch it. Record it; do not silently drop it.
+    if (!i || i === 'N/A') {
+      uncompared.push(d);
+      continue;
+    }
+    compared.push(d);
     const diff = Math.abs(letterLevel(i) - letterLevel(e));
     if (diff > maxDrift) maxDrift = diff;
     if (diff > 1) drifted.push(d);
   }
-  return { drifted, maxDrift };
+  return { drifted, maxDrift, compared, uncompared };
 }

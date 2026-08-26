@@ -640,3 +640,72 @@ describe('parseGateVerdict with citation verification', () => {
     expect(parseGateVerdict('qa-security', rej, { readFile: absent }).verdict).toBe('REJECT');
   });
 });
+
+// ── A verdict must rest on an examination ───────────────────────────
+//
+// The shared merge-gate action refuses a skipped job by construction — "a job
+// that did not run has not passed". These hold the rubric to the same line:
+// a ballot with no binding voter, and a dimension the cold reviewer graded and
+// the internal gate did not, are both absences. Neither is agreement.
+
+describe('a ballot with no binding voter', () => {
+  it('rejects rather than approving vacuously', () => {
+    // Every voter advisory means nothing counted. `all APPROVE` is vacuously
+    // true over an empty set, which would ship a PR that four roles rejected.
+    const verdicts: GateVerdict[] = [
+      { role: 'pr-reviewer', verdict: 'REJECT', feedback: 'broken', advisory: true },
+      { role: 'qa-security', verdict: 'REJECT', feedback: 'secrets', advisory: true },
+      { role: 'build-verifier', verdict: 'REJECT', feedback: 'tests fail', advisory: true },
+      { role: 'artifact-auditor', verdict: 'REJECT', feedback: 'docs wrong', advisory: true },
+    ];
+    const result = mergeGateVerdicts(verdicts);
+    expect(result.decision).toBe('reject');
+    expect(result.feedback).toContain('no binding');
+  });
+});
+
+describe('compareGrades reports what it could not compare', () => {
+  const ten = (g: Grade): Record<string, Grade> => ({
+    architecture: g,
+    patterns: g,
+    systems: g,
+    testing: g,
+    frontend: g,
+    security: g,
+    code_quality: g,
+    documentation: g,
+    consistency: g,
+    ai_systems: g,
+  });
+
+  it('names a dimension the external reviewer graded and the internal gate did not', () => {
+    // build-verifier is the sole owner of `testing`; if its block is missing,
+    // an external F on testing must not read as agreement.
+    const internal = ten('A');
+    delete internal.testing;
+    const drift = compareGrades(internal, { ...ten('A'), testing: 'F' });
+    expect(drift.uncompared).toEqual(['testing']);
+    expect(drift.compared).not.toContain('testing');
+  });
+
+  it('treats a one-sided N/A as an absence, not an exemption', () => {
+    // N/A is the rubric's only exemption mechanism and the graded side declares
+    // it. A dimension the cold reviewer scored is a dimension the internal gate
+    // does not get to excuse itself from.
+    const drift = compareGrades({ ...ten('A'), security: 'N/A' }, { ...ten('A'), security: 'F' });
+    expect(drift.uncompared).toEqual(['security']);
+  });
+
+  it('does not flag a dimension both sides agree is inapplicable', () => {
+    const drift = compareGrades({ ...ten('A'), frontend: 'N/A' }, { ...ten('A'), frontend: 'N/A' });
+    expect(drift.uncompared).toEqual([]);
+    expect(drift.compared).toHaveLength(9);
+  });
+
+  it('compares every dimension when both sides grade all ten', () => {
+    const drift = compareGrades(ten('A'), ten('A'));
+    expect(drift.compared).toHaveLength(10);
+    expect(drift.uncompared).toEqual([]);
+    expect(drift.drifted).toEqual([]);
+  });
+});

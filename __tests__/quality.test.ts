@@ -57,12 +57,22 @@ describe('quality', () => {
     await appendQualityRun(
       run({
         external: { architecture: 'B', security: 'A-' },
-        drift: { drifted: ['architecture'], maxDrift: 1 },
+        drift: {
+          drifted: ['architecture'],
+          maxDrift: 1,
+          compared: ['architecture', 'security'],
+          uncompared: [],
+        },
       }),
     );
     const [r] = await loadQualityRuns();
     expect(r.external).toEqual({ architecture: 'B', security: 'A-' });
-    expect(r.drift).toEqual({ drifted: ['architecture'], maxDrift: 1 });
+    expect(r.drift).toEqual({
+      drifted: ['architecture'],
+      maxDrift: 1,
+      compared: ['architecture', 'security'],
+      uncompared: [],
+    });
   });
 
   describe('gradeToGpa', () => {
@@ -101,7 +111,7 @@ describe('quality', () => {
         run({
           decision: 'approve',
           external: { architecture: 'B' },
-          drift: { drifted: [], maxDrift: 0 },
+          drift: { drifted: [], maxDrift: 0, compared: ['architecture'], uncompared: [] },
         }),
         run({ decision: 'reject' }),
       ]);
