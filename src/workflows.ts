@@ -26,7 +26,7 @@ import { appendQualityRun } from './quality.js';
 import { formatPreHookTranscripts, type PreHookResult, runFourPhasePreHook } from './prehook.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
-import { untrustedBlock } from './guardrails.js';
+import { unsafeSourceDirs, untrustedBlock } from './guardrails.js';
 
 const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = [
   'typescript',
@@ -984,6 +984,21 @@ export async function executeWorkflow(
     const intakeDirs = Array.isArray(rawDirs)
       ? rawDirs.filter((d): d is string => typeof d === 'string')
       : [];
+    // Every entry lands in the SYSTEM prompt of all four code-gate roles. An
+    // entry that is not a repo-relative directory is a malformed brief, and
+    // dropping it quietly would leave the caller believing a scope was applied
+    // that never was — so the run stops and names what was wrong.
+    const unsafe = unsafeSourceDirs(intakeDirs);
+    if (unsafe.length > 0) {
+      console.log(
+        `${RED}${BOLD}Halted: ${unsafe.length} source_dirs entr(y/ies) are not repo-relative directories.${RESET}`,
+      );
+      for (const d of unsafe) console.log(`${DIM}  rejected: ${JSON.stringify(d)}${RESET}`);
+      return {
+        ok: false,
+        reason: `${workflow.name} halted: source_dirs must be one-line, repo-relative directory paths; ${unsafe.length} entr(y/ies) were not.`,
+      };
+    }
     await setSourceDirs(intakeDirs);
     if (intakeDirs.length) console.log(`${DIM}Source dirs: ${intakeDirs.join(', ')}${RESET}`);
 
