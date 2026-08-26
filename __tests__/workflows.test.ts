@@ -25,6 +25,12 @@ vi.mock('../src/quality.js', async (importOriginal) => ({
 // signature so test workflows are contextually typed (roles checked as TeamRole).
 type TestWorkflow = Parameters<typeof executeWorkflow>[1];
 
+const noPreHook = async () => ({
+  status: 'unavailable' as const,
+  transcripts: [],
+  reason: 'no workspace in test',
+});
+
 describe('workflows', () => {
   it('listWorkflows returns the built-in catalog', () => {
     const wfs = listWorkflows();
@@ -285,7 +291,15 @@ describe('runMergeGate resilience', () => {
       throw new Error('gate role offline');
     };
 
-    const result = await runMergeGate({} as AgentRuntime, 'wf', 'docs', 'context', null, runRole);
+    const result = await runMergeGate(
+      {} as AgentRuntime,
+      'wf',
+      'docs',
+      'context',
+      null,
+      runRole,
+      noPreHook,
+    );
 
     // A role that can't run yields no verdict, which can never merge to approve.
     expect(result.decision).not.toBe('approve');
@@ -358,7 +372,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('approve');
     expect(calls).toEqual(['artifact-auditor', 'qa-security']);
     expect(calls).not.toContain('external-reviewer');
@@ -372,7 +386,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('approve');
     expect(calls.slice(0, 4)).toEqual([
       'pr-reviewer',
@@ -393,7 +407,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('A'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('reject');
     expect(result.feedback).toContain('code_quality');
     expect(result.feedback).toContain('drift');
@@ -405,7 +419,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('approve');
   });
 
@@ -415,7 +429,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('approve');
   });
 
@@ -425,7 +439,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('reject');
   });
 
@@ -440,7 +454,15 @@ describe('runMergeGate behavior', () => {
       return verdictWith('REQUEST_CHANGES', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'initial ctx', null, runRole);
+    const result = await runMergeGate(
+      runtime,
+      'wf',
+      'code',
+      'initial ctx',
+      null,
+      runRole,
+      noPreHook,
+    );
     expect(result.decision).toBe('revise');
     expect(attempts).toBe(3);
     expect(contexts[0]).not.toContain('MERGE GATE REVISION REQUESTED');
@@ -456,7 +478,7 @@ describe('runMergeGate behavior', () => {
       return verdictWith('APPROVE', TEN('B'));
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
     expect(result.decision).toBe('reject');
     expect(calls).toBe(4); // one pass over the code gate roles, no revision loop
   });
@@ -890,5 +912,73 @@ describe('executeWorkflow reports its outcome', () => {
     });
     expect(outcome.ok).toBe(false);
     expect(outcome.reason).toMatch(/branch|repo/i);
+  });
+});
+
+// ── The mechanical pre-hook runs before any role ────────────────────
+//
+// MERGE_GATE_CONTRACT's first requirement is a check that observes rather than
+// asks. Its absence is the reason every `testing` grade the factory has issued
+// rests on the graded run's own account of its build.
+
+describe('runMergeGate four-phase pre-hook', () => {
+  const runtime = {} as AgentRuntime;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it('rejects on a failing phase without invoking a single gate role', async () => {
+    const roles: string[] = [];
+    const runRole: RoleRunner = async (_rt, role) => {
+      roles.push(role);
+      return 'GATE_VERDICT: APPROVE\nGATE_FEEDBACK: fine\n';
+    };
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, async () => ({
+      status: 'failed',
+      transcripts: [
+        { phase: 'build', command: 'npm run build', exit: 1, stdout: '', stderr: 'tsc: error' },
+      ],
+      reason: 'build failed: `npm run build` exited 1',
+    }));
+    expect(result.decision).toBe('reject');
+    expect(result.feedback).toContain('build failed');
+    // The point of a pre-hook is that it precedes the LLM vote.
+    expect(roles).toEqual([]);
+  });
+
+  it('hands the observed transcripts to the gate roles when the phases pass', async () => {
+    let seen = '';
+    const runRole: RoleRunner = async (_rt, _role, message) => {
+      seen = message;
+      return 'GATE_VERDICT: APPROVE\nGATE_FEEDBACK: ok\n\nTRANSCRIPTS:\n  - command: npm test\n    exit: 0\n\nCITATIONS:\n  - claim: c\n    file: package.json\n    line_range: 1-1\n\nQUALITY_GRADES:\n  testing: A\n';
+    };
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole, async () => ({
+      status: 'ok',
+      transcripts: [
+        { phase: 'test', command: 'npm test', exit: 0, stdout: '552 passing', stderr: '' },
+      ],
+    }));
+    expect(seen).toContain('552 passing');
+    expect(seen).toMatch(/observed|pre-hook/i);
+  });
+
+  it('tells the roles the check did not run when it is unavailable', async () => {
+    // Unavailable must not read as verified. This is the whole defect.
+    let seen = '';
+    const runRole: RoleRunner = async (_rt, _role, message) => {
+      seen = message;
+      return 'GATE_VERDICT: APPROVE\nGATE_FEEDBACK: ok\n\nTRANSCRIPTS:\n  - command: npm test\n    exit: 0\n\nCITATIONS:\n  - claim: c\n    file: package.json\n    line_range: 1-1\n\nQUALITY_GRADES:\n  testing: A\n';
+    };
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole, async () => ({
+      status: 'unavailable',
+      transcripts: [],
+      reason: 'no package.json in /w',
+    }));
+    expect(seen).toMatch(/did not run|not verified|unverified/i);
+    expect(seen).toContain('no package.json in /w');
   });
 });

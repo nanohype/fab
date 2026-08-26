@@ -8,6 +8,7 @@ import {
   getAgentByRole,
   getBudgetLimit,
   getPrimaryRepo,
+  getProjectLanguage,
   setProjectLanguage,
   setSourceDirs,
 } from './state.js';
@@ -22,6 +23,7 @@ import {
 } from './gate.js';
 import type { GateVerdict, Grade, GradeDrift, FileReader } from './gate.js';
 import { appendQualityRun } from './quality.js';
+import { formatPreHookTranscripts, type PreHookResult, runFourPhasePreHook } from './prehook.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
 import { untrustedBlock } from './guardrails.js';
@@ -1314,6 +1316,22 @@ async function buildCitationReader(
  * each verdict's CITATIONS fragments are verified against the branch via the
  * GitHub Contents API — fabricated fragments downgrade the verdict to REJECT.
  */
+/**
+ * Resolve and run the four-phase pre-hook against the local workspace.
+ *
+ * `FAB_WORKSPACE` names the checkout when one exists; otherwise the process
+ * working directory is used, which is the tree the sdk and claude-cli
+ * transports already operate in. Under managed-agents the work happens in a
+ * cloud sandbox and there is nothing here to run, which surfaces as
+ * `unavailable` — reported to the roles and to the PR as an unverified build,
+ * never as a passing one.
+ */
+async function resolvePreHook(): Promise<PreHookResult> {
+  const cwd = process.env.FAB_WORKSPACE ?? process.cwd();
+  const language = await getProjectLanguage();
+  return runFourPhasePreHook({ cwd, language });
+}
+
 export async function runMergeGate(
   runtime: AgentRuntime,
   workflowName: string,
@@ -1321,9 +1339,39 @@ export async function runMergeGate(
   initialContext: string,
   citationSource?: CitationSource | null,
   runRole: RoleRunner = runRoleSession,
+  preHook: () => Promise<PreHookResult> = resolvePreHook,
 ): Promise<GateResult> {
   const gateRoles = profile === 'code' ? CODE_GATE_ROLES : DOCS_GATE_ROLES;
-  let context = initialContext;
+
+  // MERGE_GATE_CONTRACT requirement 1: the mechanical four-phase check runs
+  // BEFORE any LLM gate role is invoked, and a non-zero exit rejects outright.
+  // It is the only step in the gate that observes rather than asks a role to
+  // report, so its transcripts — not a role's account of them — are what the
+  // rest of the gate reads.
+  const pre = await preHook();
+  if (pre.status === 'failed') {
+    console.log(`${RED}${BOLD}Four-phase pre-hook FAILED: ${pre.reason}${RESET}`);
+    return {
+      decision: 'reject',
+      feedback: `Four-phase pre-hook rejected ${workflowName} before the gate roles ran — ${pre.reason}\n\n${formatPreHookTranscripts(pre)}`,
+    };
+  }
+
+  let preamble: string;
+  if (pre.status === 'ok') {
+    console.log(
+      `${GREEN}Four-phase pre-hook passed (${pre.transcripts.length} phases observed).${RESET}\n`,
+    );
+    preamble = `FOUR-PHASE PRE-HOOK: passed. The transcripts below were captured by the pipeline running the commands itself, not reported by a role. Treat them as observed.\n\n${formatPreHookTranscripts(pre)}`;
+  } else {
+    // Not a pass. Saying so here is the point: a gate role that cannot see this
+    // has no way to tell a verified build from an unrun one, and neither does
+    // anyone reading the PR.
+    console.log(`${YELLOW}Four-phase pre-hook did not run: ${pre.reason}${RESET}\n`);
+    preamble = `FOUR-PHASE PRE-HOOK: DID NOT RUN — ${pre.reason}. The build is UNVERIFIED by the pipeline. Any build, lint, test or docs claim in this review rests on a role's own account of commands nobody observed; weigh it accordingly and do not record it as a mechanical verification.`;
+  }
+
+  let context = `${preamble}\n\n${initialContext}`;
   let lastResult: GateResult = { decision: 'reject', feedback: 'Gate did not run.' };
   let lastInternal: Record<string, Grade> = {};
 

@@ -580,7 +580,7 @@ export const MERGE_GATE_CONTRACT = `## Merge gate
 
 Every factory PR is blocked until:
 
-1. **Automated four-phase pre-hook** runs install → build → lint → test → docs from a clean checkout of the feature branch via \`LANGUAGE_TOOLCHAIN[constraints.language]\`. Any non-zero exit auto-REJECTs the workflow BEFORE any LLM gate role is invoked. Transcripts are attached to the PR. (This alone would have caught Chorus — \`npm run build\` broke from day one.)
+1. **Automated four-phase pre-hook** runs install → build → lint → test → docs against the workspace via \`LANGUAGE_TOOLCHAIN[constraints.language]\`, stopping at the first non-zero exit. It runs BEFORE any LLM gate role is invoked and a failure REJECTs the workflow outright. Its transcripts are captured by the pipeline running the commands itself, so they are the one part of a verdict no role authored. Where no workspace is available to run against — the managed-agents transport works in a cloud sandbox, not on fab's disk — the pre-hook reports that it DID NOT RUN, and that notice goes to the gate roles and into the record. An unrun check is not a passed one, and nothing downstream may read it as a mechanical verification.
 2. **Four gate roles sign off in parallel** (two for docs-only workflows):
    - \`pr-reviewer\` — architecture, patterns, code craft, API design, performance; production-path trace
    - \`qa-security\` — threat model, dependency supply chain, secret handling, identity resolution, systems-thinking grade
