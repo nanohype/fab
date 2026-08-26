@@ -709,7 +709,7 @@ describe('compareGrades reports what it could not compare', () => {
     expect(drift.drifted).toEqual([]);
   });
 });
-||||||| parent of 93c43b3 (fix(gate): the evidence contract was satisfied by the word "none")
+
 // ── Evidence must carry evidence ────────────────────────────────────
 //
 // EVIDENCE_CONTRACT requires captured output per command and a
@@ -720,7 +720,7 @@ describe('compareGrades reports what it could not compare', () => {
 // placeholder words, so the check cannot be stepped around by inventing a new
 // way to say "none".
 
-describe("evidence blocks must contain the contract's own fields", () => {
+describe('evidence blocks must contain the required fields', () => {
   const body = (t: string, c: string) =>
     `GATE_VERDICT: APPROVE\nGATE_FEEDBACK: fine\n\nTRANSCRIPTS:\n${t}\n\nCITATIONS:\n${c}\n\nQUALITY_GRADES:\n  testing: A\n`;
   const realTranscript = '  - command: npm test\n    exit: 0\n    stdout: |\n      ok';
@@ -733,7 +733,7 @@ describe("evidence blocks must contain the contract's own fields", () => {
     '  []',
     '  -',
     '  TODO',
-    '  ✓ all green',
+    '  all green',
     '  Ran locally.',
     '  Assumed to pass.',
     '  same as last time',
