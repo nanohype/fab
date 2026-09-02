@@ -89,9 +89,10 @@ class ManagedAgentSession implements AgentSession {
   }
 
   async sendInput(input: UserEvent): Promise<void> {
-    // Map the transport-agnostic UserEvent shape to the existing api.ts
-    // helpers where they exist, fall through to the generic events endpoint
-    // for any input shape the helpers don't cover.
+    // Every UserEvent shape this transport carries has its own api.ts helper.
+    // A shape with none throws rather than being dropped: there is no generic
+    // events endpoint behind this, so silently accepting one would report a
+    // delivery that did not happen.
     switch (input.type) {
       case 'user.message':
         await this.api.sendMessage(this.id, textOf(input.content));

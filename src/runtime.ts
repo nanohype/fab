@@ -55,20 +55,44 @@ export interface AgentSession {
 }
 
 /**
- * Options for starting a role session. The transport may treat some fields
- * differently — e.g., `resources` (workspace repos) is meaningful for
- * Managed Agents but maps to `cwd` + `addDir` for the sdk runtime.
+ * Options for starting a role session.
+ *
+ * A field a transport does not honour is ignored in silence, so which
+ * transports read which field is part of the contract rather than a detail:
+ * a caller who attaches repos to a transport that never reads them gets a
+ * session that looks configured and is not. {@link RUN_ROLE_OPTION_SUPPORT} is
+ * that answer, and it is data rather than prose so a test can hold it to what
+ * the transports do.
  */
 export interface RunRoleOptions {
-  /** Human-readable session title — populated into the title field where the transport supports it. */
+  /** Human-readable session title, where the transport has one. */
   title?: string;
-  /** Repo resources to attach (for transports that support workspace mounts). */
+  /** Repo resources to attach, where the transport mounts a workspace. */
   resources?: GitRepoResource[];
-  /** Vault ids for MCP auth (Managed Agents) — for the sdk runtime, MCP auth lives in `mcpServers` config. */
+  /** Vault ids for MCP auth. Elsewhere MCP auth travels in the server config. */
   vaultIds?: string[];
-  /** Per-session metadata; passed through to the transport for observability. */
+  /** Per-session metadata, for observability. */
   metadata?: Record<string, string>;
 }
+
+/** The transports, named as `FAB_RUNTIME` accepts them. */
+export type RuntimeName = 'managed-agents' | 'sdk' | 'sdk-k8s' | 'claude-cli';
+
+/**
+ * Which transports read each {@link RunRoleOptions} field.
+ *
+ * The gaps are not oversights. The sdk transport runs the agent loop against
+ * the caller's own working directory and expects the repositories to be there
+ * already, so it has nothing to mount `resources` into; its MCP auth is built
+ * into the server config rather than fetched from a vault. The k8s and
+ * subprocess transports inherit the same filesystem stance.
+ */
+export const RUN_ROLE_OPTION_SUPPORT: Record<keyof RunRoleOptions, readonly RuntimeName[]> = {
+  title: ['managed-agents', 'claude-cli'],
+  resources: ['managed-agents'],
+  vaultIds: ['managed-agents'],
+  metadata: ['sdk'],
+};
 
 /**
  * The abstraction over agent runtimes.
@@ -96,8 +120,16 @@ export interface AgentRuntime {
    * id from a prior `runRoleSession` call and needs to drive the same session
    * again.
    *
-   * For ManagedAgents: trivial — server-side state lives at the session id.
-   * For the sdk runtime: maps to the SDK's `resume: session_id` option.
+   * The managed-agents transport reattaches for real: the session's state is
+   * server-side and the id is the whole handle. The claude-cli transport
+   * respawns `claude -p --resume <id>` on the first input.
+   *
+   * The sdk and sdk-k8s transports refuse. The SDK's `resume` option reopens a
+   * transcript in a fresh call rather than handing back a live handle to a
+   * running loop, so what they return reports its id, streams nothing and
+   * throws on input — a refusal a caller can see, instead of an empty stream it
+   * would read as an idle session. Continuation there means a new role session
+   * carrying the prior transcript as context.
    */
   resumeSession(sessionId: string): AgentSession;
 
