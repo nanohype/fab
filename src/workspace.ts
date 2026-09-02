@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tryParseGitHubUrl } from './git.js';
 
 // ── The tree the gate's mechanical step runs against ────────────────
 //
@@ -11,15 +12,15 @@ import { join } from 'node:path';
 //
 // A workspace resolved from the operator's shell is not that artifact. It is
 // whatever directory `fab` happened to be launched from — frequently a
-// different repository, and on the default transport never the branch the
-// roles are pushing to, since the roles commit through the GitHub API and the
-// operator's checkout is untouched. Running `npm ci` there and forwarding the
-// result as observed evidence is the failure the pre-hook exists to prevent,
-// arriving through the pre-hook itself.
+// different repository, and on the default transport never in step with the
+// branch the roles are pushing to, since the roles commit through the GitHub
+// API and the operator's checkout is untouched. Running `npm ci` there and
+// forwarding the result as observed evidence is the failure the pre-hook exists
+// to prevent, arriving through the pre-hook itself.
 //
-// So the artifact names the tree, and there are exactly two ways to get one:
-// fetch it, or be handed a checkout that proves it is the same thing. There is
-// no third branch that falls back to the current directory.
+// So the artifact names the tree. A local checkout is used only when it is
+// provably the same commit with nothing uncommitted on top; anything else is
+// fetched.
 
 /** The artifact under gate: a branch on a GitHub repository. */
 export interface GateArtifact {
@@ -29,12 +30,6 @@ export interface GateArtifact {
   readonly token: string;
 }
 
-/** What a checkout reports itself to be. */
-export interface WorkspaceIdentity {
-  readonly remote: string;
-  readonly branch: string;
-}
-
 /** Runs one shell command and reports its exit code and output. */
 export type ShellRunner = (
   command: string,
@@ -42,79 +37,103 @@ export type ShellRunner = (
 ) => Promise<{ exit: number; stdout: string; stderr: string }>;
 
 export type WorkspaceResolution =
-  | { readonly kind: 'ready'; readonly cwd: string; readonly release: () => Promise<void> }
+  | {
+      readonly kind: 'ready';
+      readonly cwd: string;
+      readonly source: 'declared' | 'fetched';
+      readonly release: () => Promise<void>;
+    }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
-/**
- * `owner/repo` for a GitHub remote, or null for anything else.
- *
- * Both URL forms git writes are accepted, with and without the `.git` suffix,
- * because a checkout made by `gh` and one made by `git clone` disagree on the
- * form and neither is wrong.
- */
-export function parseGitHubRemote(url: string): string | null {
-  const trimmed = url.trim().replace(/\.git$/, '');
-  const ssh = /^git@github\.com:([^/]+)\/(.+)$/.exec(trimmed);
-  if (ssh) return `${ssh[1]}/${ssh[2]}`;
-  const https = /^https?:\/\/(?:[^@/]*@)?github\.com\/([^/]+)\/(.+)$/.exec(trimmed);
-  if (https) return `${https[1]}/${https[2]}`;
-  return null;
+/** Single-quote a path for a shell command line, so a space in it is not two words. */
+export function shellQuote(value: string): string {
+  return `'${value.split("'").join(`'\\''`)}'`;
 }
 
 /**
  * The reason a checkout is not the artifact, or null when it is.
  *
- * Both halves are checked because either alone admits the wrong tree: the same
- * repository on a different branch is a different artifact, and the same branch
- * name in a different repository is a coincidence.
+ * Four questions, because passing three of them still admits a tree the roles
+ * are not reviewing: a different repository, the same repository on another
+ * branch, the right branch behind the commit the roles pushed, and the right
+ * commit with uncommitted work on top. The third is the common one — on the
+ * default transport the local branch is behind by construction once a role has
+ * pushed — and it is the one a remote-and-branch comparison cannot see.
  */
-export function workspaceMismatch(
-  identity: WorkspaceIdentity | null,
+export async function workspaceMismatch(
+  cwd: string,
   artifact: GateArtifact,
-): string | null {
+  run: ShellRunner,
+): Promise<string | null> {
   const want = `${artifact.owner}/${artifact.repo}`;
-  if (!identity) {
-    return `the workspace is not a git checkout, so it cannot be shown to be ${want}@${artifact.branch}`;
+
+  const remote = await run('git remote get-url origin', cwd);
+  if (remote.exit !== 0) {
+    return `it is not a git checkout with an origin remote, so it cannot be shown to be ${want}@${artifact.branch}`;
   }
-  const have = parseGitHubRemote(identity.remote);
-  if (have === null) {
-    return `the workspace remote "${identity.remote}" is not a GitHub remote, so it cannot be shown to be ${want}`;
+  const have = tryParseGitHubUrl(remote.stdout.trim());
+  if (!have) {
+    return `its origin remote "${remote.stdout.trim()}" is not a GitHub remote, so it cannot be shown to be ${want}`;
   }
-  if (have.toLowerCase() !== want.toLowerCase()) {
-    return `the workspace is a checkout of ${have}, not ${want}`;
+  if (`${have.owner}/${have.repo}`.toLowerCase() !== want.toLowerCase()) {
+    return `it is a checkout of ${have.owner}/${have.repo}, not ${want}`;
   }
-  if (identity.branch !== artifact.branch) {
-    return `the workspace is on branch "${identity.branch}", not the branch under gate "${artifact.branch}"`;
+
+  const branch = await run('git rev-parse --abbrev-ref HEAD', cwd);
+  if (branch.exit !== 0 || branch.stdout.trim() !== artifact.branch) {
+    return `it is on branch "${branch.stdout.trim() || '(none)'}", not the branch under gate "${artifact.branch}"`;
+  }
+
+  const dirty = await run('git status --porcelain', cwd);
+  if (dirty.exit !== 0) {
+    return `its working tree state could not be read: ${dirty.stderr.trim() || `git status exited ${dirty.exit}`}`;
+  }
+  if (dirty.stdout.trim() !== '') {
+    const count = dirty.stdout.trim().split('\n').length;
+    return `it has ${count} uncommitted change(s), so the phases would measure work that is not on the branch under gate`;
+  }
+
+  // Asked of the remote at gate time rather than compared against a commit
+  // captured when the branch was created: the roles push between those two
+  // moments, which is exactly the drift this catches.
+  const head = await run('git rev-parse HEAD', cwd);
+  const remoteHead = await run(
+    `git ls-remote origin ${shellQuote(`refs/heads/${artifact.branch}`)}`,
+    cwd,
+  );
+  if (head.exit !== 0 || remoteHead.exit !== 0) {
+    return `its commit could not be compared with the remote branch: ${
+      (remoteHead.stderr || head.stderr).trim() || 'git exited non-zero'
+    }`;
+  }
+  const remoteSha = remoteHead.stdout.trim().split(/\s+/)[0] ?? '';
+  if (remoteSha === '') {
+    return `the remote has no branch "${artifact.branch}" to compare its commit against`;
+  }
+  if (head.stdout.trim() !== remoteSha) {
+    return `it is at commit ${short(head.stdout)}, while the branch under gate is at ${short(remoteSha)}`;
   }
   return null;
 }
 
-/** What a checkout says it is, or null when the directory is not one. */
-export async function identifyWorkspace(
-  cwd: string,
-  run: ShellRunner,
-): Promise<WorkspaceIdentity | null> {
-  const remote = await run('git remote get-url origin', cwd);
-  if (remote.exit !== 0) return null;
-  const branch = await run('git rev-parse --abbrev-ref HEAD', cwd);
-  if (branch.exit !== 0) return null;
-  return { remote: remote.stdout.trim(), branch: branch.stdout.trim() };
-}
+const short = (sha: string): string => sha.trim().slice(0, 12);
 
 export interface ResolveWorkspaceOptions {
   /** The artifact under gate. Null means the caller has none to name. */
   readonly artifact: GateArtifact | null;
-  /** An operator-supplied checkout, which is used only if it is the artifact. */
+  /** An operator-supplied checkout, used when it proves to be the artifact. */
   readonly declared: string | null;
   readonly run: ShellRunner;
+  /** Where a rejected declared workspace is reported. */
+  readonly note?: (message: string) => void;
   readonly makeTempDir?: () => Promise<string>;
-  readonly writeSecret?: (path: string, body: string) => Promise<void>;
+  readonly writeSecret?: (path: string, body: string, mode: number) => Promise<void>;
   readonly removeDir?: (path: string) => Promise<void>;
 }
 
 const defaultTempDir = (): Promise<string> => mkdtemp(join(tmpdir(), 'fab-gate-'));
-const defaultWriteSecret = (path: string, body: string): Promise<void> =>
-  writeFile(path, body, { encoding: 'utf-8', mode: 0o700 });
+const defaultWriteSecret = (path: string, body: string, mode: number): Promise<void> =>
+  writeFile(path, body, { encoding: 'utf-8', mode });
 const defaultRemoveDir = (path: string): Promise<void> =>
   rm(path, { recursive: true, force: true });
 
@@ -122,10 +141,13 @@ const defaultRemoveDir = (path: string): Promise<void> =>
  * A tree that is the artifact under gate, or the reason there is not one.
  *
  * A declared workspace is checked rather than trusted; being handed a path is
- * not evidence about what is in it. A clone is shallow and single-branch
- * because the phases need the tree at that commit and nothing else, and it is a
- * fresh checkout, which is the condition FOUR_PHASE_CONTRACT states the phases
- * must exit 0 from.
+ * not evidence about what is in it. One that fails the check is not fatal — the
+ * artifact still exists on the remote — so the branch is fetched instead, and
+ * the reason the local tree was passed over is reported rather than swallowed.
+ *
+ * A fetch is shallow and single-branch because the phases need the tree at that
+ * commit and nothing else, and it is a fresh checkout, which is the condition
+ * FOUR_PHASE_CONTRACT states the phases must exit 0 from.
  */
 export async function resolveGateWorkspace(
   opts: ResolveWorkspaceOptions,
@@ -141,16 +163,22 @@ export async function resolveGateWorkspace(
   }
 
   if (declared) {
-    const mismatch = workspaceMismatch(await identifyWorkspace(declared, run), artifact);
-    if (mismatch) {
-      return {
-        kind: 'unavailable',
-        reason: `FAB_WORKSPACE=${declared} is not the artifact under gate: ${mismatch}`,
-      };
+    const mismatch = await workspaceMismatch(declared, artifact, run);
+    if (!mismatch) {
+      return { kind: 'ready', cwd: declared, source: 'declared', release: async () => {} };
     }
-    return { kind: 'ready', cwd: declared, release: async () => {} };
+    opts.note?.(
+      `FAB_WORKSPACE=${declared} is not the artifact under gate — ${mismatch}. Fetching ${artifact.owner}/${artifact.repo}@${artifact.branch} instead.`,
+    );
   }
 
+  return fetchArtifact(opts, artifact);
+}
+
+async function fetchArtifact(
+  opts: ResolveWorkspaceOptions,
+  artifact: GateArtifact,
+): Promise<WorkspaceResolution> {
   const makeTempDir = opts.makeTempDir ?? defaultTempDir;
   const writeSecret = opts.writeSecret ?? defaultWriteSecret;
   const removeDir = opts.removeDir ?? defaultRemoveDir;
@@ -158,29 +186,44 @@ export async function resolveGateWorkspace(
   const dir = await makeTempDir();
   const release = () => removeDir(dir);
   try {
-    // The token reaches git through a helper script rather than the command
-    // line, because a process argument is readable by anything on the host that
-    // can list processes and a 0700 file is not.
+    // The token is read from a file the helper prints, never passed as an
+    // argument to anything: a process argument is readable by any process on
+    // the host that can list processes, and that includes the helper's own.
+    const tokenFile = join(dir, 'token');
     const askpass = join(dir, 'askpass.sh');
-    await writeSecret(
-      askpass,
-      `#!/bin/sh\nexec printf '%s' '${artifact.token.replace(/'/g, "'\\''")}'\n`,
-    );
+    await writeSecret(tokenFile, artifact.token, 0o600);
+    await writeSecret(askpass, `#!/bin/sh\ncat ${shellQuote(tokenFile)}\n`, 0o700);
 
     const checkout = join(dir, 'checkout');
     const url = `https://github.com/${artifact.owner}/${artifact.repo}.git`;
-    const clone = await run(
-      `GIT_ASKPASS=${askpass} GIT_TERMINAL_PROMPT=0 git clone --depth 1 --single-branch --branch ${artifact.branch} ${url} ${checkout}`,
-      dir,
-    );
-    if (clone.exit !== 0) {
+    // The operator's git configuration is excluded rather than inherited. A
+    // configured credential helper would store the artifact's token past the
+    // life of this checkout, and credentials the operator already has for
+    // github.com would be offered ahead of it.
+    const clone = [
+      `GIT_ASKPASS=${shellQuote(askpass)}`,
+      'GIT_TERMINAL_PROMPT=0',
+      'GIT_CONFIG_GLOBAL=/dev/null',
+      'GIT_CONFIG_NOSYSTEM=1',
+      'git -c credential.helper=',
+      'clone --depth 1 --single-branch --branch',
+      shellQuote(artifact.branch),
+      shellQuote(url),
+      shellQuote(checkout),
+    ].join(' ');
+
+    const result = await opts.run(clone, dir);
+    if (result.exit !== 0) {
       await release();
       return {
         kind: 'unavailable',
-        reason: `could not fetch ${artifact.owner}/${artifact.repo}@${artifact.branch}: ${redact(clone.stderr || clone.stdout, artifact.token).trim() || `git clone exited ${clone.exit}`}`,
+        reason: `could not fetch ${artifact.owner}/${artifact.repo}@${artifact.branch}: ${
+          redact(result.stderr || result.stdout, artifact.token).trim() ||
+          `git clone exited ${result.exit}`
+        }`,
       };
     }
-    return { kind: 'ready', cwd: checkout, release };
+    return { kind: 'ready', cwd: checkout, source: 'fetched', release };
   } catch (err) {
     await release();
     return {

@@ -29,7 +29,7 @@ import {
   runFourPhasePreHook,
   shellRunner,
 } from './prehook.js';
-import { type GateArtifact, resolveGateWorkspace } from './workspace.js';
+import { type GateArtifact, resolveGateWorkspace, type ShellRunner } from './workspace.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
 import { unsafeSourceDirs, untrustedBlock } from './guardrails.js';
@@ -1341,31 +1341,45 @@ async function buildCitationReader(
  * Run the four-phase pre-hook against the artifact under gate.
  *
  * The tree is named by the artifact, never by where the process was launched.
- * `FAB_WORKSPACE` is honoured only when the checkout it names proves to be the
- * same repository and branch; otherwise the branch is fetched. Either way the
+ * `FAB_WORKSPACE` is used when the checkout it names proves to be the same
+ * repository, the same branch, the same commit as the remote branch, and clean;
+ * anything else is passed over with the reason, and the branch is fetched. The
  * transcripts the gate roles are told to treat as observed are transcripts of
- * the thing they are reviewing.
+ * the thing they are reviewing either way.
  *
  * With no artifact to name — a gate invoked without a repository and branch —
  * the result is `unavailable`, reported to the roles and to the PR as an
  * unverified build, never as a passing one.
  */
-async function resolvePreHook(artifact: GateArtifact | null): Promise<PreHookResult> {
+export async function runGatePreHook(
+  artifact: GateArtifact | null,
+  // The git questions that establish which tree this is. Overridden only where
+  // a test needs them answered against a local remote; the phases themselves
+  // always run as real subprocesses.
+  deps: { run?: ShellRunner } = {},
+): Promise<PreHookResult> {
+  // Resolved before anything is acquired: a throw here would otherwise leave a
+  // fetched checkout, and the token file inside it, with no owner to release
+  // them.
+  const language = await getProjectLanguage();
   const workspace = await resolveGateWorkspace({
     artifact,
     declared: process.env.FAB_WORKSPACE ?? null,
-    run: shellRunner,
+    run: deps.run ?? shellRunner,
+    note: (message) => console.log(`${YELLOW}${message}${RESET}`),
   });
   if (workspace.kind === 'unavailable') {
     return { status: 'unavailable', transcripts: [], reason: workspace.reason };
   }
-  const language = await getProjectLanguage();
   try {
     return await runFourPhasePreHook({ cwd: workspace.cwd, language });
   } finally {
     await workspace.release();
   }
 }
+
+const resolvePreHook = (artifact: GateArtifact | null): Promise<PreHookResult> =>
+  runGatePreHook(artifact);
 
 export async function runMergeGate(
   runtime: AgentRuntime,

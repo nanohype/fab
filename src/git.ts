@@ -21,15 +21,35 @@ const GITHUB_API = 'https://api.github.com';
  * exists and is a github_repository.
  */
 export function parseGitHubUrl(url: string): { owner: string; repo: string } {
+  const parsed = tryParseGitHubUrl(url);
+  if (!parsed) throw new Error(`Unrecognized GitHub URL: ${url}`);
+  return parsed;
+}
+
+/**
+ * The same parse, for callers that treat "not a GitHub remote" as an answer
+ * rather than an error.
+ *
+ * Every form git itself writes is accepted. A checkout made by one tool and one
+ * made by another disagree on the form, and a comparison that rejects a form
+ * git produced would report a genuine checkout of the repository as a different
+ * one.
+ */
+export function tryParseGitHubUrl(url: string): { owner: string; repo: string } | null {
   const cleaned = url
     .trim()
+    .replace(/\/$/, '')
     .replace(/\.git$/, '')
     .replace(/\/$/, '');
-  const httpsMatch = cleaned.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)$/);
-  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
-  const sshMatch = cleaned.match(/^git@github\.com:([^/]+)\/([^/]+)$/);
-  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
-  throw new Error(`Unrecognized GitHub URL: ${url}`);
+  // scp-like: git@github.com:owner/repo
+  const scp = cleaned.match(/^[^@/]+@github\.com:([^/]+)\/([^/]+)$/);
+  if (scp) return { owner: scp[1], repo: scp[2] };
+  // URL forms: https://, http://, ssh://, git://, with optional userinfo and port
+  const urlLike = cleaned.match(
+    /^(?:https?|ssh|git):\/\/(?:[^@/]*@)?github\.com(?::\d+)?\/([^/]+)\/([^/]+)$/,
+  );
+  if (urlLike) return { owner: urlLike[1], repo: urlLike[2] };
+  return null;
 }
 
 /**

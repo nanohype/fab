@@ -7,7 +7,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { AgentRuntime } from '../src/runtime.js';
 import { LANGUAGE_TOOLCHAIN } from '../src/standards.js';
 import { PRE_HOOK_PHASES, type PreHookPhase } from '../src/prehook.js';
-import { type RoleRunner, runMergeGate } from '../src/workflows.js';
+import { shellQuote, type ShellRunner } from '../src/workspace.js';
+import { type RoleRunner, runGatePreHook, runMergeGate } from '../src/workflows.js';
 
 // ── The pre-hook against a real workspace ───────────────────────────
 //
@@ -30,8 +31,11 @@ import { type RoleRunner, runMergeGate } from '../src/workflows.js';
 // distinguish the gate from a constant.
 //
 // The fixture is a git checkout of the artifact under gate, because that is
-// what the pre-hook resolves against. A directory that merely holds a manifest
-// is not the artifact, and the last two cases here assert it is refused.
+// what the pre-hook resolves against — a directory that merely holds a manifest
+// is not the artifact. The identity questions are answered against a local bare
+// repository rather than github.com, so this file stays offline; which trees
+// count as the artifact is settled in the workspace cases, and what is settled
+// here is that a real subprocess runs and what the roles are handed.
 
 /** Printed by the passing fixture's `test` phase; a stub has no way to emit it. */
 const OBSERVED_TOKEN = 'four-phase-pre-hook-observed-stdout';
@@ -93,6 +97,9 @@ async function fixture(phases: Record<string, PhaseSpec>): Promise<string> {
     join(dir, 'package.json'),
     JSON.stringify({ name: 'fixture', version: '1.0.0', private: true, scripts }, null, 2),
   );
+  // The phases write into the tree; without this the first case would leave it
+  // dirty and the next would be refused for work that is not the artifact's.
+  await writeFile(join(dir, '.gitignore'), 'node_modules/\nphases.log\n');
   await writeFile(
     join(dir, 'package-lock.json'),
     JSON.stringify({
@@ -103,19 +110,56 @@ async function fixture(phases: Record<string, PhaseSpec>): Promise<string> {
       packages: { '': { name: 'fixture', version: '1.0.0' } },
     }),
   );
-  // The pre-hook identifies a workspace by its remote and branch, so a fixture
-  // that is not a checkout of the artifact is not a workspace it will use.
+  // The pre-hook identifies a workspace by its remote, its branch, its commit
+  // against the remote branch, and whether anything is uncommitted. The fixture
+  // satisfies all four against a bare repository beside it.
+  const bare = `${dir}.git`;
+  await execAsync(`git init -q --bare ${shellQuote(bare)}`);
   await execAsync(
     [
       `git init -q -b ${ARTIFACT.branch}`,
-      'git add -A',
+      'git add .gitignore package.json package-lock.json *.cjs',
       'git -c user.email=fixture@example.invalid -c user.name=fixture commit -q -m fixture',
-      `git remote add origin https://github.com/${ARTIFACT.owner}/${ARTIFACT.repo}.git`,
+      `git remote add origin ${shellQuote(bare)}`,
+      `git push -q origin ${ARTIFACT.branch}`,
     ].join(' && '),
-    { cwd: dir },
+    { cwd: dir, shell: '/bin/sh' },
   );
   return dir;
 }
+
+/**
+ * Answers only the remote-identity question, and runs every other git command
+ * for real. A local remote cannot be a github.com URL and git rewrites reach
+ * `remote get-url` as well as the transport, so a fixture that disguised the
+ * path would be testing the disguise.
+ */
+const fixtureGit: ShellRunner = async (command, cwd) => {
+  if (command.includes('clone --depth 1')) {
+    // Reaching for the artifact over the network is out of scope here; that a
+    // fetch is attempted, and what the roles are told when it cannot happen, is
+    // what these cases assert.
+    return { exit: 128, stdout: '', stderr: 'fatal: no network in this fixture' };
+  }
+  if (command === 'git remote get-url origin') {
+    return {
+      exit: 0,
+      stdout: `https://github.com/${ARTIFACT.owner}/${ARTIFACT.repo}.git\n`,
+      stderr: '',
+    };
+  }
+  try {
+    const { stdout, stderr } = await execAsync(command, { cwd, encoding: 'utf-8' });
+    return { exit: 0, stdout, stderr };
+  } catch (err) {
+    const e = err as { code?: number; stdout?: string; stderr?: string };
+    return { exit: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+  }
+};
+
+/** The production pre-hook, with only the identity questions pointed locally. */
+const localPreHook = (artifact: Parameters<typeof runGatePreHook>[0]) =>
+  runGatePreHook(artifact, { run: fixtureGit });
 
 /** The phases the standard dispatches through an npm script, i.e. every one but install. */
 const SCRIPTED_PHASES = PRE_HOOK_PHASES.filter((p) => scriptName(LANGUAGE_TOOLCHAIN.typescript[p]));
@@ -190,7 +234,15 @@ describe('runMergeGate drives the real pre-hook', () => {
     };
 
     // No pre-hook argument: this is the production default, resolvePreHook.
-    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', ARTIFACT, runRole);
+    const result = await runMergeGate(
+      runtime,
+      'wf',
+      'docs',
+      'ctx',
+      ARTIFACT,
+      runRole,
+      localPreHook,
+    );
 
     expect(result.decision).toBe('reject');
     // Names the phase, so whoever reads the rejection knows what to re-run.
@@ -213,7 +265,15 @@ describe('runMergeGate drives the real pre-hook', () => {
       return APPROVE_WITH_EVIDENCE;
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', ARTIFACT, runRole);
+    const result = await runMergeGate(
+      runtime,
+      'wf',
+      'docs',
+      'ctx',
+      ARTIFACT,
+      runRole,
+      localPreHook,
+    );
 
     expect(result.decision).toBe('approve');
     const log = await readFile(join(passing, PHASE_LOG), 'utf-8');
@@ -227,10 +287,13 @@ describe('runMergeGate drives the real pre-hook', () => {
     }
   }, 120_000);
 
-  it('refuses a workspace that is not the artifact under gate', async () => {
+  it('passes over a workspace that is not the artifact, and reaches for the artifact', async () => {
     // A tree with the right manifest and the wrong identity is the defect this
     // closes: the phases would run, exit 0, and the transcripts would reach the
-    // roles labelled observed while describing a different repository.
+    // roles labelled observed while describing a different repository. The
+    // artifact still exists on the remote, so the local tree is passed over and
+    // the branch is fetched — here that fetch cannot happen, and the roles are
+    // told the build is unverified rather than handed the wrong tree.
     process.env.FAB_WORKSPACE = passing;
     const seen: string[] = [];
     const runRole: RoleRunner = async (_rt, _role, message) => {
@@ -239,7 +302,15 @@ describe('runMergeGate drives the real pre-hook', () => {
     };
 
     const elsewhere = { ...ARTIFACT, repo: 'a-different-repository' };
-    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', elsewhere, runRole);
+    const result = await runMergeGate(
+      runtime,
+      'wf',
+      'docs',
+      'ctx',
+      elsewhere,
+      runRole,
+      localPreHook,
+    );
 
     // Not a rejection — the build is unverified, which is a different thing
     // from broken, and the roles are told which.
@@ -255,7 +326,7 @@ describe('runMergeGate drives the real pre-hook', () => {
     }
   }, 120_000);
 
-  it('refuses a workspace on a branch that is not the one under gate', async () => {
+  it('passes over a workspace on a branch that is not the one under gate', async () => {
     process.env.FAB_WORKSPACE = passing;
     const seen: string[] = [];
     const runRole: RoleRunner = async (_rt, _role, message) => {
@@ -264,8 +335,11 @@ describe('runMergeGate drives the real pre-hook', () => {
     };
 
     const otherBranch = { ...ARTIFACT, branch: 'feat/something-else' };
-    await runMergeGate(runtime, 'wf', 'docs', 'ctx', otherBranch, runRole);
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', otherBranch, runRole, localPreHook);
 
+    // A loop over an empty list asserts nothing, so rejecting every gate would
+    // otherwise survive this case.
+    expect(seen.length).toBeGreaterThan(0);
     for (const message of seen) {
       expect(message).toContain('DID NOT RUN');
       expect(message).toContain('feat/something-else');
@@ -281,8 +355,9 @@ describe('runMergeGate drives the real pre-hook', () => {
       return APPROVE_WITH_EVIDENCE;
     };
 
-    await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole, localPreHook);
 
+    expect(seen.length).toBeGreaterThan(0);
     for (const message of seen) {
       expect(message).toContain('no artifact under gate');
       expect(message).not.toContain(OBSERVED_TOKEN);
