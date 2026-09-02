@@ -40,11 +40,11 @@ interface MaybeAssistant {
  * The per-request token counts an assistant message carries, as the cost span
  * the budget tracker reads.
  *
- * Without this the kill-switch is unreachable outside managed-agents: the only
- * cost signal these transports produced was `total_cost_usd` on the terminal
- * result, which arrives after the money is spent and so can report a breach but
- * never prevent one. The counts are per request, which is what makes them
- * summable — an accumulated total is what a ceiling is compared against.
+ * Without this the kill-switch is unreachable outside managed-agents. The
+ * counts are per request, which is what makes them summable, and an accumulated
+ * total is what a ceiling is compared against — the run total on the terminal
+ * result arrives once the spending has stopped, so it can report a breach and
+ * never prevent one.
  */
 function costSpan(a: MaybeAssistant): AgentEvent | null {
   const u = a.message.usage;
