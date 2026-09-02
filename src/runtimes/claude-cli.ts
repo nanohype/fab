@@ -233,20 +233,21 @@ class ClaudeCliSession implements AgentSession {
           continue;
         }
 
-        const event = translateSdkMessage(parsed, (id) => {
+        const events = translateSdkMessage(parsed, (id) => {
           this.capturedSessionId = id;
         });
-        if (!event) continue;
-        yield event;
-        if (isTerminal(event)) {
-          this.terminalEmitted = true;
-          // Close stdin so the CLI exits after processing the terminal
-          // result. Otherwise --input-format stream-json keeps the
-          // process alive waiting for the next user message.
-          try {
-            this.proc.stdin.end();
-          } catch {
-            // already closed — fine
+        for (const event of events) {
+          yield event;
+          if (isTerminal(event)) {
+            this.terminalEmitted = true;
+            // Close stdin so the CLI exits after processing the terminal
+            // result. Otherwise --input-format stream-json keeps the
+            // process alive waiting for the next user message.
+            try {
+              this.proc.stdin.end();
+            } catch {
+              // already closed — fine
+            }
           }
         }
       }

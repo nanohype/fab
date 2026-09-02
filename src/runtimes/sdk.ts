@@ -326,14 +326,16 @@ export class SdkAgentSession implements AgentSession {
     }
     try {
       for await (const raw of this.sdkQuery) {
-        const event = translateSdkMessage(raw, (id) => {
+        const events = translateSdkMessage(raw, (id) => {
           this.capturedSessionId = id;
         });
-        if (event) yield event;
-        // After a terminal result the loop ends naturally; close the input
-        // iterable so the SDK's process can shut down cleanly.
-        if (event && isTerminal(event)) {
-          this.closeInput();
+        for (const event of events) {
+          yield event;
+          // After a terminal result the loop ends naturally; close the input
+          // iterable so the SDK's process can shut down cleanly.
+          if (isTerminal(event)) {
+            this.closeInput();
+          }
         }
       }
     } finally {
