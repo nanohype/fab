@@ -1,5 +1,5 @@
 import { exec } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -66,6 +66,12 @@ describe('tryParseGitHubUrl covers the forms git writes', () => {
     ['ssh://git@github.com:22/nanohype/fab', 'nanohype/fab'],
     ['git://github.com/nanohype/fab.git', 'nanohype/fab'],
     ['  https://github.com/nanohype/fab.git\n', 'nanohype/fab'],
+    // scp-like with no userinfo, which git accepts and stores verbatim.
+    ['github.com:nanohype/fab.git', 'nanohype/fab'],
+    ['github.com:nanohype/fab', 'nanohype/fab'],
+    // The host is a DNS name, so its case carries no meaning.
+    ['https://GitHub.com/nanohype/fab', 'nanohype/fab'],
+    ['GIT@GITHUB.COM:nanohype/fab.git', 'nanohype/fab'],
   ])('reads %s', (url, expected) => {
     // A checkout git produced in any of these forms is the same checkout; a
     // comparison that refuses one of them calls a genuine tree a different one.
@@ -420,5 +426,90 @@ describe('workspaceMismatch against real checkouts', () => {
     );
     const reason = await workspaceMismatch(clone, ARTIFACT, realRun);
     expect(reason).toMatch(/while the branch under gate is at/);
+  }, 30_000);
+});
+
+// ── The fetch, executed ─────────────────────────────────────────────
+//
+// Every case above short-circuits before git runs, so what they prove is the
+// shape of the command line. These two run it: the composed flag set against a
+// real repository, and the credential helper the flags point at.
+
+describe('the composed fetch runs', () => {
+  let root: string;
+
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), 'fab-fetch-'));
+    const bare = join(root, ARTIFACT.owner, `${ARTIFACT.repo}.git`);
+    const seed = join(root, 'seed');
+    await execAsync(`git init -q --bare ${shellQuote(bare)}`, { shell: '/bin/sh' });
+    await execAsync(
+      [
+        `git init -q -b ${ARTIFACT.branch} ${shellQuote(seed)}`,
+        `cd ${shellQuote(seed)}`,
+        'echo one > file.txt',
+        'git add file.txt',
+        'git -c user.email=t@e.invalid -c user.name=t commit -q -m one',
+        `git remote add origin ${shellQuote(bare)}`,
+        `git push -q origin ${ARTIFACT.branch}`,
+      ].join(' && '),
+      { shell: '/bin/sh' },
+    );
+  }, 60_000);
+
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('fetches the branch with the flags it composes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fab-gate-real-'));
+    try {
+      const got = await resolveGateWorkspace({
+        artifact: ARTIFACT,
+        declared: null,
+        // The real runner: git is what decides whether the command is valid.
+        run: async (command, cwd) => {
+          try {
+            const { stdout, stderr } = await execAsync(command, { cwd, encoding: 'utf-8' });
+            return { exit: 0, stdout, stderr };
+          } catch (err) {
+            const e = err as { code?: number; stdout?: string; stderr?: string };
+            return { exit: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+          }
+        },
+        originBase: `file://${root}`,
+        makeTempDir: async () => dir,
+        removeDir: async () => {},
+      });
+      expect(got.kind).toBe('ready');
+      if (got.kind !== 'ready') return;
+      expect(got.source).toBe('fetched');
+      // A shallow single-branch checkout of the branch under gate, on disk.
+      expect(readFileSync(join(got.cwd, 'file.txt'), 'utf-8').trim()).toBe('one');
+      const branch = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: got.cwd });
+      expect(branch.stdout.trim()).toBe(ARTIFACT.branch);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('writes a credential helper that prints the token when git runs it', async () => {
+    // What GIT_ASKPASS points at has to work as a program, not merely exist.
+    const dir = mkdtempSync(join(tmpdir(), 'fab-gate-askpass-'));
+    try {
+      await resolveGateWorkspace({
+        artifact: ARTIFACT,
+        declared: null,
+        run: async () => ({ exit: 1, stdout: '', stderr: 'not run here' }),
+        makeTempDir: async () => dir,
+        removeDir: async () => {},
+      });
+      const { stdout } = await execAsync(`sh ${shellQuote(join(dir, 'askpass.sh'))}`, {
+        shell: '/bin/sh',
+      });
+      expect(stdout).toBe(ARTIFACT.token);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 30_000);
 });

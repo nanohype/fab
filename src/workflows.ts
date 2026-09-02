@@ -1359,7 +1359,7 @@ export async function runGatePreHook(
   deps: { run?: ShellRunner } = {},
 ): Promise<PreHookResult> {
   // Resolved before anything is acquired: a throw here would otherwise leave a
-  // fetched checkout, and the token file inside it, with no owner to release
+  // fetched checkout, and the token file beside it, with no owner to release
   // them.
   const language = await getProjectLanguage();
   const workspace = await resolveGateWorkspace({
@@ -1378,9 +1378,6 @@ export async function runGatePreHook(
   }
 }
 
-const resolvePreHook = (artifact: GateArtifact | null): Promise<PreHookResult> =>
-  runGatePreHook(artifact);
-
 export async function runMergeGate(
   runtime: AgentRuntime,
   workflowName: string,
@@ -1388,7 +1385,7 @@ export async function runMergeGate(
   initialContext: string,
   citationSource?: CitationSource | null,
   runRole: RoleRunner = runRoleSession,
-  preHook: (artifact: GateArtifact | null) => Promise<PreHookResult> = resolvePreHook,
+  preHook: (artifact: GateArtifact | null) => Promise<PreHookResult> = runGatePreHook,
 ): Promise<GateResult> {
   const gateRoles = profile === 'code' ? CODE_GATE_ROLES : DOCS_GATE_ROLES;
 

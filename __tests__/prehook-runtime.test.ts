@@ -233,7 +233,8 @@ describe('runMergeGate drives the real pre-hook', () => {
       return APPROVE_WITH_EVIDENCE;
     };
 
-    // No pre-hook argument: this is the production default, resolvePreHook.
+    // The production pre-hook, with only the git questions pointed at the local
+    // remote — the phases below are real subprocesses either way.
     const result = await runMergeGate(
       runtime,
       'wf',
@@ -345,6 +346,43 @@ describe('runMergeGate drives the real pre-hook', () => {
       expect(message).toContain('feat/something-else');
       expect(message).not.toContain(OBSERVED_TOKEN);
     }
+  }, 120_000);
+
+  it('runs the production default when no pre-hook is supplied', async () => {
+    // Every other case here injects the git questions, which leaves the default
+    // binding — process.env.FAB_WORKSPACE and the real shell runner wired into
+    // runGatePreHook — exercised by nothing. This case takes the one path
+    // through it that reaches an answer without a network: no artifact to name.
+    process.env.FAB_WORKSPACE = passing;
+    const seen: string[] = [];
+    const runRole: RoleRunner = async (_rt, _role, message) => {
+      seen.push(message);
+      return APPROVE_WITH_EVIDENCE;
+    };
+
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const message of seen) {
+      expect(message).toContain('DID NOT RUN');
+      expect(message).toContain('no artifact under gate');
+      expect(message).not.toContain(OBSERVED_TOKEN);
+    }
+  }, 120_000);
+
+  it('reads the declared workspace from the environment', async () => {
+    // The other half of the default binding: which directory the git questions
+    // are asked in comes from FAB_WORKSPACE, not from where fab was launched.
+    process.env.FAB_WORKSPACE = passing;
+    const asked: { command: string; cwd: string }[] = [];
+    await runGatePreHook(ARTIFACT, {
+      run: async (command, cwd) => {
+        asked.push({ command, cwd });
+        return { exit: 1, stdout: '', stderr: 'stop here' };
+      },
+    });
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked[0]!.cwd).toBe(passing);
   }, 120_000);
 
   it('reports no artifact as unverified rather than running somewhere', async () => {

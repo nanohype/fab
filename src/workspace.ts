@@ -126,6 +126,12 @@ export interface ResolveWorkspaceOptions {
   readonly run: ShellRunner;
   /** Where a rejected declared workspace is reported. */
   readonly note?: (message: string) => void;
+  /**
+   * Where the repository is fetched from. The default is GitHub; a test points
+   * it at a local repository so the composed command is executed rather than
+   * only inspected.
+   */
+  readonly originBase?: string;
   readonly makeTempDir?: () => Promise<string>;
   readonly writeSecret?: (path: string, body: string, mode: number) => Promise<void>;
   readonly removeDir?: (path: string) => Promise<void>;
@@ -195,7 +201,7 @@ async function fetchArtifact(
     await writeSecret(askpass, `#!/bin/sh\ncat ${shellQuote(tokenFile)}\n`, 0o700);
 
     const checkout = join(dir, 'checkout');
-    const url = `https://github.com/${artifact.owner}/${artifact.repo}.git`;
+    const url = `${opts.originBase ?? 'https://github.com'}/${artifact.owner}/${artifact.repo}.git`;
     // The operator's git configuration is excluded rather than inherited. A
     // configured credential helper would store the artifact's token past the
     // life of this checkout, and credentials the operator already has for
