@@ -135,11 +135,13 @@ session` in red, then the stream ends. If the interrupt itself fails you
   get `Failed to interrupt on budget breach (session <id> may still be
 running): <error>` — at that point kill the session manually (managed
   agents: interrupt via the API/REPL; sdk-k8s: delete the AgentSandbox CR).
-- **Transport scope** — cost spans are a managed-agents feature, so
-  mid-session enforcement fires on the managed-agents transport. The `sdk` /
-  `claude-cli` transports report a single `total_cost_usd` on the final
-  idle event — fab records it (`session cost: $…`) but the session is
-  already done, so the kill-switch cannot cut those off mid-run.
+- **Transport scope** — every transport emits a cost span per model request,
+  so mid-session enforcement applies to all of them. The `sdk` and
+  `claude-cli` transports also report a single `total_cost_usd` on the final
+  idle event; fab records it (`session cost: $…`) as the run's own total,
+  which reconciles the accumulated spans rather than enforcing anything —
+  it arrives once the session is over. On `sdk` and `sdk-k8s` the Agent SDK
+  applies its own `maxBudgetUsd` ceiling in addition.
 - **How to adjust** — `fab budget set <dollars>` against the same
   `FAB_STATE_FILE` the run reads (in-cluster: the seed initContainer above).
   Unset (`fab budget clear`) means no limit.

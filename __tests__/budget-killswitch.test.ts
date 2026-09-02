@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaudeCliRuntime } from '../src/runtimes/claude-cli.js';
 import { SdkAgentSession } from '../src/runtimes/sdk.js';
 import { streamSessionWithAdvisor } from '../src/workflows.js';
+import { formatEvent } from '../src/stream.js';
 import type { AgentEvent } from '../src/types.js';
 
 // ── The budget ceiling, reached from the transports that had no route to it ──
@@ -207,6 +208,83 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
     const seen: AgentEvent[] = [];
     for await (const e of session.events) seen.push(e);
     expect(seen.map((e) => e.type)).toContain('span.model_request_end');
+  });
+});
+
+// ── The span is accounting, not narration ───────────────────────────
+//
+// `streamSessionWithAdvisor` writes whatever `formatEvent` returns straight to
+// the transcript with no separator, and `formatEvent`'s default branch renders
+// an event as its own type name. One span arrives per model request, so a span
+// that formats to anything splices a type name into the middle of the role's
+// text on every transport that emits one.
+
+describe('the cost span stays out of the operator transcript', () => {
+  const SPAN: AgentEvent = {
+    type: 'span.model_request_end',
+    id: 'msg_1',
+    is_error: false,
+    model_usage: {
+      input_tokens: 1,
+      output_tokens: 2,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    },
+    processed_at: '2026-01-01T00:00:00Z',
+  };
+
+  it('formats to nothing rather than to its own type name', () => {
+    expect(formatEvent(SPAN)).toBe('');
+  });
+
+  it('leaves the streamed text contiguous, and still reports the run cost', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fab-span-'));
+    const priorState = process.env.FAB_STATE_FILE;
+    process.env.FAB_STATE_FILE = join(dir, 'state.json');
+    writeFileSync(
+      process.env.FAB_STATE_FILE,
+      JSON.stringify({ agents: [], repos: [], skills: [] }),
+    );
+    let out = '';
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      out += String(chunk);
+      return true;
+    });
+    try {
+      const sdk = {
+        query() {
+          return {
+            async *[Symbol.asyncIterator]() {
+              yield { type: 'system', subtype: 'init', session_id: 's' };
+              yield assistantMessage('first half ', { input_tokens: 1, output_tokens: 2 });
+              yield assistantMessage('second half', { input_tokens: 1, output_tokens: 2 });
+              yield {
+                type: 'result',
+                subtype: 'success',
+                uuid: 'r',
+                session_id: 's',
+                total_cost_usd: 0.5,
+              };
+            },
+            async interrupt() {},
+          };
+        },
+      };
+      const session = new SdkAgentSession(sdk, MODEL, 'prompt');
+      await session.start('go');
+      const output = await streamSessionWithAdvisor(session, { model: MODEL });
+
+      expect(out).not.toContain('span.model_request_end');
+      expect(out).toContain('first half second half');
+      expect(output).toBe('first half second half');
+      // Suppressing the event must not suppress what it was accounting for.
+      expect(out).toContain('session cost: $0.5000');
+    } finally {
+      spy.mockRestore();
+      if (priorState === undefined) delete process.env.FAB_STATE_FILE;
+      else process.env.FAB_STATE_FILE = priorState;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -58,10 +58,10 @@ export class SdkRuntime implements AgentRuntime {
     const backend = resolveInferenceBackend();
     const model = resolveModelId(member.model, backend);
     // Native per-run budget: the SDK stops the loop with an error_max_budget_usd
-    // result when this USD cap is exceeded. This is how budget enforcement
-    // reaches the sdk/sdk-k8s transports — managed-agents enforces it via span
-    // accumulation + interrupt in streamSessionWithAdvisor, which never fires
-    // here (these transports emit no cost spans).
+    // result when this USD cap is exceeded. It is a second ceiling, independent
+    // of the one the pipeline applies — streamSessionWithAdvisor accumulates the
+    // per-request cost spans this transport emits and interrupts on breach, and
+    // that path reaches every transport that emits them.
     const budgetUsd = await getBudgetLimit();
     // Wire the role's MCP servers into the in-process loop. Without this the sdk
     // transport ran with NO MCP tools — roles lost github/linear/etc. and could
