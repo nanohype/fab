@@ -332,11 +332,15 @@ describe('the bound is wired into the transports that had none', () => {
       }
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, 90_000);
 });
 
 async function waitForFile(path: string): Promise<void> {
-  for (let i = 0; i < 200; i++) {
+  // Generous because process startup is not what this file measures, and a
+  // loaded machine running the whole suite can take seconds to boot a child.
+  // A bound that fired early because the subprocess had not spoken yet would
+  // pass for the wrong reason.
+  for (let i = 0; i < 1200; i++) {
     if (existsSync(path)) return;
     await new Promise((res) => setTimeout(res, 25));
   }
