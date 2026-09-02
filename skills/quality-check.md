@@ -640,7 +640,46 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 ## Output format
 
-When you run this skill, end the report with this exact block (parsed by the merge gate):
+A report ends with three blocks, in this order: `TRANSCRIPTS:`, `CITATIONS:`, `QUALITY_GRADES:`. They carry the same required keys the merge gate enforces on a gate role — `EVIDENCE_KEY` in `src/gate.ts` — so an interactive grade and a factory grade are the same artifact held to the same bar, and a report written here can be read there without translation.
+
+A report that carries grades but no `TRANSCRIPTS:` block, or no `CITATIONS:` block, is not a grade. The gate rewrites a verdict in that shape to REJECT; interactively it has exactly the same standing, which is none. Grades are the conclusion, and a conclusion shipped without its evidence is an impression presented as a measurement.
+
+### TRANSCRIPTS
+
+Every command a grade rests on, with its exit code and its captured output. Each entry carries a `command:` key — an entry without one names nothing that was run, which is the one way a block can be present and empty at the same time.
+
+The four toolchain phases — build, lint, test, docs — are the minimum, whatever else the grading needed. Resolve their commands from the `language-toolchain` standard for the repo's language rather than assuming a package manager, run all four, and record each. Record the ones that fail: a red phase is a finding, and dropping it turns the block into a selection.
+
+```
+TRANSCRIPTS:
+  - command: <the command, as run>
+    exit: <code>
+    stdout: |
+      <captured>
+    stderr: |
+      <captured>
+```
+
+A phase that could not run is recorded with the reason it could not. That is not a pass, and any grade resting on it says so in its rationale.
+
+### CITATIONS
+
+Every claim, with the file it came from and a fragment quoted verbatim from that location. Each entry carries a `file:` key, and the fragment must appear at the cited lines character for character.
+
+```
+CITATIONS:
+  - claim: <the claim the grade rests on>
+    file: <path from the repo root>
+    line_range: <n-n>
+    quoted_fragment: |
+      <verbatim from file>
+```
+
+A fragment that appears nowhere in the cited file is fabrication rather than a typo, and it leaves the report worse off than silence would, because it reads as verified.
+
+### QUALITY_GRADES
+
+Close with this exact block (parsed by the merge gate):
 
 ```
 QUALITY_GRADES:
