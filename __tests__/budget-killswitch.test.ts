@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaudeCliRuntime } from '../src/runtimes/claude-cli.js';
-import { SdkAgentSession } from '../src/runtimes/sdk.js';
+import { SdkAgentSession, SdkRuntime } from '../src/runtimes/sdk.js';
 import { streamSessionWithAdvisor } from '../src/workflows.js';
 import { formatEvent } from '../src/stream.js';
 import type { AgentEvent } from '../src/types.js';
 
-// ── The budget ceiling, reached from the transports that had no route to it ──
+// ── The budget ceiling, and what it is compared against ────────────────
 //
 // streamSessionWithAdvisor compares its accumulated cost against the limit on
 // `span.model_request_end` and on nothing else, so every transport reaches the
@@ -187,6 +187,75 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
     expect(output).toContain('a small answer');
   });
 
+  it('charges one API turn once, however many messages it arrives in', async () => {
+    // The SDK emits one assistant message per content block and every one
+    // carries the whole turn's usage. Charging per message multiplies the total
+    // by the block count, so the ceiling fires at a fraction of the budget —
+    // asserted here by what the session does, not by what the translator looks
+    // like: one turn under the limit runs to its end, and the second turn is
+    // what trips it.
+    const turn = (id: string, text: string) => ({
+      type: 'assistant',
+      uuid: `u-${id}-${text}`,
+      session_id: 'sess-budget',
+      // 20k output tokens at the sonnet rate is $0.30; the limit is $0.50.
+      message: {
+        id,
+        usage: { input_tokens: 0, output_tokens: 20_000 },
+        content: [{ type: 'text', text }],
+      },
+    });
+    let interrupted = 0;
+    const sdk = {
+      query() {
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield { type: 'system', subtype: 'init', session_id: 'sess-budget' };
+            // One turn, three content blocks, one message id.
+            yield turn('msg_A', 'a1');
+            yield turn('msg_A', 'a2');
+            yield turn('msg_A', 'a3');
+            yield turn('msg_B', 'b1');
+            yield { type: 'result', subtype: 'success', uuid: 'r', session_id: 'sess-budget' };
+          },
+          async interrupt() {
+            interrupted += 1;
+          },
+        };
+      },
+    };
+    const session = new SdkAgentSession(sdk, MODEL, 'prompt');
+    await session.start('go');
+    const output = await streamSessionWithAdvisor(session, { model: MODEL });
+
+    // $0.30 for the first turn leaves the ceiling untouched; the second turn
+    // takes the total to $0.60 and trips it. Charged per message the first turn
+    // alone would have been $0.90.
+    expect(written).toContain('BUDGET EXCEEDED');
+    expect(written).toMatch(/\$0\.60 \/ \$0\.50/);
+    expect(interrupted).toBe(1);
+    expect(output).toContain('a1');
+    expect(output).toContain('b1');
+  });
+
+  it('sdk: hands the configured ceiling to the query it starts', async () => {
+    // The runbook promises the Agent SDK applies its own spend cap on this
+    // transport. That is only true if runRoleSession reads the limit and passes
+    // it down, which is observable here and nowhere else.
+    let seen: Record<string, unknown> | undefined;
+    const sdk = {
+      query(params: { options?: Record<string, unknown> }) {
+        seen = params.options;
+        return {
+          async *[Symbol.asyncIterator]() {},
+          async interrupt() {},
+        };
+      },
+    };
+    await new SdkRuntime(async () => sdk).runRoleSession('pr-reviewer', 'go');
+    expect(seen?.maxBudgetUsd).toBe(0.5);
+  });
+
   it('sdk: emits the span the ceiling reads, not only a total on the result', async () => {
     // The seam itself: the consumer in workflows.ts reads this event type and
     // nothing else, so a transport that never emits it has no route to the
@@ -215,7 +284,7 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
 //
 // `streamSessionWithAdvisor` writes whatever `formatEvent` returns straight to
 // the transcript with no separator, and `formatEvent`'s default branch renders
-// an event as its own type name. One span arrives per model request, so a span
+// an event as its own type name. A span arrives for every charged unit of work, so a span
 // that formats to anything splices a type name into the middle of the role's
 // text on every transport that emits one.
 

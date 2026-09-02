@@ -23,6 +23,7 @@ describe('translateSdkMessage', () => {
     const result = translateSdkMessage(
       { type: 'system', subtype: 'init', session_id: 'sess_abc', uuid: 'uuid-1' },
       onSessionId,
+      new Set(),
     );
     expect(result).toEqual([]);
     expect(onSessionId).toHaveBeenCalledWith('sess_abc');
@@ -38,6 +39,7 @@ describe('translateSdkMessage', () => {
           message: { content: [{ type: 'text', text: 'hello there' }] },
         },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event).not.toBeNull();
@@ -62,6 +64,7 @@ describe('translateSdkMessage', () => {
           },
         },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event).not.toBeNull();
@@ -82,6 +85,7 @@ describe('translateSdkMessage', () => {
           },
         },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event).not.toBeNull();
@@ -107,6 +111,7 @@ describe('translateSdkMessage', () => {
           },
         },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event!.type).toBe('agent.message');
@@ -117,6 +122,7 @@ describe('translateSdkMessage', () => {
       translateSdkMessage(
         { type: 'result', subtype: 'success', uuid: 'uuid-6', session_id: 'sess' },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event!.type).toBe('session.status_idle');
@@ -133,6 +139,7 @@ describe('translateSdkMessage', () => {
           total_cost_usd: 0.0421,
         },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event!.type).toBe('session.status_idle');
@@ -144,6 +151,7 @@ describe('translateSdkMessage', () => {
       translateSdkMessage(
         { type: 'result', subtype: 'success', uuid: 'uuid-6c', session_id: 'sess' },
         () => {},
+        new Set<string>(),
       ),
     );
     expect((event as { total_cost_usd?: number }).total_cost_usd).toBeUndefined();
@@ -160,6 +168,7 @@ describe('translateSdkMessage', () => {
           errors: ['something blew up', 'and then again'],
         },
         () => {},
+        new Set<string>(),
       ),
     );
     expect(event!.type).toBe('session.error');
@@ -170,10 +179,10 @@ describe('translateSdkMessage', () => {
   });
 
   it('emits nothing for unknown / unparsable shapes', () => {
-    expect(translateSdkMessage(null, () => {})).toEqual([]);
-    expect(translateSdkMessage('not an object', () => {})).toEqual([]);
-    expect(translateSdkMessage({}, () => {})).toEqual([]);
-    expect(translateSdkMessage({ type: 'unknown-shape' }, () => {})).toEqual([]);
+    expect(translateSdkMessage(null, () => {}, new Set())).toEqual([]);
+    expect(translateSdkMessage('not an object', () => {}, new Set())).toEqual([]);
+    expect(translateSdkMessage({}, () => {}, new Set())).toEqual([]);
+    expect(translateSdkMessage({ type: 'unknown-shape' }, () => {}, new Set())).toEqual([]);
   });
 
   it('emits nothing for assistant messages with no content and no usage', () => {
@@ -181,6 +190,7 @@ describe('translateSdkMessage', () => {
       translateSdkMessage(
         { type: 'assistant', uuid: 'uuid-8', session_id: 'sess', message: { content: [] } },
         () => {},
+        new Set<string>(),
       ),
     ).toEqual([]);
   });
@@ -202,7 +212,7 @@ describe('cost spans from assistant usage', () => {
   });
 
   it('emits a span carrying the per-request token counts', () => {
-    const events = translateSdkMessage(assistant(USAGE), () => {});
+    const events = translateSdkMessage(assistant(USAGE), () => {}, new Set());
     const span = events.find((e) => e.type === 'span.model_request_end');
     expect(span).toBeDefined();
     if (span?.type === 'span.model_request_end') {
@@ -220,7 +230,7 @@ describe('cost spans from assistant usage', () => {
   it('puts the content event before the span', () => {
     // A ceiling that trips on the span must not discard the text that preceded
     // it: the partial output is what the caller returns.
-    const events = translateSdkMessage(assistant(USAGE), () => {});
+    const events = translateSdkMessage(assistant(USAGE), () => {}, new Set());
     expect(events.map((e) => e.type)).toEqual(['agent.message', 'span.model_request_end']);
   });
 
@@ -228,20 +238,22 @@ describe('cost spans from assistant usage', () => {
     const events = translateSdkMessage(
       assistant(USAGE, [{ type: 'tool_use', id: 'tu', name: 'Bash', input: {} }]),
       () => {},
+      new Set<string>(),
     );
     expect(events.map((e) => e.type)).toEqual(['agent.tool_use', 'span.model_request_end']);
   });
 
   it('emits the span alone when a message has usage and no renderable content', () => {
-    expect(translateSdkMessage(assistant(USAGE, []), () => {}).map((e) => e.type)).toEqual([
-      'span.model_request_end',
-    ]);
+    expect(
+      translateSdkMessage(assistant(USAGE, []), () => {}, new Set()).map((e) => e.type),
+    ).toEqual(['span.model_request_end']);
   });
 
   it('treats absent cache counts as zero rather than dropping the span', () => {
     const events = translateSdkMessage(
       assistant({ input_tokens: 10, output_tokens: 20 }),
       () => {},
+      new Set<string>(),
     );
     const span = events.find((e) => e.type === 'span.model_request_end');
     if (span?.type === 'span.model_request_end') {
@@ -254,7 +266,7 @@ describe('cost spans from assistant usage', () => {
 
   it('emits no span when the message carries no usable counts', () => {
     for (const usage of [undefined, {}, { input_tokens: 5 }, { output_tokens: 5 }]) {
-      const events = translateSdkMessage(assistant(usage), () => {});
+      const events = translateSdkMessage(assistant(usage), () => {}, new Set());
       expect(events.some((e) => e.type === 'span.model_request_end')).toBe(false);
     }
   });

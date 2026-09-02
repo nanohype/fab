@@ -90,7 +90,7 @@ export function formatEvent(event: AgentEvent): string {
     case 'session.error':
       return `${RED}error:${RESET} ${event.error.message}`;
 
-    // Cost accounting, not narration. One of these arrives per model request,
+    // Cost accounting, not narration. One of these arrives per charged unit of work,
     // and the caller writes whatever it is given straight to the transcript
     // with no separator — rendering it would splice a type name into the middle
     // of the role's own text. What it is for is read elsewhere: the running

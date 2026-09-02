@@ -135,8 +135,11 @@ session` in red, then the stream ends. If the interrupt itself fails you
   get `Failed to interrupt on budget breach (session <id> may still be
 running): <error>` — at that point kill the session manually (managed
   agents: interrupt via the API/REPL; sdk-k8s: delete the AgentSandbox CR).
-- **Transport scope** — every transport emits a cost span per model request,
-  so mid-session enforcement applies to all of them. The `sdk` and
+- **Transport scope** — every transport emits a cost span the ceiling reads,
+  so mid-session enforcement applies to all of them. Managed Agents emits one
+  per model request; the transports that speak the Claude Code message shape
+  derive one per API turn, since a turn arrives as one message per content
+  block and each carries the whole turn's usage. The `sdk` and
   `claude-cli` transports also report a single `total_cost_usd` on the final
   idle event; fab records it (`session cost: $…`) as the run's own total,
   which reconciles the accumulated spans rather than enforcing anything —

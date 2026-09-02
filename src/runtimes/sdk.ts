@@ -42,6 +42,14 @@ import { buildHttpMcpServers, type HttpMcpServer } from '../mcp.js';
  * Bedrock (see `src/inference.ts`); the default is the Anthropic API.
  */
 export class SdkRuntime implements AgentRuntime {
+  /**
+   * How the Agent SDK is obtained. Defaulted to the real loader, so production
+   * takes it; a caller supplies one to observe what `runRoleSession` hands the
+   * query, which is the only place the configured spend ceiling is read and
+   * passed down.
+   */
+  constructor(private readonly loadSdkModule: () => Promise<AgentSdkModule> = loadSdk) {}
+
   async runRoleSession(
     role: TeamRole,
     message: string,
@@ -74,7 +82,7 @@ export class SdkRuntime implements AgentRuntime {
       );
     }
 
-    const sdk = await loadSdk();
+    const sdk = await this.loadSdkModule();
     const session = new SdkAgentSession(
       sdk,
       model,
@@ -171,6 +179,8 @@ export class SdkAgentSession implements AgentSession {
   private closed = false;
   private sdkQuery: SdkQuery | null = null;
   private capturedSessionId: string | null = null;
+  /** Turns already charged for; one API turn arrives as several messages. */
+  private readonly seenTurns = new Set<string>();
 
   constructor(
     private readonly sdk: AgentSdkModule,
@@ -326,9 +336,13 @@ export class SdkAgentSession implements AgentSession {
     }
     try {
       for await (const raw of this.sdkQuery) {
-        const events = translateSdkMessage(raw, (id) => {
-          this.capturedSessionId = id;
-        });
+        const events = translateSdkMessage(
+          raw,
+          (id) => {
+            this.capturedSessionId = id;
+          },
+          this.seenTurns,
+        );
         for (const event of events) {
           yield event;
           // After a terminal result the loop ends naturally; close the input

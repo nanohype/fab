@@ -40,16 +40,28 @@ interface MaybeAssistant {
  * The per-request token counts an assistant message carries, as the cost span
  * the budget tracker reads.
  *
- * Without this the kill-switch is unreachable outside managed-agents. The
- * counts are per request, which is what makes them summable, and an accumulated
- * total is what a ceiling is compared against — the run total on the terminal
- * result arrives once the spending has stopped, so it can report a breach and
- * never prevent one.
+ * Without this the kill-switch is unreachable outside managed-agents. What a
+ * ceiling is compared against is an accumulated total, and a total is the
+ * turn's cost only if each turn contributes once: the SDK emits one assistant
+ * message per content block and every one carries the whole turn's usage, so a
+ * span per message multiplies the total by the block count and trips the
+ * ceiling at a fraction of the budget. `seen` is what makes the second message
+ * of a turn free. The run total on the terminal result arrives once the
+ * spending has stopped, so it reports a breach and never prevents one.
+ *
+ * A message with no id cannot be attributed to a turn, so it is counted. That
+ * over-counts rather than under-counts, which is the direction a spend ceiling
+ * should err in.
  */
-function costSpan(a: MaybeAssistant): AgentEvent | null {
+function costSpan(a: MaybeAssistant, seen: Set<string>): AgentEvent | null {
   const u = a.message.usage;
   if (!u || typeof u.input_tokens !== 'number' || typeof u.output_tokens !== 'number') {
     return null;
+  }
+  const turn = a.message.id;
+  if (turn !== undefined) {
+    if (seen.has(turn)) return null;
+    seen.add(turn);
   }
   return {
     type: 'span.model_request_end',
@@ -83,7 +95,16 @@ interface MaybeResult {
  * what the model said and what the request cost. Returning only the first drops
  * the cost on every transport that speaks this shape.
  */
-export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => void): AgentEvent[] {
+export function translateSdkMessage(
+  raw: unknown,
+  onSessionId: (id: string) => void,
+  /**
+   * The turns already charged for, owned by the session. Required rather than
+   * defaulted: a caller that forgot it would charge a turn once per content
+   * block, and the ceiling would fire at a fraction of the budget.
+   */
+  seenTurns: Set<string>,
+): AgentEvent[] {
   if (typeof raw !== 'object' || raw === null) return [];
   const m = raw as MaybeSystemInit;
 
@@ -102,7 +123,7 @@ export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => v
     const a = raw as MaybeAssistant;
     // Content before cost, so text the model produced is captured before a
     // ceiling can end the stream on the span that follows it.
-    const span = costSpan(a);
+    const span = costSpan(a, seenTurns);
     // An `assistant` message can contain interleaved text + tool_use blocks.
     // Surface the first text block as `agent.message` so the workflow
     // formatter has something to render; tool-use blocks emit their own

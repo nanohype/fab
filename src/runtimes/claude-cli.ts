@@ -111,6 +111,8 @@ class ClaudeCliSession implements AgentSession {
   private stderrBuf = '';
   private terminalEmitted = false;
   private cleaned = false;
+  /** Turns already charged for; one API turn arrives as several messages. */
+  private readonly seenTurns = new Set<string>();
 
   constructor(opts: SessionConstructorOptions) {
     this.id = opts.sessionId;
@@ -233,9 +235,13 @@ class ClaudeCliSession implements AgentSession {
           continue;
         }
 
-        const events = translateSdkMessage(parsed, (id) => {
-          this.capturedSessionId = id;
-        });
+        const events = translateSdkMessage(
+          parsed,
+          (id) => {
+            this.capturedSessionId = id;
+          },
+          this.seenTurns,
+        );
         for (const event of events) {
           yield event;
           if (isTerminal(event)) {
