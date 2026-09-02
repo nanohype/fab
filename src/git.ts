@@ -8,7 +8,7 @@
 // workflow start so agents never have to create, search for, or verify
 // the repo themselves.
 
-import { describeRefusal, repoPathRefusal } from './paths.js';
+import { canonicalRepoPath, describeRefusal, repoPathRefusal } from './paths.js';
 
 const GITHUB_API = 'https://api.github.com';
 
@@ -181,7 +181,7 @@ export async function fetchRepoFile(
     );
     return null;
   }
-  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+  const encodedPath = canonicalRepoPath(path)!.split('/').map(encodeURIComponent).join('/');
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
     {

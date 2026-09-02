@@ -23,8 +23,6 @@ export type PathRefusal =
   | 'not-one-line'
   | 'absolute'
   | 'parent-segment'
-  | 'empty-segment'
-  | 'current-segment'
   | 'backslash';
 
 /**
@@ -51,12 +49,32 @@ export function repoPathRefusal(value: string): PathRefusal | null {
   if (value.includes('\\')) return 'backslash';
   if (value.startsWith('/')) return 'absolute';
 
-  for (const segment of value.split('/')) {
-    if (segment === '..') return 'parent-segment';
-    if (segment === '.') return 'current-segment';
-    if (segment === '') return 'empty-segment';
-  }
+  // Only the parent segment can leave the tree. A `.` or an empty segment
+  // resolves to the directory it sits in, so refusing them would buy no
+  // containment and would cost a caller a path the published contract accepts —
+  // and on the read side a refusal is a skipped check, which fails open. They
+  // are removed by {@link canonicalRepoPath} instead, so the path that was
+  // checked is the path that gets used.
+  if (value.split('/').includes('..')) return 'parent-segment';
   return null;
+}
+
+/**
+ * The contained path in the one spelling every consumer uses, or null when the
+ * value is not contained.
+ *
+ * Segments that resolve to nothing are dropped here rather than refused above,
+ * so `./src`, `src/` and `a//b` reach a consumer as `src`, `src` and `a/b`. A
+ * check that passes a string and a use that resolves a different one is the
+ * defect this module exists to prevent, and normalising once at the boundary is
+ * what keeps them the same string.
+ */
+export function canonicalRepoPath(value: string): string | null {
+  if (repoPathRefusal(value) !== null) return null;
+  return value
+    .split('/')
+    .filter((seg) => seg !== '' && seg !== '.')
+    .join('/');
 }
 
 /** True when `value` names a location inside the repository and nowhere else. */
@@ -77,11 +95,27 @@ export function describeRefusal(refusal: PathRefusal): string {
       return 'is an absolute path';
     case 'parent-segment':
       return 'contains a parent-directory segment';
-    case 'empty-segment':
-      return 'contains an empty path segment';
-    case 'current-segment':
-      return 'contains a bare current-directory segment';
     case 'backslash':
       return 'contains a backslash';
   }
+}
+
+/** Where an artifact recorded in a session lands, or why it lands nowhere. */
+export type ExportDestination = { readonly path: string } | { readonly refusal: PathRefusal };
+
+/**
+ * The repo-relative destination for an artifact path a role's model chose.
+ *
+ * The sandbox roots are stripped first because that is where a session's own
+ * writes are rooted, and what remains is held to the same containment rule the
+ * read side uses. Exported rather than inlined at the call site so the rule can
+ * be exercised on this side too: a guard reachable only from a command's
+ * private function is a guard no test can run, and the two sides of one rule
+ * are one rule only while both are checked.
+ */
+export function exportDestination(filePath: string): ExportDestination {
+  const stripped = filePath.replace(/^\/workspace\/artifacts\//, '').replace(/^\/workspace\//, '');
+  const refusal = repoPathRefusal(stripped);
+  if (refusal) return { refusal };
+  return { path: canonicalRepoPath(stripped)! };
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { isContainedRepoPath } from './paths.js';
+import { describeRefusal, type PathRefusal, repoPathRefusal } from './paths.js';
 
 /**
  * Prompt-injection hardening for untrusted input.
@@ -139,5 +139,21 @@ const PROMPT_SAFE_SEGMENTS = /^[A-Za-z0-9._][A-Za-z0-9._\-/]{0,199}$/;
  * reporting that something was.
  */
 export function unsafeSourceDirs(dirs: readonly string[]): string[] {
-  return dirs.filter((d) => !PROMPT_SAFE_SEGMENTS.test(d) || !isContainedRepoPath(d));
+  return dirs.filter((d) => sourceDirRefusal(d) !== null);
+}
+
+/**
+ * Why an entry is not a usable source directory, in words, or null when it is.
+ *
+ * The halt message goes to whoever wrote the brief, and "this entry is wrong" is
+ * not something they can act on. Both halves can be the reason, so both can say
+ * so.
+ */
+export function sourceDirRefusal(dir: string): string | null {
+  const refusal: PathRefusal | null = repoPathRefusal(dir);
+  if (refusal) return describeRefusal(refusal);
+  if (!PROMPT_SAFE_SEGMENTS.test(dir)) {
+    return 'is not spelled as a repo-relative directory (letters, digits, dot, dash, underscore and slash, at most 200 characters)';
+  }
+  return null;
 }

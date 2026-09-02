@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { AnthropicAgents } from '../api.js';
-import { describeRefusal, repoPathRefusal } from '../paths.js';
+import { describeRefusal, exportDestination } from '../paths.js';
 import { TEAM } from '../team.js';
 import { formatEvent } from '../stream.js';
 import { startRepl } from '../repl.js';
@@ -1332,18 +1332,14 @@ async function exportSession(args: ParsedArgs): Promise<void> {
   let written = 0;
   const refused: string[] = [];
   for (const file of files) {
-    // Normalize: /workspace/artifacts/product/prd.md → product/prd.md
-    const relativePath = file.path
-      .replace(/^\/workspace\/artifacts\//, '')
-      .replace(/^\/workspace\//, '');
-    const refusal = repoPathRefusal(relativePath);
-    if (refusal) {
-      refused.push(`${file.path} (${describeRefusal(refusal)})`);
+    const dest = exportDestination(file.path);
+    if ('refusal' in dest) {
+      refused.push(`${file.path} — ${describeRefusal(dest.refusal)}`);
       continue;
     }
-    const dest = join(outputDir, relativePath);
-    await mkdir(dirname(dest), { recursive: true });
-    await writeFile(dest, file.content, 'utf-8');
+    const target = join(outputDir, dest.path);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, file.content, 'utf-8');
     written += 1;
   }
 
@@ -1352,8 +1348,11 @@ async function exportSession(args: ParsedArgs): Promise<void> {
     // Named rather than counted: which path the session asked for is the part
     // an operator needs, and a silent skip is how a truncated export reads as a
     // complete one.
-    console.log(`${refused.length} file(s) were not written because the path escapes the export:`);
+    console.log(
+      `${refused.length} file(s) were not written — the session named a path this export cannot place:`,
+    );
     for (const r of refused) console.log(`  ${r}`);
+    console.log('  Re-run the role with a repo-relative artifact path to place them.');
   }
 }
 
