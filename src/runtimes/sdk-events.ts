@@ -80,8 +80,8 @@ interface MaybeResult {
  * must see them.
  *
  * A list rather than one event because an assistant message carries two things:
- * what the model said and what the request cost. Returning only the first is how
- * the cost went missing on every transport that speaks this shape.
+ * what the model said and what the request cost. Returning only the first drops
+ * the cost on every transport that speaks this shape.
  */
 export function translateSdkMessage(raw: unknown, onSessionId: (id: string) => void): AgentEvent[] {
   if (typeof raw !== 'object' || raw === null) return [];

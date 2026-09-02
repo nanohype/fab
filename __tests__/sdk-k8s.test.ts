@@ -66,6 +66,33 @@ describe('buildAgentSandboxManifest', () => {
     expect(manifest.spec.runtimeClassName).toBeUndefined();
   });
 
+  it('carries no state-file variable onto the session pod', () => {
+    // What reaches the pod decides which ceilings apply inside it. The Agent
+    // SDK's own spend cap is read from the operator's state file, so a pod with
+    // no variable naming that file has span-driven enforcement and nothing
+    // else — which is what the runbook tells an operator. Asserted here so the
+    // manifest and that sentence cannot part.
+    for (const key of ['FAB_STATE_FILE', 'FAB_QUALITY_FILE', 'ANTHROPIC_API_KEY']) {
+      vi.stubEnv(key, '/somewhere/state.json');
+    }
+    const manifest = buildAgentSandboxManifest('go-engineer', 'go', cfg);
+    const names = (manifest.spec.env ?? []).map((e) => e.name);
+    expect(names).not.toContain('FAB_STATE_FILE');
+    expect(names).not.toContain('FAB_QUALITY_FILE');
+    expect(names).not.toContain('ANTHROPIC_API_KEY');
+  });
+
+  it('carries the variables the in-pod session is bounded by', () => {
+    // The wall clocks do reach the pod, and by this channel: a pod cannot read
+    // the operator's state file, so anything the session must honour has to be
+    // named here.
+    vi.stubEnv('FAB_SESSION_IDLE_MS', '900000');
+    vi.stubEnv('FAB_SESSION_TOTAL_MS', '1800000');
+    const manifest = buildAgentSandboxManifest('go-engineer', 'go', cfg);
+    expect(manifest.spec.env).toContainEqual({ name: 'FAB_SESSION_IDLE_MS', value: '900000' });
+    expect(manifest.spec.env).toContainEqual({ name: 'FAB_SESSION_TOTAL_MS', value: '1800000' });
+  });
+
   it('forwards the inference backend onto the session pod env', () => {
     vi.stubEnv('FAB_INFERENCE', 'bedrock');
     vi.stubEnv('AWS_REGION', 'us-east-1');

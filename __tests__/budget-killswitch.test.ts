@@ -11,15 +11,12 @@ import type { AgentEvent } from '../src/types.js';
 // ── The budget ceiling, reached from the transports that had no route to it ──
 //
 // streamSessionWithAdvisor compares its accumulated cost against the limit on
-// `span.model_request_end` and on nothing else. The transports that speak the
-// Claude Code message shape produced no such span: their only cost signal was
-// `total_cost_usd` on the terminal result, which arrives once the session is
-// over. A ceiling that is only consulted after the spending has stopped can
-// report a breach and can never prevent one, so the kill-switch was declared,
-// consumed, and unreachable.
+// `span.model_request_end` and on nothing else, so every transport reaches the
+// ceiling only through those spans. A run total on the terminal result arrives
+// once the spending has stopped: it can report a breach and never prevent one.
 //
 // These cases drive the real transports rather than a hand-built event list,
-// because the defect was in what the transports emitted, not in the comparison.
+// because what a transport emits is what decides whether the ceiling can act.
 
 const MODEL = 'claude-sonnet-5';
 

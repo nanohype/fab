@@ -140,8 +140,11 @@ running): <error>` — at that point kill the session manually (managed
   `claude-cli` transports also report a single `total_cost_usd` on the final
   idle event; fab records it (`session cost: $…`) as the run's own total,
   which reconciles the accumulated spans rather than enforcing anything —
-  it arrives once the session is over. On `sdk` and `sdk-k8s` the Agent SDK
-  applies its own `maxBudgetUsd` ceiling in addition.
+  it arrives once the session is over. The `sdk` transport carries a second,
+  independent ceiling: the Agent SDK's own `maxBudgetUsd`, read from the same
+  limit. It does not reach `sdk-k8s` — the in-pod session reads the limit from
+  the operator's state file, and a pod has neither that file nor a variable
+  naming it, so span-driven enforcement is the only ceiling there.
 - **How to adjust** — `fab budget set <dollars>` against the same
   `FAB_STATE_FILE` the run reads (in-cluster: the seed initContainer above).
   Unset (`fab budget clear`) means no limit.
