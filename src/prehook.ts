@@ -57,7 +57,7 @@ export type CommandRunner = (
 // floor for the same reason attribution.ts's runner is: it shells out, so
 // covering it would mean running a real build inside the unit suite.
 /* v8 ignore start */
-const defaultRunner: CommandRunner = async (command, cwd) => {
+export const shellRunner: CommandRunner = async (command, cwd) => {
   try {
     const { stdout, stderr } = await execAsync(command, {
       cwd,
@@ -109,7 +109,7 @@ const realExists = async (path: string): Promise<boolean> => {
  */
 export async function runFourPhasePreHook(opts: PreHookOptions): Promise<PreHookResult> {
   const toolchain = LANGUAGE_TOOLCHAIN[opts.language];
-  const run = opts.run ?? defaultRunner;
+  const run = opts.run ?? shellRunner;
   const exists = opts.exists ?? realExists;
 
   if (!(await exists(join(opts.cwd, toolchain.manifest)))) {
