@@ -15,10 +15,14 @@ import { fetchRepoFile } from '../src/git.js';
 // The values here are repo-relative paths by contract and arbitrary text in
 // fact: a directory from an intake brief, a `file:` from a role's CITATIONS
 // block, a `file_path` from a tool call a model made. What separates them is
-// only what checks them, so the table below is run through all three consumers
-// — `unsafeSourceDirs`, `fetchRepoFile` and `exportDestination` — rather than
-// through one. A guard that refuses what its sibling admits is two rules, and
-// two rules is what this closes.
+// only what checks them, so the table below is run through the intake guard,
+// the citation read, and the destination the export computes, rather than
+// through one of them. A guard that refuses what its sibling admits is two
+// rules, and two rules is what this closes.
+//
+// What the table cannot say is whether a consumer applies the answer it gets.
+// That is a question about what a run leaves on disk, and
+// `__tests__/export.test.ts` asks it there.
 
 /** Values that must be refused everywhere, with why. */
 const ESCAPES: [string, string][] = [
@@ -87,7 +91,7 @@ describe('the containment rule', () => {
   it('names every refusal in a phrase that reads inside a sentence', () => {
     for (const [value] of ESCAPES) {
       const refusal = repoPathRefusal(value)!;
-      expect(describeRefusal(refusal)).toMatch(/^(is|contains|carries)\b/);
+      expect(describeRefusal(refusal)).toMatch(/^(is|contains|carries|names)\b/);
     }
   });
 });

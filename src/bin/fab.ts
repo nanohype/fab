@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { AnthropicAgents } from '../api.js';
-import { describeRefusal, exportDestination } from '../paths.js';
+import { collectArtifacts, type EventPage, writeArtifacts } from '../export.js';
 import { TEAM } from '../team.js';
 import { formatEvent } from '../stream.js';
 import { startRepl } from '../repl.js';
@@ -1285,69 +1285,27 @@ async function exportSession(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const { writeFile, mkdir } = await import('node:fs/promises');
-  const { join, dirname } = await import('node:path');
-
   const api = client();
   const outputDir =
     typeof args.flags.output === 'string' ? args.flags.output : `./export-${sessionId.slice(-8)}`;
 
-  // Paginate through all events
-  let page: string | null = null;
-  const files: { path: string; content: string }[] = [];
-
-  do {
-    const url = `/v1/sessions/${sessionId}/events?limit=100&order=asc${page ? `&page=${page}` : ''}`;
-    const result = await (
+  const files = await collectArtifacts((page) =>
+    (
       api as unknown as {
-        get: (p: string) => Promise<{
-          data: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
-          next_page: string | null;
-        }>;
+        get: (p: string) => Promise<EventPage>;
       }
-    ).get(url);
-
-    for (const event of result.data) {
-      if (event.type === 'agent.tool_use' && event.name === 'write' && event.input) {
-        const filePath = String(event.input.file_path ?? event.input.path ?? '');
-        const content = String(event.input.content ?? '');
-        if (filePath && content) {
-          files.push({ path: filePath, content });
-        }
-      }
-    }
-    page = result.next_page;
-  } while (page);
+    ).get(`/v1/sessions/${sessionId}/events?limit=100&order=asc${page ? `&page=${page}` : ''}`),
+  );
 
   if (files.length === 0) {
     console.log('No file artifacts found in session.');
     return;
   }
 
-  // Write files locally. Each path is the `file_path` argument of a `write`
-  // tool call a role's model made, so what it names is the model's choice and
-  // nothing here has been near a filesystem yet. `join` resolves a parent
-  // segment rather than rejecting it, and `mkdir -p` builds whatever tree the
-  // resolved path implies, so an unchecked value writes wherever it points.
-  let written = 0;
-  const refused: string[] = [];
-  for (const file of files) {
-    const dest = exportDestination(file.path);
-    if ('refusal' in dest) {
-      refused.push(`${file.path} — ${describeRefusal(dest.refusal)}`);
-      continue;
-    }
-    const target = join(outputDir, dest.path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, file.content, 'utf-8');
-    written += 1;
-  }
+  const { written, refused } = await writeArtifacts(files, outputDir);
 
-  console.log(`Exported ${written} files to ${outputDir}/`);
+  console.log(`Exported ${written.length} files to ${outputDir}/`);
   if (refused.length > 0) {
-    // Named rather than counted: which path the session asked for is the part
-    // an operator needs, and a silent skip is how a truncated export reads as a
-    // complete one.
     console.log(
       `${refused.length} file(s) were not written — the session named a path this export cannot place:`,
     );

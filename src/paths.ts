@@ -56,8 +56,16 @@ export function repoPathRefusal(value: string): PathRefusal | null {
   // are removed by {@link canonicalRepoPath} instead, so the path that was
   // checked is the path that gets used.
   if (value.split('/').includes('..')) return 'parent-segment';
+  // `.`, `./` and every spelling that reduces to nothing name the directory
+  // they are relative to, not a place inside it. Admitted, one would join to
+  // the output directory itself, and a write there replaces the directory with
+  // a file.
+  if (canonicalSegments(value).length === 0) return 'empty';
   return null;
 }
+
+const canonicalSegments = (value: string): string[] =>
+  value.split('/').filter((seg) => seg !== '' && seg !== '.');
 
 /**
  * The contained path in the one spelling every consumer uses, or null when the
@@ -71,10 +79,7 @@ export function repoPathRefusal(value: string): PathRefusal | null {
  */
 export function canonicalRepoPath(value: string): string | null {
   if (repoPathRefusal(value) !== null) return null;
-  return value
-    .split('/')
-    .filter((seg) => seg !== '' && seg !== '.')
-    .join('/');
+  return canonicalSegments(value).join('/');
 }
 
 /** True when `value` names a location inside the repository and nowhere else. */
@@ -86,7 +91,7 @@ export function isContainedRepoPath(value: string): boolean {
 export function describeRefusal(refusal: PathRefusal): string {
   switch (refusal) {
     case 'empty':
-      return 'is empty';
+      return 'names no location inside the tree';
     case 'too-long':
       return `is longer than ${REPO_PATH_MAX} characters`;
     case 'not-one-line':
@@ -108,10 +113,12 @@ export type ExportDestination = { readonly path: string } | { readonly refusal: 
  *
  * The sandbox roots are stripped first because that is where a session's own
  * writes are rooted, and what remains is held to the same containment rule the
- * read side uses. Exported rather than inlined at the call site so the rule can
- * be exercised on this side too: a guard reachable only from a command's
- * private function is a guard no test can run, and the two sides of one rule
- * are one rule only while both are checked.
+ * read side uses.
+ *
+ * This is the rule, not its application. Whether the export applies it is a
+ * question about what lands on disk, and `__tests__/export.test.ts` answers it
+ * by running the export against a session that recorded an escape and looking
+ * at the filesystem afterwards.
  */
 export function exportDestination(filePath: string): ExportDestination {
   const stripped = filePath.replace(/^\/workspace\/artifacts\//, '').replace(/^\/workspace\//, '');

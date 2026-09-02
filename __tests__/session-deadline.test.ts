@@ -339,12 +339,18 @@ async function waitForFile(path: string): Promise<void> {
   // Generous because process startup is not what this file measures, and a
   // loaded machine running the whole suite can take seconds to boot a child.
   // A bound that fired early because the subprocess had not spoken yet would
-  // pass for the wrong reason.
-  for (let i = 0; i < 1200; i++) {
+  // pass for the wrong reason. Sized under the case's own budget so this is
+  // what reports, rather than a timeout with nothing to say.
+  for (let i = 0; i < 3000; i++) {
     if (existsSync(path)) return;
     await new Promise((res) => setTimeout(res, 25));
   }
-  throw new Error(`the fake claude never started: ${path} was not written`);
+  // Either cause looks the same from here: `spawnClaude` reports a failed exec
+  // on stderr and returns a session either way, so this names both rather than
+  // picking one.
+  throw new Error(
+    `no fixture subprocess wrote ${path} within 75s — it started slowly, or the spawn failed and said so on stderr`,
+  );
 }
 
 async function waitForExit(pid: number): Promise<void> {
