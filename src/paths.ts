@@ -82,7 +82,15 @@ export function canonicalRepoPath(value: string): string | null {
   return canonicalSegments(value).join('/');
 }
 
-/** True when `value` names a location inside the repository and nowhere else. */
+/**
+ * True when `value`'s shape cannot leave the tree it is relative to.
+ *
+ * Lexical, and only that: it reads the path and knows nothing of the
+ * filesystem, so a symlink already sitting in the destination is invisible to
+ * it. A caller that writes resolves the target and compares it against the
+ * resolved destination — see `writeArtifacts` — because where bytes land is not
+ * a property of how a string reads.
+ */
 export function isContainedRepoPath(value: string): boolean {
   return repoPathRefusal(value) === null;
 }
