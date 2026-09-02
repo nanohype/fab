@@ -8,6 +8,8 @@
 // workflow start so agents never have to create, search for, or verify
 // the repo themselves.
 
+import { describeRefusal, repoPathRefusal } from './paths.js';
+
 const GITHUB_API = 'https://api.github.com';
 
 /**
@@ -139,11 +141,21 @@ export async function fetchRepoFile(
   path: string,
   ref: string,
 ): Promise<string | null> {
-  const encodedPath = path
-    .split('/')
-    .filter((seg) => seg.length > 0)
-    .map(encodeURIComponent)
-    .join('/');
+  // The path is a `file:` a model wrote. `encodeURIComponent` leaves a dot
+  // alone, so a parent segment survives encoding intact and the dot-segment
+  // removal every URL parser applies then walks the request off the pinned
+  // `/repos/{owner}/{repo}/contents/` prefix — to another repository, or to an
+  // account-wide endpoint, carrying this repository's token. Refusing the value
+  // is what keeps the request inside the repository under review; refusing it
+  // before the request is what keeps the reply from being an oracle.
+  const refusal = repoPathRefusal(path);
+  if (refusal) {
+    process.stderr.write(
+      `[git] refusing to read a cited path that ${describeRefusal(refusal)}: ${JSON.stringify(path)}\n`,
+    );
+    return null;
+  }
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
     {

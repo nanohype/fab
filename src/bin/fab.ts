@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { AnthropicAgents } from '../api.js';
+import { describeRefusal, repoPathRefusal } from '../paths.js';
 import { TEAM } from '../team.js';
 import { formatEvent } from '../stream.js';
 import { startRepl } from '../repl.js';
@@ -1323,18 +1324,37 @@ async function exportSession(args: ParsedArgs): Promise<void> {
     return;
   }
 
-  // Write files locally
+  // Write files locally. Each path is the `file_path` argument of a `write`
+  // tool call a role's model made, so what it names is the model's choice and
+  // nothing here has been near a filesystem yet. `join` resolves a parent
+  // segment rather than rejecting it, and `mkdir -p` builds whatever tree the
+  // resolved path implies, so an unchecked value writes wherever it points.
+  let written = 0;
+  const refused: string[] = [];
   for (const file of files) {
     // Normalize: /workspace/artifacts/product/prd.md → product/prd.md
     const relativePath = file.path
       .replace(/^\/workspace\/artifacts\//, '')
       .replace(/^\/workspace\//, '');
+    const refusal = repoPathRefusal(relativePath);
+    if (refusal) {
+      refused.push(`${file.path} (${describeRefusal(refusal)})`);
+      continue;
+    }
     const dest = join(outputDir, relativePath);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, file.content, 'utf-8');
+    written += 1;
   }
 
-  console.log(`Exported ${files.length} files to ${outputDir}/`);
+  console.log(`Exported ${written} files to ${outputDir}/`);
+  if (refused.length > 0) {
+    // Named rather than counted: which path the session asked for is the part
+    // an operator needs, and a silent skip is how a truncated export reads as a
+    // complete one.
+    console.log(`${refused.length} file(s) were not written because the path escapes the export:`);
+    for (const r of refused) console.log(`  ${r}`);
+  }
 }
 
 // ── Revise command ──────────────────────────────────────────────────
