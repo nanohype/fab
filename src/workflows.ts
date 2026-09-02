@@ -1353,9 +1353,10 @@ async function buildCitationReader(
  */
 export async function runGatePreHook(
   artifact: GateArtifact | null,
-  // The git questions that establish which tree this is. Overridden only where
-  // a test needs them answered against a local remote; the phases themselves
-  // always run as real subprocesses.
+  // Every git command this reaches for: the questions that establish which tree
+  // this is, and the fetch that obtains one. Overridden only where a test needs
+  // both answered locally; the phases themselves always run as real
+  // subprocesses, because `runFourPhasePreHook` is called without a runner.
   deps: { run?: ShellRunner } = {},
 ): Promise<PreHookResult> {
   // Resolved before anything is acquired: a throw here would otherwise leave a

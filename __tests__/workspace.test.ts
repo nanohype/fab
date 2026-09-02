@@ -431,9 +431,10 @@ describe('workspaceMismatch against real checkouts', () => {
 
 // ── The fetch, executed ─────────────────────────────────────────────
 //
-// Every case above short-circuits before git runs, so what they prove is the
-// shape of the command line. These two run it: the composed flag set against a
-// real repository, and the credential helper the flags point at.
+// No case above runs the fetch. The ones that reach it record its command line
+// and stop; the ones that run git for real never call it. So what is proven of
+// the fetch there is its shape. These two run it: the composed flag set against
+// a real repository, and the credential helper the flags point at.
 
 describe('the composed fetch runs', () => {
   let root: string;

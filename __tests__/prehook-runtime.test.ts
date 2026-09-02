@@ -14,10 +14,9 @@ import { type RoleRunner, runGatePreHook, runMergeGate } from '../src/workflows.
 //
 // Every other runMergeGate test injects a stubbed pre-hook, and prehook.ts's
 // default runner is excluded from the coverage floor because it shells out.
-// Between those two, the path from runMergeGate through resolvePreHook to a
-// subprocess is asserted nowhere: a gate that spawns nothing at all satisfies
-// the rest of the suite. That is the shape of the defect this closes, so the
-// control has to be the shape of the fix — a real workspace, the real
+// Between those two, a gate that spawns nothing at all satisfies the rest of
+// the suite. What is asserted here is the path from runMergeGate through
+// runGatePreHook to a subprocess — a real workspace, the real
 // toolchain commands, and an observation a stub cannot forge.
 //
 // Each phase script appends its name to a file in the workspace. A stubbed
@@ -129,10 +128,14 @@ async function fixture(phases: Record<string, PhaseSpec>): Promise<string> {
 }
 
 /**
- * Answers only the remote-identity question, and runs every other git command
- * for real. A local remote cannot be a github.com URL and git rewrites reach
+ * Answers the remote-identity question, refuses the fetch, and runs every other
+ * git command for real.
+ *
+ * A local remote cannot be a github.com URL and git rewrites reach
  * `remote get-url` as well as the transport, so a fixture that disguised the
- * path would be testing the disguise.
+ * path would be testing the disguise. The fetch is refused because reaching for
+ * the artifact over the network is out of scope here; that it is attempted, and
+ * what the roles are told when it cannot happen, is what these cases assert.
  */
 const fixtureGit: ShellRunner = async (command, cwd) => {
   if (command.includes('clone --depth 1')) {
@@ -157,7 +160,7 @@ const fixtureGit: ShellRunner = async (command, cwd) => {
   }
 };
 
-/** The production pre-hook, with only the identity questions pointed locally. */
+/** The production pre-hook, with the git questions answered against the fixture. */
 const localPreHook = (artifact: Parameters<typeof runGatePreHook>[0]) =>
   runGatePreHook(artifact, { run: fixtureGit });
 
@@ -233,8 +236,8 @@ describe('runMergeGate drives the real pre-hook', () => {
       return APPROVE_WITH_EVIDENCE;
     };
 
-    // The production pre-hook, with only the git questions pointed at the local
-    // remote — the phases below are real subprocesses either way.
+    // The production pre-hook, with the git questions answered against the
+    // fixture — the phases below are real subprocesses either way.
     const result = await runMergeGate(
       runtime,
       'wf',
