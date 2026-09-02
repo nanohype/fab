@@ -183,13 +183,13 @@ describe('QUALITY_RUBRIC', () => {
 });
 
 describe('PRODUCTION_BAR', () => {
-  it('covers all 9 numbered dimensions', () => {
+  it('covers all 9 numbered requirements', () => {
     for (let i = 1; i <= 9; i++) {
       expect(PRODUCTION_BAR).toMatch(new RegExp(`\\b${i}\\.\\s`, 'm'));
     }
   });
 
-  it('includes the ninth dimension on versions', () => {
+  it('includes the ninth requirement on versions', () => {
     expect(PRODUCTION_BAR).toMatch(/9\..*Versions/);
     expect(PRODUCTION_BAR).toMatch(/VERSION_CURRENCY_POLICY/);
   });

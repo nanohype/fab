@@ -1520,7 +1520,7 @@ async function recordQuality(
 
 /**
  * Cold-context external-reviewer calibration. Runs AFTER the four gate
- * roles approve. The external-reviewer grades the 9 QUALITY_RUBRIC
+ * roles approve. The external-reviewer grades the 10 QUALITY_RUBRIC
  * dimensions against the post-merge tree without seeing any internal
  * verdicts. The pipeline compares its grades against the aggregate of
  * internal grades; >1-letter drift on any dimension blocks release.
