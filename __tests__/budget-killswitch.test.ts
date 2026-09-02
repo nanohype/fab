@@ -6,6 +6,12 @@ import { ClaudeCliRuntime } from '../src/runtimes/claude-cli.js';
 import { SdkAgentSession, SdkRuntime } from '../src/runtimes/sdk.js';
 import { streamSessionWithAdvisor } from '../src/workflows.js';
 import { streamEventsToJsonl } from '../src/runtimes/role-session.js';
+import {
+  assistantMessage as fixtureAssistant,
+  initLine,
+  resultLine,
+  startFakeClaudeSession,
+} from './helpers/fake-claude.js';
 import { parseLogLine } from '../src/runtimes/sdk-k8s.js';
 import { formatEvent } from '../src/stream.js';
 import type { AgentEvent } from '../src/types.js';
@@ -44,12 +50,10 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'fab-budget-'));
-    saved = {
-      state: process.env.FAB_STATE_FILE,
-      claude: process.env.FAB_CLAUDE_PATH,
-      mcp: process.env.FAB_CLAUDE_MCP_DIR,
-      idle: process.env.FAB_SESSION_IDLE_MS,
-    };
+    // Only the ceiling's own variable: everything a claude-cli fixture needs is
+    // set and restored by the fixture, and a second owner here would be the
+    // per-case remedy this file just stopped keeping.
+    saved = { state: process.env.FAB_STATE_FILE };
     // A ceiling is read from state; this file is this case's own.
     process.env.FAB_STATE_FILE = join(dir, 'state.json');
     writeFileSync(
@@ -65,15 +69,8 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
 
   afterEach(() => {
     vi.restoreAllMocks();
-    for (const [k, v] of [
-      ['FAB_STATE_FILE', saved.state],
-      ['FAB_CLAUDE_PATH', saved.claude],
-      ['FAB_CLAUDE_MCP_DIR', saved.mcp],
-      ['FAB_SESSION_IDLE_MS', saved.idle],
-    ] as const) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
+    if (saved.state === undefined) delete process.env.FAB_STATE_FILE;
+    else process.env.FAB_STATE_FILE = saved.state;
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -116,50 +113,26 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
   });
 
   it('claude-cli: the subprocess is gone, not merely stopped being read', async () => {
-    const pidFile = join(dir, 'pid');
-    const fake = join(dir, 'claude');
-    const line = (o: unknown) =>
-      `process.stdout.write(${JSON.stringify(`${JSON.stringify(o)}\n`)});`;
-    writeFileSync(
-      fake,
-      [
-        '#!/usr/bin/env node',
-        `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`,
-        line({ type: 'system', subtype: 'init', session_id: 'sess-budget' }),
-        line(assistantMessage('burning tokens', EXPENSIVE)),
-        line(assistantMessage('spent past the ceiling', EXPENSIVE)),
-        // Never reached if the ceiling acts; the process would otherwise sit
-        // here forever, which is what a run past its budget looks like.
-        'setInterval(() => {}, 1e9);',
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    // writeFileSync's mode is masked by the umask; the bit has to be set again.
-    chmodSync(fake, 0o755);
-    process.env.FAB_CLAUDE_PATH = fake;
-    process.env.FAB_CLAUDE_MCP_DIR = dir;
-    // Far enough above this case's own duration that the wall clock cannot be
-    // what ends the session, and low enough that a subprocess which never
-    // speaks fails the case by name instead of hanging it.
-    process.env.FAB_SESSION_IDLE_MS = '20000';
+    const fake = await startFakeClaudeSession({
+      emit: [
+        initLine('sess-budget'),
+        fixtureAssistant('msg_1', 'burning tokens', EXPENSIVE, 'sess-budget'),
+        fixtureAssistant('msg_2', 'spent past the ceiling', EXPENSIVE, 'sess-budget'),
+      ],
+    });
+    try {
+      const output = await streamSessionWithAdvisor(fake.session, { model: MODEL });
 
-    const session = await new ClaudeCliRuntime().runRoleSession('pr-reviewer', 'go');
-    // The child writes its pid before it writes an event, so waiting for the
-    // file is waiting for it to exist. Without that wait the wall clock races
-    // process startup, and under a loaded suite the clock wins — which would
-    // end the session for a reason this case is not about.
-    await waitForFile(pidFile);
-    const pid = Number(readFileSync(pidFile, 'utf-8'));
+      expect(written).toContain('BUDGET EXCEEDED');
+      expect(output).toContain('burning tokens');
+      expect(output).not.toContain('spent past the ceiling');
 
-    const output = await streamSessionWithAdvisor(session, { model: MODEL });
-
-    expect(written).toContain('BUDGET EXCEEDED');
-    expect(output).toContain('burning tokens');
-    expect(output).not.toContain('spent past the ceiling');
-
-    await waitForExit(pid);
-    expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
-  }, 60_000);
+      await fake.waitForExit();
+      expect(fake.isGone()).toBe(true);
+    } finally {
+      fake.dispose();
+    }
+  }, 120_000);
 
   it('lets a session under the ceiling run to its own end', async () => {
     // A ceiling that stops everything is not a ceiling. The same shape of run,
@@ -262,52 +235,19 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
     // The per-turn property is three pieces of state, not one: this transport
     // keeps its own, and a gate that drives only the in-process session leaves
     // it unheld.
-    const dir = mkdtempSync(join(tmpdir(), 'fab-cli-turn-'));
-    const pidFile = join(dir, 'pid');
-    const fake = join(dir, 'claude');
-    const line = (o: unknown) =>
-      `process.stdout.write(${JSON.stringify(`${JSON.stringify(o)}\n`)});`;
-    const msg = (id: string, text: string) => ({
-      type: 'assistant',
-      uuid: `u-${id}-${text}`,
-      session_id: 'sess-cli',
-      message: {
-        id,
-        usage: { input_tokens: 0, output_tokens: 20_000 },
-        content: [{ type: 'text', text }],
-      },
+    const usage = { input_tokens: 0, output_tokens: 20_000 };
+    const fake = await startFakeClaudeSession({
+      emit: [
+        initLine('sess-cli'),
+        fixtureAssistant('msg_A', 'a1', usage, 'sess-cli'),
+        fixtureAssistant('msg_A', 'a2', usage, 'sess-cli'),
+        fixtureAssistant('msg_A', 'a3', usage, 'sess-cli'),
+        fixtureAssistant('msg_B', 'b1', usage, 'sess-cli'),
+        resultLine('sess-cli'),
+      ],
     });
-    writeFileSync(
-      fake,
-      [
-        '#!/usr/bin/env node',
-        `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`,
-        line({ type: 'system', subtype: 'init', session_id: 'sess-cli' }),
-        line(msg('msg_A', 'a1')),
-        line(msg('msg_A', 'a2')),
-        line(msg('msg_A', 'a3')),
-        line(msg('msg_B', 'b1')),
-        line({ type: 'result', subtype: 'success', uuid: 'r', session_id: 'sess-cli' }),
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    chmodSync(fake, 0o755);
-
-    const saved = {
-      path: process.env.FAB_CLAUDE_PATH,
-      mcp: process.env.FAB_CLAUDE_MCP_DIR,
-      idle: process.env.FAB_SESSION_IDLE_MS,
-    };
-    process.env.FAB_CLAUDE_PATH = fake;
-    process.env.FAB_CLAUDE_MCP_DIR = dir;
-    // Far above this case's own duration, and low enough that a subprocess
-    // which never speaks ends the stream by name instead of hanging it.
-    process.env.FAB_SESSION_IDLE_MS = '20000';
     try {
-      const session = await new ClaudeCliRuntime().runRoleSession('pr-reviewer', 'go');
-      await waitForFile(pidFile);
-      const output = await streamSessionWithAdvisor(session, { model: MODEL });
-
+      const output = await streamSessionWithAdvisor(fake.session, { model: MODEL });
       // One turn is $0.30 against a $0.50 limit; the second takes it to $0.60.
       // Charged per message the first turn alone would have been $0.90.
       expect(written).toContain('BUDGET EXCEEDED');
@@ -315,13 +255,7 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
       expect(output).toContain('a1');
       expect(output).toContain('b1');
     } finally {
-      if (saved.path === undefined) delete process.env.FAB_CLAUDE_PATH;
-      else process.env.FAB_CLAUDE_PATH = saved.path;
-      if (saved.mcp === undefined) delete process.env.FAB_CLAUDE_MCP_DIR;
-      else process.env.FAB_CLAUDE_MCP_DIR = saved.mcp;
-      if (saved.idle === undefined) delete process.env.FAB_SESSION_IDLE_MS;
-      else process.env.FAB_SESSION_IDLE_MS = saved.idle;
-      rmSync(dir, { recursive: true, force: true });
+      fake.dispose();
     }
   }, 120_000);
 
