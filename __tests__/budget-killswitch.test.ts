@@ -14,6 +14,7 @@ import {
 } from './helpers/fake-claude.js';
 import { parseLogLine } from '../src/runtimes/sdk-k8s.js';
 import { formatEvent } from '../src/stream.js';
+import type { AgentSession } from '../src/runtime.js';
 import type { AgentEvent } from '../src/types.js';
 
 // ── The budget ceiling, and what it is compared against ────────────────
@@ -258,6 +259,55 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
       fake.dispose();
     }
   }, 120_000);
+
+  it("prices a turn at the caller's model, and at the default tier without one", async () => {
+    // The ceiling compares against an estimate, so what the estimate is priced
+    // at is part of the ceiling. Naming a model and omitting one are different
+    // numbers for identical tokens, and the difference is the tier ratio — held
+    // here so it is a stated property rather than something a reader would have
+    // to derive from a fallback three modules away.
+    // Under the ceiling this file configures, so the session reaches its idle
+    // event and reports the accumulated estimate instead of being stopped.
+    const usage = {
+      input_tokens: 1_000,
+      output_tokens: 2_000,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    };
+    const span = {
+      type: 'span.model_request_end',
+      id: 't1',
+      is_error: false,
+      model_usage: usage,
+      processed_at: 'x',
+    } as unknown as AgentEvent;
+    // No total_cost_usd on the terminal event, so the accumulated estimate is
+    // what gets reported and can be read back.
+    const idle = { type: 'session.status_idle', id: 's', processed_at: 'x' } as AgentEvent;
+    const session = (): AgentSession =>
+      ({
+        id: 'sess',
+        sendInput: async () => {},
+        interrupt: async () => {},
+        events: (async function* () {
+          yield span;
+          yield idle;
+        })(),
+      }) as unknown as AgentSession;
+
+    const costOf = async (options?: { model: string }): Promise<number> => {
+      written = '';
+      await streamSessionWithAdvisor(session(), options);
+      return Number(/session cost: \$([0-9.]+)/.exec(written)?.[1] ?? Number.NaN);
+    };
+
+    const named = await costOf({ model: 'claude-opus-5' });
+    const unnamed = await costOf(undefined);
+    expect(named).toBeCloseTo(0.055, 5);
+    expect(unnamed).toBeCloseTo(0.033, 5);
+    // The revision path takes the second number for every role it resumes.
+    expect(named / unnamed).toBeCloseTo(5 / 3, 4);
+  });
 
   it('the pod-log wire carries one span per turn to the dispatcher', async () => {
     // The k8s transport reaches the ceiling only through this wire: the in-pod
