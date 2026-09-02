@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   RUN_ROLE_OPTION_SUPPORT,
@@ -48,16 +49,101 @@ const MODULE_OF: Record<RuntimeName, string> = {
   'claude-cli': 'src/runtimes/claude-cli.ts',
 };
 
-const sourceOf = (rel: string): string =>
-  readFileSync(fileURLToPath(new URL(`../${rel}`, import.meta.url)), 'utf-8');
+/**
+ * Which `RunRoleOptions` fields each transport reads, derived from the program
+ * the compiler resolves rather than from the text of one file per transport.
+ *
+ * A read is recorded where the checker says the object being accessed is
+ * `RunRoleOptions`; attribution walks each transport's imports, so a read that
+ * lives in a helper belongs to whichever transports can reach it.
+ */
+function readsPerTransport(): Map<RuntimeName, Set<string>> {
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const configPath = join(root, 'tsconfig.json');
+  const parsed = ts.parseJsonConfigFileContent(
+    ts.readConfigFile(configPath, ts.sys.readFile).config,
+    ts.sys,
+    root,
+  );
+  const program = ts.createProgram(parsed.fileNames, parsed.options);
+  const checker = program.getTypeChecker();
 
-/** Source with comments removed, so a mention in prose is not read as a use. */
-function code(rel: string): string {
-  return sourceOf(rel)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .filter((l) => !l.trim().startsWith('//'))
-    .join('\n');
+  let target: ts.Symbol | undefined;
+  for (const sf of program.getSourceFiles()) {
+    if (!sf.fileName.endsWith('/src/runtime.ts')) continue;
+    ts.forEachChild(sf, (n) => {
+      if (ts.isInterfaceDeclaration(n) && n.name.text === 'RunRoleOptions') {
+        target = checker.getSymbolAtLocation(n.name);
+      }
+    });
+  }
+  if (!target) throw new Error('RunRoleOptions is not declared where this expects it');
+
+  const isOptions = (type: ts.Type): boolean =>
+    (type.isUnion() ? type.types : [type]).some(
+      (t) => t.getSymbol() === target || t.aliasSymbol === target,
+    );
+
+  const byFile = new Map<string, Set<string>>();
+  const note = (file: string, field: string) => {
+    const set = byFile.get(file) ?? new Set<string>();
+    set.add(field);
+    byFile.set(file, set);
+  };
+
+  for (const sf of program.getSourceFiles()) {
+    if (!sf.fileName.includes('/src/') || sf.isDeclarationFile) continue;
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        isOptions(checker.getTypeAtLocation(node.expression))
+      ) {
+        note(sf.fileName, node.name.text);
+      }
+      if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
+        const decl = node.parent.parent;
+        const source = ts.isVariableDeclaration(decl) ? decl.initializer : decl;
+        if (source && isOptions(checker.getTypeAtLocation(source))) {
+          note(sf.fileName, (node.propertyName ?? node.name).getText());
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+  }
+
+  const importsOf = (sf: ts.SourceFile): string[] => {
+    const out: string[] = [];
+    ts.forEachChild(sf, (n) => {
+      const spec =
+        (ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier
+          ? n.moduleSpecifier
+          : undefined;
+      if (spec && ts.isStringLiteral(spec) && spec.text.startsWith('.')) {
+        const resolved = join(dirname(sf.fileName), spec.text.replace(/\.js$/, '.ts'));
+        if (program.getSourceFile(resolved)) out.push(resolved);
+      }
+    });
+    return out;
+  };
+
+  const result = new Map<RuntimeName, Set<string>>();
+  for (const name of ALL) {
+    const entry = join(root, MODULE_OF[name]);
+    const seen = new Set<string>();
+    const fields = new Set<string>();
+    const stack = [entry];
+    while (stack.length > 0) {
+      const file = stack.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      for (const f of byFile.get(file) ?? []) fields.add(f);
+      const sf = program.getSourceFile(file);
+      if (sf) stack.push(...importsOf(sf));
+    }
+    result.set(name, fields);
+  }
+  return result;
 }
 
 describe('the support matrix is well formed', () => {
@@ -80,43 +166,23 @@ describe('the support matrix is well formed', () => {
   });
 });
 
-describe('a transport the matrix omits does not read the field', () => {
-  // The claim is about the module, so the module is what is read. Driving
-  // sdk-k8s would need a cluster and claude-cli a subprocess; what those two
-  // do with a field they never name is settled without either.
+describe('the matrix matches what each transport reads', () => {
+  // Resolved by type, not by pattern. A read is a property access or a
+  // destructured binding whose object the checker says is `RunRoleOptions`, so
+  // what identifies it is the type rather than the identifier: a parameter
+  // named `opts`, a rename, a helper one import away — all of them are the same
+  // read, and a text search for `options?.x` sees none of them.
   //
-  // Reading a member expression is the only form this can see. A module that
-  // destructured its options would satisfy the check while reading the field
-  // through a name this never looks for, so destructuring is refused outright
-  // rather than passed over — a check that cannot see a construct has to say so
-  // instead of returning a clean result.
-  it.each(ALL)('%s does not reach its options by destructuring', (name) => {
-    expect(code(MODULE_OF[name])).not.toMatch(
-      /(?:const|let|var)\s*\{[^}]*\}\s*=\s*(?:options|opts)\b/,
-    );
-  });
+  // Attribution follows the import graph from each transport's own module, so a
+  // field read in a helper counts against every transport that reaches it.
+  const reads = readsPerTransport();
 
-  it.each(
-    FIELDS.flatMap((field) =>
-      ALL.filter((n) => !RUN_ROLE_OPTION_SUPPORT[field].includes(n)).map(
-        (name) => [field, name] as const,
-      ),
-    ),
-  )('%s is absent from the %s transport', (field, name) => {
-    expect(code(MODULE_OF[name])).not.toContain(`options?.${field}`);
-    expect(code(MODULE_OF[name])).not.toContain(`options.${field}`);
-  });
-});
-
-describe('a transport the matrix lists does read the field', () => {
-  // Without this the matrix is checkable in one direction only: adding a
-  // transport to a field it ignores would remove the case that would have
-  // caught it, and the map could claim support nothing provides.
-  it.each(
-    FIELDS.flatMap((field) => RUN_ROLE_OPTION_SUPPORT[field].map((name) => [field, name] as const)),
-  )('%s is read by the %s transport', (field, name) => {
-    const src = code(MODULE_OF[name]);
-    expect(src.includes(`options?.${field}`) || src.includes(`options.${field}`)).toBe(true);
+  // Exactly, in both directions at once: a field the matrix withholds and the
+  // transport reads fails, and so does a field the matrix grants and the
+  // transport ignores.
+  it.each(ALL)('%s reads exactly the fields the matrix gives it', (name) => {
+    const expected = FIELDS.filter((f) => RUN_ROLE_OPTION_SUPPORT[f].includes(name)).sort();
+    expect([...(reads.get(name) ?? [])].sort()).toEqual(expected);
   });
 });
 

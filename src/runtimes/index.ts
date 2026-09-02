@@ -49,8 +49,12 @@ export function createRuntime(api: AnthropicAgents): AgentRuntime {
 export function resolveRuntimeKind(): RuntimeKind {
   const choice = (process.env.FAB_RUNTIME ?? 'managed-agents').trim();
   if (RUNTIME_KINDS.has(choice as RuntimeKind)) return choice as RuntimeKind;
+  // Rendered from the list rather than restated beside it: a message naming
+  // four transports while the tree runs five is a copy of the union that no
+  // compiler and no test can notice has drifted.
+  const known = RUNTIME_NAMES.map((n) => (n === 'managed-agents' ? `"${n}" (default)` : `"${n}"`));
   throw new Error(
-    `Unknown FAB_RUNTIME value: "${choice}". Expected "managed-agents" (default), "sdk", "sdk-k8s", or "claude-cli".`,
+    `Unknown FAB_RUNTIME value: "${choice}". Expected ${known.slice(0, -1).join(', ')} or ${known.at(-1)}.`,
   );
 }
 

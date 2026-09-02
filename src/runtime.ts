@@ -92,14 +92,19 @@ export type RuntimeName = (typeof RUNTIME_NAMES)[number];
 /**
  * Which transports read each {@link RunRoleOptions} field.
  *
- * The sdk transport runs the agent loop against the caller's own working
- * directory and expects the repositories to be there already, so it has nothing
- * to mount `resources` into; its MCP auth is built into the server config
- * rather than fetched from a vault. The k8s and subprocess transports inherit
- * the same filesystem stance.
+ * Each gap has its own reason. The sdk transport runs the agent loop against
+ * the caller's own working directory and expects the repositories to be there
+ * already, so it has nothing to mount `resources` into. The subprocess
+ * transport does attach a repository directory, but sources it from workspace
+ * state rather than from this field. The k8s transport runs in a pod, where
+ * neither the caller's directory nor the operator's vault is reachable. MCP
+ * auth on all three travels in the server config rather than from a vault.
  *
- * Both axes derive: `keyof RunRoleOptions` makes a new option a compile error,
- * and `RuntimeName` makes a new transport one.
+ * Both axes derive, and so does the check: `keyof RunRoleOptions` makes a new
+ * option a compile error, `RuntimeName` makes a new transport one, and what a
+ * transport reads is resolved from the program's own types rather than matched
+ * in its text — so a read through a renamed parameter, or one module away, is
+ * the same read.
  */
 export const RUN_ROLE_OPTION_SUPPORT: Record<keyof RunRoleOptions, readonly RuntimeName[]> = {
   title: ['managed-agents', 'claude-cli'],
