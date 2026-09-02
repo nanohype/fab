@@ -23,7 +23,13 @@ import {
 } from './gate.js';
 import type { GateVerdict, Grade, GradeDrift, FileReader } from './gate.js';
 import { appendQualityRun } from './quality.js';
-import { formatPreHookTranscripts, type PreHookResult, runFourPhasePreHook } from './prehook.js';
+import {
+  formatPreHookTranscripts,
+  type PreHookResult,
+  runFourPhasePreHook,
+  shellRunner,
+} from './prehook.js';
+import { type GateArtifact, resolveGateWorkspace, type ShellRunner } from './workspace.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
 import { unsafeSourceDirs, untrustedBlock } from './guardrails.js';
@@ -1332,19 +1338,45 @@ async function buildCitationReader(
  * GitHub Contents API — fabricated fragments downgrade the verdict to REJECT.
  */
 /**
- * Resolve and run the four-phase pre-hook against the local workspace.
+ * Run the four-phase pre-hook against the artifact under gate.
  *
- * `FAB_WORKSPACE` names the checkout when one exists; otherwise the process
- * working directory is used, which is the tree the sdk and claude-cli
- * transports already operate in. Under managed-agents the work happens in a
- * cloud sandbox and there is nothing here to run, which surfaces as
- * `unavailable` — reported to the roles and to the PR as an unverified build,
- * never as a passing one.
+ * The tree is named by the artifact, never by where the process was launched.
+ * `FAB_WORKSPACE` is used when the checkout it names proves to be the same
+ * repository, the same branch, the same commit as the remote branch, and clean;
+ * anything else is passed over with the reason, and the branch is fetched. The
+ * transcripts the gate roles are told to treat as observed are transcripts of
+ * the thing they are reviewing either way.
+ *
+ * With no artifact to name — a gate invoked without a repository and branch —
+ * the result is `unavailable`, reported to the roles and to the PR as an
+ * unverified build, never as a passing one.
  */
-async function resolvePreHook(): Promise<PreHookResult> {
-  const cwd = process.env.FAB_WORKSPACE ?? process.cwd();
+export async function runGatePreHook(
+  artifact: GateArtifact | null,
+  // Every git command this reaches for: the questions that establish which tree
+  // this is, and the fetch that obtains one. Overridden only where a test needs
+  // both answered locally; the phases themselves always run as real
+  // subprocesses, because `runFourPhasePreHook` is called without a runner.
+  deps: { run?: ShellRunner } = {},
+): Promise<PreHookResult> {
+  // Resolved before anything is acquired: a throw here would otherwise leave a
+  // fetched checkout, and the token file beside it, with no owner to release
+  // them.
   const language = await getProjectLanguage();
-  return runFourPhasePreHook({ cwd, language });
+  const workspace = await resolveGateWorkspace({
+    artifact,
+    declared: process.env.FAB_WORKSPACE ?? null,
+    run: deps.run ?? shellRunner,
+    note: (message) => console.log(`${YELLOW}${message}${RESET}`),
+  });
+  if (workspace.kind === 'unavailable') {
+    return { status: 'unavailable', transcripts: [], reason: workspace.reason };
+  }
+  try {
+    return await runFourPhasePreHook({ cwd: workspace.cwd, language });
+  } finally {
+    await workspace.release();
+  }
 }
 
 export async function runMergeGate(
@@ -1354,7 +1386,7 @@ export async function runMergeGate(
   initialContext: string,
   citationSource?: CitationSource | null,
   runRole: RoleRunner = runRoleSession,
-  preHook: () => Promise<PreHookResult> = resolvePreHook,
+  preHook: (artifact: GateArtifact | null) => Promise<PreHookResult> = runGatePreHook,
 ): Promise<GateResult> {
   const gateRoles = profile === 'code' ? CODE_GATE_ROLES : DOCS_GATE_ROLES;
 
@@ -1363,7 +1395,7 @@ export async function runMergeGate(
   // It is the only step in the gate that observes rather than asks a role to
   // report, so its transcripts — not a role's account of them — are what the
   // rest of the gate reads.
-  const pre = await preHook();
+  const pre = await preHook(citationSource ?? null);
   if (pre.status === 'failed') {
     console.log(`${RED}${BOLD}Four-phase pre-hook FAILED: ${pre.reason}${RESET}`);
     return {
