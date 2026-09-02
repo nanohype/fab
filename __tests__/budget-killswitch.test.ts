@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaudeCliRuntime } from '../src/runtimes/claude-cli.js';
 import { SdkAgentSession, SdkRuntime } from '../src/runtimes/sdk.js';
 import { streamSessionWithAdvisor } from '../src/workflows.js';
+import { streamEventsToJsonl } from '../src/runtimes/role-session.js';
+import { parseLogLine } from '../src/runtimes/sdk-k8s.js';
 import { formatEvent } from '../src/stream.js';
 import type { AgentEvent } from '../src/types.js';
 
@@ -254,6 +256,117 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
     };
     await new SdkRuntime(async () => sdk).runRoleSession('pr-reviewer', 'go');
     expect(seen?.maxBudgetUsd).toBe(0.5);
+  });
+
+  it('claude-cli: charges an API turn once, across its own session state', async () => {
+    // The per-turn property is three pieces of state, not one: this transport
+    // keeps its own, and a gate that drives only the in-process session leaves
+    // it unheld.
+    const dir = mkdtempSync(join(tmpdir(), 'fab-cli-turn-'));
+    const pidFile = join(dir, 'pid');
+    const fake = join(dir, 'claude');
+    const line = (o: unknown) =>
+      `process.stdout.write(${JSON.stringify(`${JSON.stringify(o)}\n`)});`;
+    const msg = (id: string, text: string) => ({
+      type: 'assistant',
+      uuid: `u-${id}-${text}`,
+      session_id: 'sess-cli',
+      message: {
+        id,
+        usage: { input_tokens: 0, output_tokens: 20_000 },
+        content: [{ type: 'text', text }],
+      },
+    });
+    writeFileSync(
+      fake,
+      [
+        '#!/usr/bin/env node',
+        `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`,
+        line({ type: 'system', subtype: 'init', session_id: 'sess-cli' }),
+        line(msg('msg_A', 'a1')),
+        line(msg('msg_A', 'a2')),
+        line(msg('msg_A', 'a3')),
+        line(msg('msg_B', 'b1')),
+        line({ type: 'result', subtype: 'success', uuid: 'r', session_id: 'sess-cli' }),
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    chmodSync(fake, 0o755);
+
+    const saved = {
+      path: process.env.FAB_CLAUDE_PATH,
+      mcp: process.env.FAB_CLAUDE_MCP_DIR,
+      idle: process.env.FAB_SESSION_IDLE_MS,
+    };
+    process.env.FAB_CLAUDE_PATH = fake;
+    process.env.FAB_CLAUDE_MCP_DIR = dir;
+    // Far above this case's own duration, and low enough that a subprocess
+    // which never speaks ends the stream by name instead of hanging it.
+    process.env.FAB_SESSION_IDLE_MS = '20000';
+    try {
+      const session = await new ClaudeCliRuntime().runRoleSession('pr-reviewer', 'go');
+      await waitForFile(pidFile);
+      const output = await streamSessionWithAdvisor(session, { model: MODEL });
+
+      // One turn is $0.30 against a $0.50 limit; the second takes it to $0.60.
+      // Charged per message the first turn alone would have been $0.90.
+      expect(written).toContain('BUDGET EXCEEDED');
+      expect(written).toMatch(/\$0\.60 \/ \$0\.50/);
+      expect(output).toContain('a1');
+      expect(output).toContain('b1');
+    } finally {
+      if (saved.path === undefined) delete process.env.FAB_CLAUDE_PATH;
+      else process.env.FAB_CLAUDE_PATH = saved.path;
+      if (saved.mcp === undefined) delete process.env.FAB_CLAUDE_MCP_DIR;
+      else process.env.FAB_CLAUDE_MCP_DIR = saved.mcp;
+      if (saved.idle === undefined) delete process.env.FAB_SESSION_IDLE_MS;
+      else process.env.FAB_SESSION_IDLE_MS = saved.idle;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it('the pod-log wire carries one span per turn to the dispatcher', async () => {
+    // The k8s transport reaches the ceiling only through this wire: the in-pod
+    // session serializes its events to stdout and the dispatcher parses them
+    // back. A span that does not survive the round trip is not a weaker ceiling
+    // on that transport, it is no ceiling at all.
+    const assistant = (id: string, text: string) => ({
+      type: 'assistant',
+      uuid: `u-${id}-${text}`,
+      session_id: 'sess-pod',
+      message: {
+        id,
+        usage: { input_tokens: 10, output_tokens: 20 },
+        content: [{ type: 'text', text }],
+      },
+    });
+    const sdk = {
+      query() {
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield { type: 'system', subtype: 'init', session_id: 'sess-pod' };
+            yield assistant('msg_A', 'a1');
+            yield assistant('msg_A', 'a2');
+            yield assistant('msg_B', 'b1');
+            yield { type: 'result', subtype: 'success', uuid: 'r', session_id: 'sess-pod' };
+          },
+          async interrupt() {},
+        };
+      },
+    };
+    const session = new SdkAgentSession(sdk, MODEL, 'prompt');
+    await session.start('go');
+
+    const lines: string[] = [];
+    const exitCode = await streamEventsToJsonl(session.events, (l) => lines.push(l));
+    expect(exitCode).toBe(0);
+
+    const onTheWire = lines.map(parseLogLine).filter((e): e is AgentEvent => e !== null);
+    const spans = onTheWire.filter((e) => e.type === 'span.model_request_end');
+    // Two turns in, two spans out — the third message of turn A is free on the
+    // far side of the wire because it was free on the near side.
+    expect(spans).toHaveLength(2);
+    expect(spans.map((sp) => (sp as { id: string }).id)).toEqual(['msg_A', 'msg_B']);
   });
 
   it('sdk: emits the span the ceiling reads, not only a total on the result', async () => {

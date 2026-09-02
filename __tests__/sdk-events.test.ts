@@ -264,6 +264,26 @@ describe('cost spans from assistant usage', () => {
     }
   });
 
+  it('charges a message with no id rather than dropping its cost', () => {
+    // A message that cannot be attributed to a turn is counted every time. The
+    // stated direction is over-count rather than drop, because a ceiling that
+    // misses spending is worse than one that trips early — and a direction no
+    // case holds is a direction that drifts.
+    const seen = new Set<string>();
+    const anon = {
+      type: 'assistant',
+      uuid: 'u-anon',
+      session_id: 's',
+      message: { usage: USAGE, content: [] },
+    };
+    expect(translateSdkMessage(anon, () => {}, seen).map((e) => e.type)).toEqual([
+      'span.model_request_end',
+    ]);
+    expect(translateSdkMessage(anon, () => {}, seen).map((e) => e.type)).toEqual([
+      'span.model_request_end',
+    ]);
+  });
+
   it('emits no span when the message carries no usable counts', () => {
     for (const usage of [undefined, {}, { input_tokens: 5 }, { output_tokens: 5 }]) {
       const events = translateSdkMessage(assistant(usage), () => {}, new Set());
