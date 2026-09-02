@@ -48,6 +48,11 @@ const FORWARDED_ENV = [
   'FAB_OPERATOR',
   'FAB_SESSION_ROLE_ARN',
   'FAB_SESSION_DURATION',
+  // Session wall clocks (src/runtimes/deadline.ts) — forwarded so the in-pod
+  // session is bounded by the same numbers as the dispatcher. A pod cannot read
+  // the operator's state file, so env is the only channel that reaches it.
+  'FAB_SESSION_IDLE_MS',
+  'FAB_SESSION_TOTAL_MS',
 ] as const;
 
 /** The session pod runs the in-pod role-session entrypoint. */
