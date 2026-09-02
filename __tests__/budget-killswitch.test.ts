@@ -145,16 +145,19 @@ describe('the budget ceiling stops a session while it can still be stopped', () 
     process.env.FAB_SESSION_IDLE_MS = '20000';
 
     const session = await new ClaudeCliRuntime().runRoleSession('pr-reviewer', 'go');
-    // Streaming is the barrier: the first event cannot arrive before the
-    // subprocess has run, so there is no separate wait to race against it.
+    // The child writes its pid before it writes an event, so waiting for the
+    // file is waiting for it to exist. Without that wait the wall clock races
+    // process startup, and under a loaded suite the clock wins — which would
+    // end the session for a reason this case is not about.
+    await waitForFile(pidFile);
+    const pid = Number(readFileSync(pidFile, 'utf-8'));
+
     const output = await streamSessionWithAdvisor(session, { model: MODEL });
 
     expect(written).toContain('BUDGET EXCEEDED');
     expect(output).toContain('burning tokens');
     expect(output).not.toContain('spent past the ceiling');
 
-    await waitForFile(pidFile);
-    const pid = Number(readFileSync(pidFile, 'utf-8'));
     await waitForExit(pid);
     expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
   }, 60_000);
@@ -289,7 +292,10 @@ describe('the cost span stays out of the operator transcript', () => {
 });
 
 async function waitForFile(path: string): Promise<void> {
-  for (let i = 0; i < 200; i++) {
+  // Generous because process startup is not what this file measures: under a
+  // full suite a child can take seconds to boot, and a bound that fired before
+  // it had spoken would end the case for the wrong reason.
+  for (let i = 0; i < 1200; i++) {
     if (existsSync(path)) return;
     await new Promise((res) => setTimeout(res, 25));
   }
