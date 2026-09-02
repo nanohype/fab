@@ -1,12 +1,30 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { RUN_ROLE_OPTION_SUPPORT, type RunRoleOptions, type RuntimeName } from '../src/runtime.js';
+import {
+  RUN_ROLE_OPTION_SUPPORT,
+  type RunRoleOptions,
+  RUNTIME_NAMES,
+  type RuntimeName,
+} from '../src/runtime.js';
 import { ManagedAgentsRuntime } from '../src/runtimes/managed-agents.js';
 import { SdkAgentSession, SdkRuntime } from '../src/runtimes/sdk.js';
 import { buildClaudeArgs } from '../src/runtimes/claude-cli.js';
 import type { AnthropicAgents } from '../src/api.js';
 import type { UserEvent } from '../src/types.js';
+import { resolveRuntimeKind } from '../src/runtimes/index.js';
+
+/** What `resolveRuntimeKind` returns for a given `FAB_RUNTIME` value. */
+function resolveRuntimeKindFor(name: string): string {
+  const prior = process.env.FAB_RUNTIME;
+  process.env.FAB_RUNTIME = name;
+  try {
+    return resolveRuntimeKind();
+  } finally {
+    if (prior === undefined) delete process.env.FAB_RUNTIME;
+    else process.env.FAB_RUNTIME = prior;
+  }
+}
 
 // ── Which transports read which option ──────────────────────────────
 //
@@ -17,8 +35,12 @@ import type { UserEvent } from '../src/types.js';
 // file: prose drifts from the code with nothing to notice, and a map does not.
 
 const FIELDS = Object.keys(RUN_ROLE_OPTION_SUPPORT) as (keyof RunRoleOptions)[];
-const ALL: readonly RuntimeName[] = ['managed-agents', 'sdk', 'sdk-k8s', 'claude-cli'];
+// The coverage set is the tree's own list, not a copy of it. A transport added
+// to RUNTIME_NAMES arrives here without anyone remembering to add it, which is
+// the only way a set-versus-list check is a check.
+const ALL = RUNTIME_NAMES;
 
+// Exhaustive by type: a transport with no module named here does not compile.
 const MODULE_OF: Record<RuntimeName, string> = {
   'managed-agents': 'src/runtimes/managed-agents.ts',
   sdk: 'src/runtimes/sdk.ts',
@@ -46,12 +68,34 @@ describe('the support matrix is well formed', () => {
       for (const n of names) expect(ALL).toContain(n);
     }
   });
+
+  it('covers every transport the tree resolves FAB_RUNTIME to', () => {
+    // The set this is checked against is the one `resolveRuntimeKind` accepts,
+    // so a transport the tree can run and the matrix does not describe fails
+    // here rather than passing unexamined.
+    for (const name of RUNTIME_NAMES) {
+      expect(resolveRuntimeKindFor(name), `${name} is not resolvable`).toBe(name);
+      expect(Object.keys(MODULE_OF)).toContain(name);
+    }
+  });
 });
 
 describe('a transport the matrix omits does not read the field', () => {
   // The claim is about the module, so the module is what is read. Driving
   // sdk-k8s would need a cluster and claude-cli a subprocess; what those two
   // do with a field they never name is settled without either.
+  //
+  // Reading a member expression is the only form this can see. A module that
+  // destructured its options would satisfy the check while reading the field
+  // through a name this never looks for, so destructuring is refused outright
+  // rather than passed over — a check that cannot see a construct has to say so
+  // instead of returning a clean result.
+  it.each(ALL)('%s does not reach its options by destructuring', (name) => {
+    expect(code(MODULE_OF[name])).not.toMatch(
+      /(?:const|let|var)\s*\{[^}]*\}\s*=\s*(?:options|opts)\b/,
+    );
+  });
+
   it.each(
     FIELDS.flatMap((field) =>
       ALL.filter((n) => !RUN_ROLE_OPTION_SUPPORT[field].includes(n)).map(

@@ -1,18 +1,22 @@
 import type { AnthropicAgents } from '../api.js';
+import { type RuntimeName, RUNTIME_NAMES } from '../runtime.js';
 import type { AgentRuntime } from '../runtime.js';
 import { ClaudeCliRuntime } from './claude-cli.js';
 import { SdkRuntime } from './sdk.js';
 import { ManagedAgentsRuntime } from './managed-agents.js';
 import { SdkK8sRuntime } from './sdk-k8s.js';
 
-export type RuntimeKind = 'managed-agents' | 'sdk' | 'sdk-k8s' | 'claude-cli';
+/**
+ * The transport names, from the one list that declares them.
+ *
+ * Kept as an alias rather than a second union: what `FAB_RUNTIME` accepts, what
+ * `createRuntime` switches on, and what the session-option support matrix is
+ * keyed by have to be the same set, and they are the same set only if one of
+ * them is where it is written down.
+ */
+export type RuntimeKind = RuntimeName;
 
-const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set([
-  'managed-agents',
-  'sdk',
-  'sdk-k8s',
-  'claude-cli',
-]);
+const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set(RUNTIME_NAMES);
 
 /**
  * Resolve the configured runtime from the `FAB_RUNTIME` env var.
@@ -50,4 +54,5 @@ export function resolveRuntimeKind(): RuntimeKind {
   );
 }
 
+export { RUNTIME_NAMES };
 export { ClaudeCliRuntime, SdkRuntime, SdkK8sRuntime, ManagedAgentsRuntime };
