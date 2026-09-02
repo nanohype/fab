@@ -1,6 +1,8 @@
+import { exec } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentRuntime } from '../src/runtime.js';
 import { LANGUAGE_TOOLCHAIN } from '../src/standards.js';
@@ -26,11 +28,25 @@ import { type RoleRunner, runMergeGate } from '../src/workflows.js';
 // invoked, and the passing fixture must approve with the observed stdout
 // reaching the roles. A control that only ever sees one outcome cannot
 // distinguish the gate from a constant.
+//
+// The fixture is a git checkout of the artifact under gate, because that is
+// what the pre-hook resolves against. A directory that merely holds a manifest
+// is not the artifact, and the last two cases here assert it is refused.
 
 /** Printed by the passing fixture's `test` phase; a stub has no way to emit it. */
 const OBSERVED_TOKEN = 'four-phase-pre-hook-observed-stdout';
 
 const PHASE_LOG = 'phases.log';
+
+const execAsync = promisify(exec);
+
+/** The artifact the fixtures are checkouts of. */
+const ARTIFACT = {
+  token: 'unused-when-the-workspace-is-the-artifact',
+  owner: 'nanohype',
+  repo: 'gate-fixture',
+  branch: 'feat/gate-fixture',
+} as const;
 
 type PhaseSpec = { exit: number; stdout?: string };
 
@@ -86,6 +102,17 @@ async function fixture(phases: Record<string, PhaseSpec>): Promise<string> {
       requires: true,
       packages: { '': { name: 'fixture', version: '1.0.0' } },
     }),
+  );
+  // The pre-hook identifies a workspace by its remote and branch, so a fixture
+  // that is not a checkout of the artifact is not a workspace it will use.
+  await execAsync(
+    [
+      `git init -q -b ${ARTIFACT.branch}`,
+      'git add -A',
+      'git -c user.email=fixture@example.invalid -c user.name=fixture commit -q -m fixture',
+      `git remote add origin https://github.com/${ARTIFACT.owner}/${ARTIFACT.repo}.git`,
+    ].join(' && '),
+    { cwd: dir },
   );
   return dir;
 }
@@ -143,10 +170,15 @@ describe('runMergeGate drives the real pre-hook', () => {
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Passing the artifact also arms CITATIONS prefetching. A 404 is the
+    // documented non-blocking outcome, so the gate's decision here is the
+    // pre-hook's and nothing else's.
+    vi.stubGlobal('fetch', async () => new Response('not found', { status: 404 }));
   });
 
   afterEach(() => {
     logSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('rejects a failing phase before a role runs, and a process is what noticed', async () => {
@@ -158,7 +190,7 @@ describe('runMergeGate drives the real pre-hook', () => {
     };
 
     // No pre-hook argument: this is the production default, resolvePreHook.
-    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', ARTIFACT, runRole);
 
     expect(result.decision).toBe('reject');
     // Names the phase, so whoever reads the rejection knows what to re-run.
@@ -181,7 +213,7 @@ describe('runMergeGate drives the real pre-hook', () => {
       return APPROVE_WITH_EVIDENCE;
     };
 
-    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
+    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', ARTIFACT, runRole);
 
     expect(result.decision).toBe('approve');
     const log = await readFile(join(passing, PHASE_LOG), 'utf-8');
@@ -192,6 +224,68 @@ describe('runMergeGate drives the real pre-hook', () => {
       // Captured stdout of the run itself, not a role's account of it.
       expect(message).toContain(OBSERVED_TOKEN);
       expect(message).toContain(LANGUAGE_TOOLCHAIN.typescript.install);
+    }
+  }, 120_000);
+
+  it('refuses a workspace that is not the artifact under gate', async () => {
+    // A tree with the right manifest and the wrong identity is the defect this
+    // closes: the phases would run, exit 0, and the transcripts would reach the
+    // roles labelled observed while describing a different repository.
+    process.env.FAB_WORKSPACE = passing;
+    const seen: string[] = [];
+    const runRole: RoleRunner = async (_rt, _role, message) => {
+      seen.push(message);
+      return APPROVE_WITH_EVIDENCE;
+    };
+
+    const elsewhere = { ...ARTIFACT, repo: 'a-different-repository' };
+    const result = await runMergeGate(runtime, 'wf', 'docs', 'ctx', elsewhere, runRole);
+
+    // Not a rejection — the build is unverified, which is a different thing
+    // from broken, and the roles are told which.
+    expect(result.decision).toBe('approve');
+    expect(seen.length).toBeGreaterThan(0);
+    for (const message of seen) {
+      expect(message).toContain('DID NOT RUN');
+      expect(message).toContain('UNVERIFIED');
+      expect(message).toContain('a-different-repository');
+      // The observed marker belongs to the other tree's transcripts; if it
+      // reaches a role here, the wrong tree was run and reported as observed.
+      expect(message).not.toContain(OBSERVED_TOKEN);
+    }
+  }, 120_000);
+
+  it('refuses a workspace on a branch that is not the one under gate', async () => {
+    process.env.FAB_WORKSPACE = passing;
+    const seen: string[] = [];
+    const runRole: RoleRunner = async (_rt, _role, message) => {
+      seen.push(message);
+      return APPROVE_WITH_EVIDENCE;
+    };
+
+    const otherBranch = { ...ARTIFACT, branch: 'feat/something-else' };
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', otherBranch, runRole);
+
+    for (const message of seen) {
+      expect(message).toContain('DID NOT RUN');
+      expect(message).toContain('feat/something-else');
+      expect(message).not.toContain(OBSERVED_TOKEN);
+    }
+  }, 120_000);
+
+  it('reports no artifact as unverified rather than running somewhere', async () => {
+    process.env.FAB_WORKSPACE = passing;
+    const seen: string[] = [];
+    const runRole: RoleRunner = async (_rt, _role, message) => {
+      seen.push(message);
+      return APPROVE_WITH_EVIDENCE;
+    };
+
+    await runMergeGate(runtime, 'wf', 'docs', 'ctx', null, runRole);
+
+    for (const message of seen) {
+      expect(message).toContain('no artifact under gate');
+      expect(message).not.toContain(OBSERVED_TOKEN);
     }
   }, 120_000);
 });
