@@ -19,6 +19,7 @@ import { buildSystemPrompt } from '../prompts.js';
 import { loadState, getPrimaryRepo } from '../state.js';
 import { buildHttpMcpServers } from '../mcp.js';
 import { isTerminal, translateSdkMessage } from './sdk-events.js';
+import { boundEvents, resolveSessionDeadlines } from './deadline.js';
 
 /**
  * Subprocess-driven runtime that spawns `claude -p` per role session. Lets
@@ -88,6 +89,9 @@ export class ClaudeCliRuntime implements AgentRuntime {
   }
 }
 
+/** Grace between the request to stop and the signal that does not negotiate. */
+const SIGKILL_GRACE_MS = 2_000;
+
 interface SessionConstructorOptions {
   initialArgs: string[];
   initialMessage: string;
@@ -120,7 +124,10 @@ class ClaudeCliSession implements AgentSession {
   }
 
   get events(): AsyncIterable<AgentEvent> {
-    return this.translateEvents();
+    // The bound is structural rather than a parameter a caller may omit. A
+    // subprocess reading an LLM's output has no other ceiling on this
+    // transport, so the only way to iterate it is bounded.
+    return boundEvents(this.translateEvents(), this, resolveSessionDeadlines(process.env));
   }
 
   async sendInput(input: UserEvent): Promise<void> {
@@ -146,9 +153,32 @@ class ClaudeCliSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
+    await this.stop();
+  }
+
+  /**
+   * End the subprocess and release what only this session holds.
+   *
+   * SIGINT is a request, and whether `claude` honours it mid-tool-call is a
+   * property of that binary rather than something this code can assert. An
+   * unkilled child with piped stdio holds fab's own process alive, so the
+   * signal needs an escalation that does not depend on cooperation.
+   *
+   * The MCP config carries a gateway bearer token and is consumed when the
+   * subprocess starts. The event stream's `finally` unlinks it, but that runs
+   * only when the generator resumes; a session stopped while suspended must
+   * not leave the token behind.
+   */
+  async stop(): Promise<void> {
     if (this.proc.exitCode === null && !this.proc.killed) {
       this.proc.kill('SIGINT');
+      const escalation = setTimeout(() => {
+        if (this.proc.exitCode === null) this.proc.kill('SIGKILL');
+      }, SIGKILL_GRACE_MS);
+      escalation.unref();
+      this.proc.once('exit', () => clearTimeout(escalation));
     }
+    this.cleanup();
   }
 
   private writeUserMessage(text: string): void {

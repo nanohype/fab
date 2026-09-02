@@ -10,6 +10,7 @@ import {
   type InferenceBackend,
 } from '../inference.js';
 import { isTerminal, textOf, translateSdkMessage } from './sdk-events.js';
+import { boundEvents, resolveSessionDeadlines } from './deadline.js';
 import { buildHttpMcpServers, type HttpMcpServer } from '../mcp.js';
 
 /**
@@ -220,7 +221,10 @@ export class SdkAgentSession implements AgentSession {
   }
 
   get events(): AsyncIterable<AgentEvent> {
-    return this.translateEvents();
+    // The bound is structural rather than a parameter a caller may omit.
+    // `maxBudgetUsd` is a spend cap and is opt-in; neither answers how long a
+    // stalled loop may sit here, so the only way to iterate it is bounded.
+    return boundEvents(this.translateEvents(), this, resolveSessionDeadlines(process.env));
   }
 
   async sendInput(input: UserEvent): Promise<void> {
@@ -250,6 +254,16 @@ export class SdkAgentSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
+    await this.stop();
+  }
+
+  /**
+   * End the agent loop and let the SDK's process shut down.
+   *
+   * Closing the input iterable is what releases that process; interrupting the
+   * query alone leaves it waiting for a message that will not arrive.
+   */
+  async stop(): Promise<void> {
     if (this.sdkQuery) {
       await this.sdkQuery.interrupt();
     }
@@ -310,16 +324,23 @@ export class SdkAgentSession implements AgentSession {
     if (!this.sdkQuery) {
       throw new Error('SdkRuntime: session has not been started');
     }
-    for await (const raw of this.sdkQuery) {
-      const event = translateSdkMessage(raw, (id) => {
-        this.capturedSessionId = id;
-      });
-      if (event) yield event;
-      // After a terminal result the loop ends naturally; close the input
-      // iterable so the SDK's process can shut down cleanly.
-      if (event && isTerminal(event)) {
-        this.closeInput();
+    try {
+      for await (const raw of this.sdkQuery) {
+        const event = translateSdkMessage(raw, (id) => {
+          this.capturedSessionId = id;
+        });
+        if (event) yield event;
+        // After a terminal result the loop ends naturally; close the input
+        // iterable so the SDK's process can shut down cleanly.
+        if (event && isTerminal(event)) {
+          this.closeInput();
+        }
       }
+    } finally {
+      // A consumer that stops reading leaves the input iterable open and the
+      // SDK's process with it, so closing cannot depend on reaching a terminal
+      // event.
+      this.closeInput();
     }
   }
 }
