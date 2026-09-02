@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -10,31 +11,34 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { collectArtifacts, type EventPage, writeArtifacts } from '../src/export.js';
+import { mkdir, realpath, writeFile } from 'node:fs/promises';
+import { collectArtifacts, type EventPage, type ExportFs, writeArtifacts } from '../src/export.js';
 
-// ── What the export puts on disk ────────────────────────────────────
+// ── Where the export writes ─────────────────────────────────────────
 //
 // The paths here are the ones a role's model chose, so the property is about
-// what happens when one of them names somewhere else — and that is a question
-// about the filesystem, not about which expressions appear in the source. These
-// cases run the export against a session that recorded an escape and then look
-// at the disk. A guard removed, a guard reported and not applied, a carve-out
-// for one refusal: all three change what appears, and none of them can be
-// spelled around, because nothing here reads the source.
+// what happens when one of them names somewhere else. Three detectors, and it
+// is worth being exact about what each can see, because two of them are blind
+// in ways the third is not.
 //
-// What they look at is where each write landed, not the contents of directories
-// chosen in advance. An escape leaves the output directory for somewhere its
-// author picks — a listing of any particular place is a guess about where that
-// is, and a guess that is wrong reports success. Resolving each written path
-// and asking whether it is under the output directory is the same question
-// asked where the answer is.
+//   attempts — the destinations the export reaches for, recorded at the
+//     filesystem seam it writes through. This sees a write that is refused in
+//     the report and made anyway, and it sees it for every refusal kind,
+//     including kinds added later. It is blind to a writer that bypasses the
+//     seam.
 //
-// What this does not cover: the command that calls this, which reads flags and
-// builds a client. `src/bin/fab.ts` runs `main()` on import, so a function
-// there can be read and cannot be driven; what it keeps is the part with no
-// filesystem in it.
+//   the sandbox walk — a listing of a directory chosen in advance, correct only
+//     because the export sits fifteen levels inside it and the escapes carry at
+//     most twelve parent segments, so the listing is a superset by
+//     construction. An absolute path leaves the sandbox and this sees nothing.
+//
+//   the report — what the export says it wrote. This reads the export's own
+//     account, so it cannot see an unreported write at all. It is here to check
+//     that the account matches the attempts, which is a different property.
+//
+// Together they cover the writer, and separately none of them does.
 
 const artifact = (path: string, content = 'x') => ({
   type: 'agent.tool_use',
@@ -45,6 +49,25 @@ const artifact = (path: string, content = 'x') => ({
 const onePage = (paths: string[]): ((page: string | null) => Promise<EventPage>) => {
   return async () => ({ data: paths.map((p) => artifact(p)), next_page: null });
 };
+
+/** A filesystem that does the real thing and records every destination reached for. */
+function recordingFs(): { fs: ExportFs; attempts: string[] } {
+  const attempts: string[] = [];
+  return {
+    attempts,
+    fs: {
+      async mkdir(path) {
+        attempts.push(path);
+        await mkdir(path, { recursive: true });
+      },
+      async writeFile(path, data) {
+        attempts.push(path);
+        await writeFile(path, data, 'utf-8');
+      },
+      realpath: (path) => realpath(path),
+    },
+  };
+}
 
 describe('the export writes inside its directory and nowhere else', () => {
   let root: string;
@@ -61,6 +84,37 @@ describe('the export writes inside its directory and nowhere else', () => {
   afterEach(() => {
     rmSync(root, { recursive: true, force: true });
   });
+
+  /**
+   * `p` with every symlink on the way resolved, whether or not it exists yet.
+   *
+   * An attempt is recorded before the call that would create it, and on this
+   * platform the temp root is itself a link, so comparing the raw strings would
+   * report a contained write as an escape.
+   */
+  function resolveAttempt(p: string): string {
+    const parts: string[] = [];
+    let probe = resolve(p);
+    for (;;) {
+      if (existsSync(probe)) return join(realpathSync(probe), ...parts.reverse());
+      const parent = dirname(probe);
+      if (parent === probe) return resolve(p);
+      parts.push(probe.slice(parent.length + 1));
+      probe = parent;
+    }
+  }
+
+  /** Every destination reached for that is not inside the output directory. */
+  function outsideAttempts(attempts: readonly string[]): string[] {
+    const base = realpathSync(outputDir);
+    return attempts.map(resolveAttempt).filter((a) => a !== base && !isInsideOf(base, a));
+  }
+
+  /** True when `p` names a place strictly inside `base`, both resolved. */
+  function isInsideOf(base: string, p: string): boolean {
+    const rel = relative(base, p);
+    return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+  }
 
   /** Every file under a directory, mapped to its contents. */
   function snapshot(dir: string, prefix = ''): Map<string, string> {
@@ -155,6 +209,58 @@ describe('the export writes inside its directory and nowhere else', () => {
     expect(escaped(written)).toEqual([]);
     expect(tree(outputDir)).toEqual(['a.md']);
     expect(readFileSync(join(root, 'VICTIM.txt'), 'utf-8')).toBe('original\n');
+  });
+
+  it('reaches for nothing outside the directory, for any refusal kind', async () => {
+    // Aimed at the writer rather than at geography: every destination the
+    // export reaches for is recorded where it is made, so a refusal that is
+    // reported and written anyway is visible whatever kind it is — including
+    // kinds nobody has added yet, since nothing here enumerates them.
+    const { fs, attempts } = recordingFs();
+    const files = await collectArtifacts(
+      onePage([
+        // One value per refusal kind that can name somewhere outside the tree,
+        // plus the contained case so the run is not vacuous.
+        '/workspace/../../PARENT.txt',
+        '../../PARENT2.txt',
+        '/etc/cron.d/ABSOLUTE.txt',
+        '/workspace/artifacts/../../../ABOVE.txt',
+        '/workspace/.',
+        '/workspace/kept.md',
+      ]),
+    );
+    const { written } = await writeArtifacts(files, outputDir, fs);
+
+    expect(outsideAttempts(attempts)).toEqual([]);
+    expect(escaped(written)).toEqual([]);
+    expect(tree(outputDir)).toEqual(['kept.md']);
+  });
+
+  it('reports every write it attempted, and attempts every write it reports', async () => {
+    // The report is the export's own account. Held against the attempts rather
+    // than trusted, because an account that omits a write is exactly the shape
+    // the detector above exists to catch.
+    const { fs, attempts } = recordingFs();
+    const files = await collectArtifacts(
+      onePage(['/workspace/a.md', '/workspace/deep/b.md', '/workspace/../../ESCAPE.txt']),
+    );
+    const { written } = await writeArtifacts(files, outputDir, fs);
+    for (const w of written) expect(attempts).toContain(w);
+    expect(written).toHaveLength(2);
+  });
+
+  it('keeps a sibling whose name extends the output directory outside it', async () => {
+    // `out` and `out-side` share a prefix and are different directories; a
+    // containment check comparing strings without a separator admits the second.
+    mkdirSync(`${outputDir}-side`, { recursive: true });
+    const { fs, attempts } = recordingFs();
+    const files = await collectArtifacts(onePage(['/workspace/../out-side/SNEAK.txt']));
+    const { written, refused } = await writeArtifacts(files, outputDir, fs);
+
+    expect(written).toEqual([]);
+    expect(refused).toHaveLength(1);
+    expect(outsideAttempts(attempts)).toEqual([]);
+    expect(readdirSync(`${outputDir}-side`)).toEqual([]);
   });
 
   it('changes nothing outside the directory, whether or not it says so', async () => {

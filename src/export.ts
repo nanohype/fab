@@ -31,6 +31,29 @@ export interface EventPage {
   readonly next_page: string | null;
 }
 
+/**
+ * The filesystem calls an export makes.
+ *
+ * A seam, because where a write is attempted is the thing worth observing: a
+ * refusal that is reported and then written anyway leaves the report intact and
+ * the bytes on disk, so a check that reads the report cannot see it and a check
+ * that lists a directory only sees it if the directory was guessed correctly.
+ * Every destination this export reaches for passes through here.
+ */
+export interface ExportFs {
+  mkdir(path: string): Promise<void>;
+  writeFile(path: string, data: string): Promise<void>;
+  realpath(path: string): Promise<string>;
+}
+
+const nodeFs: ExportFs = {
+  mkdir: async (path) => {
+    await mkdir(path, { recursive: true });
+  },
+  writeFile: (path, data) => writeFile(path, data, 'utf-8'),
+  realpath,
+};
+
 export interface ExportOutcome {
   /** Absolute, symlink-resolved locations of the files this export created. */
   readonly written: string[];
@@ -47,12 +70,12 @@ export interface ExportOutcome {
  * through one lands wherever the link points while every string involved still
  * looks contained.
  */
-async function resolvedTarget(target: string): Promise<string> {
+async function resolvedTarget(target: string, fs: ExportFs): Promise<string> {
   const parts: string[] = [];
   let probe = resolve(target);
   for (;;) {
     try {
-      return join(await realpath(probe), ...parts.reverse());
+      return join(await fs.realpath(probe), ...parts.reverse());
     } catch {
       const parent = dirname(probe);
       if (parent === probe) return resolve(target);
@@ -94,38 +117,54 @@ export async function collectArtifacts(
  * A refused path is named rather than counted: which path the session asked for
  * is the part an operator needs, and a silent skip is how a truncated export
  * reads as a complete one.
+ *
+ * What the containment holds against is a path the session chose, however it is
+ * spelled. It does not hold against another process editing the output
+ * directory while this runs: the check and the write are separate syscalls, so
+ * a directory swapped for a symlink between them is followed. Anything able to
+ * do that can already write in the directory this is placing files into, so it
+ * is a precondition rather than a way past the check — but the guarantee is
+ * against the session, not against the machine.
  */
 export async function writeArtifacts(
   files: readonly RecordedArtifact[],
   outputDir: string,
+  fs: ExportFs = nodeFs,
 ): Promise<ExportOutcome> {
   const written: string[] = [];
   const refused: string[] = [];
-  await mkdir(outputDir, { recursive: true });
-  const base = await realpath(outputDir);
+  await fs.mkdir(outputDir);
+  const base = await fs.realpath(outputDir);
 
   for (const file of files) {
     const dest = exportDestination(file.path);
     if ('refusal' in dest) {
-      refused.push(`${file.path} — ${describeRefusal(dest.refusal)}`);
+      refused.push(`${JSON.stringify(file.path)} — ${describeRefusal(dest.refusal)}`);
       continue;
     }
     // Where the write would actually land, not where the string says. The rule
     // above is lexical and cannot see a symlink already in the directory.
-    const target = await resolvedTarget(join(outputDir, dest.path));
+    const target = await resolvedTarget(join(outputDir, dest.path), fs);
     if (!isInside(base, target)) {
-      refused.push(`${file.path} — resolves to ${target}, outside the export directory`);
+      refused.push(
+        `${JSON.stringify(file.path)} — resolves to ${target}, outside the export directory`,
+      );
       continue;
     }
     try {
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, file.content, 'utf-8');
-      written.push(target);
+      await fs.mkdir(dirname(target));
+      await fs.writeFile(target, file.content);
+      // One entry per file on disk: two artifacts naming one path are one file,
+      // and a count above what the directory holds is a count an operator
+      // cannot reconcile with it.
+      if (!written.includes(target)) written.push(target);
     } catch (err) {
       // One artifact that cannot be placed — a path that names a file another
       // artifact already occupies, a permission — must not take the rest of the
       // export with it, silently.
-      refused.push(`${file.path} — ${err instanceof Error ? err.message : String(err)}`);
+      refused.push(
+        `${JSON.stringify(file.path)} — ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return { written, refused };
