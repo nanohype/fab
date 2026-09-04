@@ -1,18 +1,22 @@
 import type { AnthropicAgents } from '../api.js';
+import { type RuntimeName, RUNTIME_NAMES } from '../runtime.js';
 import type { AgentRuntime } from '../runtime.js';
 import { ClaudeCliRuntime } from './claude-cli.js';
 import { SdkRuntime } from './sdk.js';
 import { ManagedAgentsRuntime } from './managed-agents.js';
 import { SdkK8sRuntime } from './sdk-k8s.js';
 
-export type RuntimeKind = 'managed-agents' | 'sdk' | 'sdk-k8s' | 'claude-cli';
+/**
+ * The transport names, from the one list that declares them.
+ *
+ * Kept as an alias rather than a second union: what `FAB_RUNTIME` accepts, what
+ * `createRuntime` switches on, and what the session-option support matrix is
+ * keyed by have to be the same set, and they are the same set only if one of
+ * them is where it is written down.
+ */
+export type RuntimeKind = RuntimeName;
 
-const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set([
-  'managed-agents',
-  'sdk',
-  'sdk-k8s',
-  'claude-cli',
-]);
+const RUNTIME_KINDS: ReadonlySet<RuntimeKind> = new Set(RUNTIME_NAMES);
 
 /**
  * Resolve the configured runtime from the `FAB_RUNTIME` env var.
@@ -45,9 +49,14 @@ export function createRuntime(api: AnthropicAgents): AgentRuntime {
 export function resolveRuntimeKind(): RuntimeKind {
   const choice = (process.env.FAB_RUNTIME ?? 'managed-agents').trim();
   if (RUNTIME_KINDS.has(choice as RuntimeKind)) return choice as RuntimeKind;
+  // Rendered from the list rather than restated beside it: a message naming
+  // four transports while the tree runs five is a copy of the union that no
+  // compiler and no test can notice has drifted.
+  const known = RUNTIME_NAMES.map((n) => (n === 'managed-agents' ? `"${n}" (default)` : `"${n}"`));
   throw new Error(
-    `Unknown FAB_RUNTIME value: "${choice}". Expected "managed-agents" (default), "sdk", "sdk-k8s", or "claude-cli".`,
+    `Unknown FAB_RUNTIME value: "${choice}". Expected ${known.slice(0, -1).join(', ')} or ${known.at(-1)}.`,
   );
 }
 
+export { RUNTIME_NAMES };
 export { ClaudeCliRuntime, SdkRuntime, SdkK8sRuntime, ManagedAgentsRuntime };

@@ -18,7 +18,7 @@ import type { CustomTool, TeamRole } from './types.js';
 //      built-in conversation-level cap", so a per-session budget there means
 //      hand-stripping `advisor_tool_result` blocks from history (fragile).
 //   3. Separate pinned Opus — `callAdvisor` always targets `ADVISOR_MODEL`
-//      regardless of the caller's model, uniformly across all four transports
+//      regardless of the caller's model, uniformly on every transport
 //      (the interception lives in the shared stream consumer).
 //
 // Availability also rules out a swap: the native advisor tool is beta on the
