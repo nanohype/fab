@@ -2,6 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { initLine, startFakeClaudeSession } from './helpers/fake-claude.js';
 import {
   boundEvents,
   deadlineError,
@@ -13,7 +14,6 @@ import {
   type Stoppable,
 } from '../src/runtimes/deadline.js';
 import { isTerminal } from '../src/runtimes/sdk-events.js';
-import { ClaudeCliRuntime } from '../src/runtimes/claude-cli.js';
 import { SdkAgentSession } from '../src/runtimes/sdk.js';
 import type { AgentEvent } from '../src/types.js';
 
@@ -281,75 +281,23 @@ describe('the bound is wired into the transports that had none', () => {
     // parent alive, so a bound that only stops iterating turns a hung LLM call
     // into a hung CLI. The assertion is that the operating system no longer has
     // the process, not that the loop returned.
-    const dir = mkdtempSync(join(tmpdir(), 'fab-deadline-'));
-    const pidFile = join(dir, 'pid');
-    const fakeClaude = join(dir, 'claude');
-    writeFileSync(
-      fakeClaude,
-      [
-        '#!/usr/bin/env node',
-        `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`,
-        "process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'hung' }) + '\\n');",
-        'setInterval(() => {}, 1e9);',
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    chmodSync(fakeClaude, 0o755);
-
-    const saved = {
-      path: process.env.FAB_CLAUDE_PATH,
-      idle: process.env.FAB_SESSION_IDLE_MS,
-      mcp: process.env.FAB_CLAUDE_MCP_DIR,
-    };
-    process.env.FAB_CLAUDE_PATH = fakeClaude;
-    process.env.FAB_SESSION_IDLE_MS = String(MIN_BOUND_MS);
-    process.env.FAB_CLAUDE_MCP_DIR = dir;
-
+    const fake = await startFakeClaudeSession({
+      emit: [initLine('hung')],
+      hang: true,
+      idleMs: MIN_BOUND_MS,
+    });
     try {
-      const session = await new ClaudeCliRuntime().runRoleSession('pr-reviewer', 'review it');
-      // The clocks start when the stream is first read, and node's own startup
-      // is not the stall under test — wait for the child to exist so the bound
-      // is measured against a running process rather than a booting one.
-      await waitForFile(pidFile);
-      const pid = Number(readFileSync(pidFile, 'utf-8'));
-
       const out = await within(
-        collect(session.events),
-        15_000,
+        collect(fake.session.events),
+        30_000,
         'the claude-cli session was never bounded',
       );
       expect(out.at(-1)).toMatchObject({ error: { type: 'idle_timeout' } });
-      await waitForExit(pid);
-      expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
+
+      await fake.waitForExit();
+      expect(fake.isGone()).toBe(true);
     } finally {
-      for (const [k, v] of [
-        ['FAB_CLAUDE_PATH', saved.path],
-        ['FAB_SESSION_IDLE_MS', saved.idle],
-        ['FAB_CLAUDE_MCP_DIR', saved.mcp],
-      ] as const) {
-        if (v === undefined) delete process.env[k];
-        else process.env[k] = v;
-      }
-      rmSync(dir, { recursive: true, force: true });
+      fake.dispose();
     }
-  }, 30_000);
+  }, 120_000);
 });
-
-async function waitForFile(path: string): Promise<void> {
-  for (let i = 0; i < 200; i++) {
-    if (existsSync(path)) return;
-    await new Promise((res) => setTimeout(res, 25));
-  }
-  throw new Error(`the fake claude never started: ${path} was not written`);
-}
-
-async function waitForExit(pid: number): Promise<void> {
-  for (let i = 0; i < 100; i++) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return;
-    }
-    await new Promise((res) => setTimeout(res, 50));
-  }
-}

@@ -2,26 +2,45 @@ import { describe, it, expect, vi } from 'vitest';
 import { isTerminal, translateSdkMessage } from '../src/runtimes/sdk-events.js';
 import type { AgentEvent } from '../src/types.js';
 
+// A translated message is a list, because an assistant message carries two
+// things: what the model said and what the request cost. `first` reads the
+// content event these cases are about; the cost span is asserted separately.
+function first(events: AgentEvent[]): AgentEvent | null {
+  return events[0] ?? null;
+}
+
+/** Claude Code's per-request usage block, as it appears on an assistant message. */
+const USAGE = {
+  input_tokens: 1000,
+  output_tokens: 500,
+  cache_creation_input_tokens: 200,
+  cache_read_input_tokens: 4000,
+};
+
 describe('translateSdkMessage', () => {
   it('captures the session id from system.init and emits no event', () => {
     const onSessionId = vi.fn();
     const result = translateSdkMessage(
       { type: 'system', subtype: 'init', session_id: 'sess_abc', uuid: 'uuid-1' },
       onSessionId,
+      new Set(),
     );
-    expect(result).toBeNull();
+    expect(result).toEqual([]);
     expect(onSessionId).toHaveBeenCalledWith('sess_abc');
   });
 
   it('produces agent.message for assistant text content', () => {
-    const event = translateSdkMessage(
-      {
-        type: 'assistant',
-        uuid: 'uuid-2',
-        session_id: 'sess',
-        message: { content: [{ type: 'text', text: 'hello there' }] },
-      },
-      () => {},
+    const event = first(
+      translateSdkMessage(
+        {
+          type: 'assistant',
+          uuid: 'uuid-2',
+          session_id: 'sess',
+          message: { content: [{ type: 'text', text: 'hello there' }] },
+        },
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event).not.toBeNull();
     expect(event!.type).toBe('agent.message');
@@ -31,19 +50,22 @@ describe('translateSdkMessage', () => {
   });
 
   it('joins multiple text blocks into a single agent.message', () => {
-    const event = translateSdkMessage(
-      {
-        type: 'assistant',
-        uuid: 'uuid-3',
-        session_id: 'sess',
-        message: {
-          content: [
-            { type: 'text', text: 'first ' },
-            { type: 'text', text: 'second' },
-          ],
+    const event = first(
+      translateSdkMessage(
+        {
+          type: 'assistant',
+          uuid: 'uuid-3',
+          session_id: 'sess',
+          message: {
+            content: [
+              { type: 'text', text: 'first ' },
+              { type: 'text', text: 'second' },
+            ],
+          },
         },
-      },
-      () => {},
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event).not.toBeNull();
     if (event!.type === 'agent.message') {
@@ -52,16 +74,19 @@ describe('translateSdkMessage', () => {
   });
 
   it('produces agent.tool_use when the assistant message is tool-only', () => {
-    const event = translateSdkMessage(
-      {
-        type: 'assistant',
-        uuid: 'uuid-4',
-        session_id: 'sess',
-        message: {
-          content: [{ type: 'tool_use', id: 'tu-1', name: 'Read', input: { file_path: '/x' } }],
+    const event = first(
+      translateSdkMessage(
+        {
+          type: 'assistant',
+          uuid: 'uuid-4',
+          session_id: 'sess',
+          message: {
+            content: [{ type: 'tool_use', id: 'tu-1', name: 'Read', input: { file_path: '/x' } }],
+          },
         },
-      },
-      () => {},
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event).not.toBeNull();
     expect(event!.type).toBe('agent.tool_use');
@@ -72,64 +97,79 @@ describe('translateSdkMessage', () => {
   });
 
   it('prefers text over tool_use when both blocks are present', () => {
-    const event = translateSdkMessage(
-      {
-        type: 'assistant',
-        uuid: 'uuid-5',
-        session_id: 'sess',
-        message: {
-          content: [
-            { type: 'text', text: 'thinking out loud' },
-            { type: 'tool_use', id: 'tu-2', name: 'Bash', input: {} },
-          ],
+    const event = first(
+      translateSdkMessage(
+        {
+          type: 'assistant',
+          uuid: 'uuid-5',
+          session_id: 'sess',
+          message: {
+            content: [
+              { type: 'text', text: 'thinking out loud' },
+              { type: 'tool_use', id: 'tu-2', name: 'Bash', input: {} },
+            ],
+          },
         },
-      },
-      () => {},
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event!.type).toBe('agent.message');
   });
 
   it('produces session.status_idle for result.success', () => {
-    const event = translateSdkMessage(
-      { type: 'result', subtype: 'success', uuid: 'uuid-6', session_id: 'sess' },
-      () => {},
+    const event = first(
+      translateSdkMessage(
+        { type: 'result', subtype: 'success', uuid: 'uuid-6', session_id: 'sess' },
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event!.type).toBe('session.status_idle');
   });
 
   it('attaches native total_cost_usd from the result onto status_idle', () => {
-    const event = translateSdkMessage(
-      {
-        type: 'result',
-        subtype: 'success',
-        uuid: 'uuid-6b',
-        session_id: 'sess',
-        total_cost_usd: 0.0421,
-      },
-      () => {},
+    const event = first(
+      translateSdkMessage(
+        {
+          type: 'result',
+          subtype: 'success',
+          uuid: 'uuid-6b',
+          session_id: 'sess',
+          total_cost_usd: 0.0421,
+        },
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event!.type).toBe('session.status_idle');
     expect((event as { total_cost_usd?: number }).total_cost_usd).toBe(0.0421);
   });
 
   it('omits total_cost_usd when the result has none (managed-agents shape)', () => {
-    const event = translateSdkMessage(
-      { type: 'result', subtype: 'success', uuid: 'uuid-6c', session_id: 'sess' },
-      () => {},
+    const event = first(
+      translateSdkMessage(
+        { type: 'result', subtype: 'success', uuid: 'uuid-6c', session_id: 'sess' },
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect((event as { total_cost_usd?: number }).total_cost_usd).toBeUndefined();
   });
 
   it('produces session.error for result error subtypes with the error message', () => {
-    const event = translateSdkMessage(
-      {
-        type: 'result',
-        subtype: 'error_during_execution',
-        uuid: 'uuid-7',
-        session_id: 'sess',
-        errors: ['something blew up', 'and then again'],
-      },
-      () => {},
+    const event = first(
+      translateSdkMessage(
+        {
+          type: 'result',
+          subtype: 'error_during_execution',
+          uuid: 'uuid-7',
+          session_id: 'sess',
+          errors: ['something blew up', 'and then again'],
+        },
+        () => {},
+        new Set<string>(),
+      ),
     );
     expect(event!.type).toBe('session.error');
     if (event!.type === 'session.error') {
@@ -138,19 +178,117 @@ describe('translateSdkMessage', () => {
     }
   });
 
-  it('returns null for unknown / unparsable shapes', () => {
-    expect(translateSdkMessage(null, () => {})).toBeNull();
-    expect(translateSdkMessage('not an object', () => {})).toBeNull();
-    expect(translateSdkMessage({}, () => {})).toBeNull();
-    expect(translateSdkMessage({ type: 'unknown-shape' }, () => {})).toBeNull();
+  it('emits nothing for unknown / unparsable shapes', () => {
+    expect(translateSdkMessage(null, () => {}, new Set())).toEqual([]);
+    expect(translateSdkMessage('not an object', () => {}, new Set())).toEqual([]);
+    expect(translateSdkMessage({}, () => {}, new Set())).toEqual([]);
+    expect(translateSdkMessage({ type: 'unknown-shape' }, () => {}, new Set())).toEqual([]);
   });
 
-  it('returns null for assistant messages with empty content', () => {
-    const event = translateSdkMessage(
-      { type: 'assistant', uuid: 'uuid-8', session_id: 'sess', message: { content: [] } },
+  it('emits nothing for assistant messages with no content and no usage', () => {
+    expect(
+      translateSdkMessage(
+        { type: 'assistant', uuid: 'uuid-8', session_id: 'sess', message: { content: [] } },
+        () => {},
+        new Set<string>(),
+      ),
+    ).toEqual([]);
+  });
+});
+
+// ── The cost span the budget ceiling reads ──────────────────────────
+//
+// streamSessionWithAdvisor compares its accumulated total against the limit on
+// `span.model_request_end` and on nothing else. Every transport that speaks
+// this message shape reaches the ceiling only through these spans; the result
+// message's `total_cost_usd` arrives after the session is over.
+
+describe('cost spans from assistant usage', () => {
+  const assistant = (usage: unknown, content: unknown[] = [{ type: 'text', text: 'hi' }]) => ({
+    type: 'assistant',
+    uuid: 'uuid-cost',
+    session_id: 'sess',
+    message: { id: 'msg_01', usage, content },
+  });
+
+  it('emits a span carrying the per-request token counts', () => {
+    const events = translateSdkMessage(assistant(USAGE), () => {}, new Set());
+    const span = events.find((e) => e.type === 'span.model_request_end');
+    expect(span).toBeDefined();
+    if (span?.type === 'span.model_request_end') {
+      expect(span.is_error).toBe(false);
+      expect(span.id).toBe('msg_01');
+      expect(span.model_usage).toEqual({
+        input_tokens: 1000,
+        output_tokens: 500,
+        cache_creation_input_tokens: 200,
+        cache_read_input_tokens: 4000,
+      });
+    }
+  });
+
+  it('puts the content event before the span', () => {
+    // A ceiling that trips on the span must not discard the text that preceded
+    // it: the partial output is what the caller returns.
+    const events = translateSdkMessage(assistant(USAGE), () => {}, new Set());
+    expect(events.map((e) => e.type)).toEqual(['agent.message', 'span.model_request_end']);
+  });
+
+  it('emits the span for a tool-only message too', () => {
+    const events = translateSdkMessage(
+      assistant(USAGE, [{ type: 'tool_use', id: 'tu', name: 'Bash', input: {} }]),
       () => {},
+      new Set<string>(),
     );
-    expect(event).toBeNull();
+    expect(events.map((e) => e.type)).toEqual(['agent.tool_use', 'span.model_request_end']);
+  });
+
+  it('emits the span alone when a message has usage and no renderable content', () => {
+    expect(
+      translateSdkMessage(assistant(USAGE, []), () => {}, new Set()).map((e) => e.type),
+    ).toEqual(['span.model_request_end']);
+  });
+
+  it('treats absent cache counts as zero rather than dropping the span', () => {
+    const events = translateSdkMessage(
+      assistant({ input_tokens: 10, output_tokens: 20 }),
+      () => {},
+      new Set<string>(),
+    );
+    const span = events.find((e) => e.type === 'span.model_request_end');
+    if (span?.type === 'span.model_request_end') {
+      expect(span.model_usage.cache_creation_input_tokens).toBe(0);
+      expect(span.model_usage.cache_read_input_tokens).toBe(0);
+    } else {
+      throw new Error('no span emitted');
+    }
+  });
+
+  it('charges a message with no id rather than dropping its cost', () => {
+    // A message that cannot be attributed to a turn is counted every time. The
+    // stated direction is over-count rather than drop, because a ceiling that
+    // misses spending is worse than one that trips early — and a direction no
+    // case holds is a direction that drifts.
+    const seen = new Set<string>();
+    const anon = {
+      type: 'assistant',
+      uuid: 'u-anon',
+      session_id: 's',
+      message: { usage: USAGE, content: [] },
+    };
+    expect(translateSdkMessage(anon, () => {}, seen).map((e) => e.type)).toEqual([
+      'span.model_request_end',
+    ]);
+    expect(translateSdkMessage(anon, () => {}, seen).map((e) => e.type)).toEqual([
+      'span.model_request_end',
+    ]);
+  });
+
+  it('emits no span when the message carries no usable counts', () => {
+    for (const usage of [undefined, {}, { input_tokens: 5 }, { output_tokens: 5 }]) {
+      const events = translateSdkMessage(assistant(usage), () => {}, new Set());
+      expect(events.some((e) => e.type === 'span.model_request_end')).toBe(false);
+    }
   });
 });
 
