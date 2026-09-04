@@ -324,7 +324,11 @@ export interface SessionStatusEvent {
     | 'session.status_terminated';
   id: string;
   stop_reason?: { type: string; event_ids?: string[] };
-  /** Native run cost from the SDK / claude-cli result. Unset on managed-agents (cost arrives via spans). */
+  /**
+   * The run's own total, where the transport's result message carries one. It
+   * reconciles the accumulated `span.model_request_end` costs against what was
+   * billed, and it arrives with the terminal event, so nothing can act on it.
+   */
   total_cost_usd?: number;
   processed_at: string;
 }

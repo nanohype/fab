@@ -1813,8 +1813,20 @@ export async function streamSessionWithAdvisor(
       }
     }
 
-    // Track cost from model request spans (managed-agents transport). Priced
-    // through the shared, model+cache-aware estimator using the role's model.
+    // Cost accumulates from per-request spans, priced through the shared
+    // estimator. This is the only signal that arrives while a session can still
+    // be stopped, so it is what a ceiling has to be compared against.
+    //
+    // What it is compared against is an estimate, and it is worth being exact
+    // about how it differs from the bill. It applies this repository's rate
+    // card to the token counts a transport reports, at the caller's model where
+    // one is given and at the default tier where none is — the revision path
+    // resumes a session by id and has no role to name, so a turn there is
+    // priced at that tier whatever model ran, which for an opus role is 1.667x
+    // low. The run's own total replaces this number at idle, so the record is
+    // the billed one and only the ceiling is compared against the estimate:
+    // where they differ, what moves is when a session is stopped, not what it
+    // is reported to have cost.
     if (event.type === 'span.model_request_end' && !event.is_error) {
       sessionCost += estimateCost(event.model_usage, options?.model);
 
@@ -1836,10 +1848,11 @@ export async function streamSessionWithAdvisor(
       }
     }
 
-    // Native run cost from the SDK / claude-cli result message. Those transports
-    // don't emit cost spans; the Agent SDK / Claude Code report a final
-    // total_cost_usd on the result, which sdk-events attaches to status_idle.
-    // managed-agents leaves it unset (cost is accumulated from spans above).
+    // The run's own total, reported on the result by the transports that have
+    // one. It reconciles the summed spans against what was actually billed, and
+    // it arrives at the end — after the point where a ceiling could act — so it
+    // corrects the record rather than enforcing anything. managed-agents leaves
+    // it unset and the accumulated total stands.
     if (event.type === 'session.status_idle' && typeof event.total_cost_usd === 'number') {
       sessionCost = event.total_cost_usd;
     }
