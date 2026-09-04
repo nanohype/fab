@@ -3,8 +3,9 @@ import type { AgentEvent, GitRepoResource, TeamRole, UserEvent } from './types.j
 /**
  * Transport-agnostic agent runtime.
  *
- * Fab ships four transports, picked via `FAB_RUNTIME` (see
- * `src/runtimes/index.ts` and `docs/transports.md`):
+ * A transport is picked with `FAB_RUNTIME`, against the list in
+ * {@link RUNTIME_NAMES} (see `src/runtimes/index.ts` and
+ * `docs/transports.md`):
  *
  *   - **ManagedAgentsRuntime** (`managed-agents`, default) — the Anthropic
  *     Managed Agents REST API. Agents are deployed cloud-side; sessions
@@ -19,7 +20,7 @@ import type { AgentEvent, GitRepoResource, TeamRole, UserEvent } from './types.j
  *     per role session (subscription-billable via an existing Claude Code
  *     login).
  *
- * All four expose the same `AgentSession` shape: events flow out via an
+ * Every one of them exposes the same `AgentSession` shape: events flow out via an
  * async iterable; follow-up inputs (tool confirmations, custom tool results,
  * interrupts) flow in via `sendInput`. The workflow layer in `workflows.ts`
  * doesn't know which transport it's running on.
@@ -97,14 +98,15 @@ export type RuntimeName = (typeof RUNTIME_NAMES)[number];
  * already, so it has nothing to mount `resources` into. The subprocess
  * transport does attach a repository directory, but sources it from workspace
  * state rather than from this field. The k8s transport runs in a pod, where
- * neither the caller's directory nor the operator's vault is reachable. MCP
- * auth on all three travels in the server config rather than from a vault.
+ * neither the caller's directory nor the operator's vault is reachable. Away
+ * from the default transport, MCP auth travels in the server config rather
+ * than from a vault.
  *
- * Both axes derive, and so does the check: `keyof RunRoleOptions` makes a new
- * option a compile error, `RuntimeName` makes a new transport one, and what a
- * transport reads is resolved from the program's own types rather than matched
- * in its text — so a read through a renamed parameter, or one module away, is
- * the same read.
+ * Both axes derive, and the check runs rather than reads: `keyof
+ * RunRoleOptions` makes a new option a compile error, `RuntimeName` makes a new
+ * transport one, and each transport is started with an options object that
+ * records the fields it takes from it. What the matrix is held to is the reads
+ * that happen — whatever spells them, and wherever they live.
  */
 export const RUN_ROLE_OPTION_SUPPORT: Record<keyof RunRoleOptions, readonly RuntimeName[]> = {
   title: ['managed-agents', 'claude-cli'],

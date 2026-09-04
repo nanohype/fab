@@ -1,6 +1,6 @@
 # Transports
 
-Fab runs the same role definitions + workflow code against four transports:
+Fab runs the same role definitions + workflow code against each of these transports:
 
 - **`managed-agents`** (default) — Anthropic-hosted REST API. Sessions and sandboxes live on Anthropic infrastructure.
 - **`sdk`** — `@anthropic-ai/claude-agent-sdk` running the agent loop in fab's own process. Sessions run in-process; tools touch the working directory.
@@ -151,7 +151,7 @@ The operator runs the session pods in the Platform's tenant namespace (`tenants-
 
 ## What's the same across all transports
 
-- **Roster.** All four transports run the same roles from `src/team/`.
+- **Roster.** Every transport runs the same roles from `src/team/`.
 - **Workflows.** `src/workflows.ts` is transport-agnostic. The same revision-loop, merge-gate, and external-reviewer calibration code runs in every mode.
 - **Skill overlay.** The overlay chain (`$FAB_SKILLS_DIR` → `~/.fab/skills/` → `<cwd>/.fab/skills/` → bundled `fab/skills/`) resolves identically.
 - **Gate logic.** `src/gate.ts` — pure functions, no transport coupling.
