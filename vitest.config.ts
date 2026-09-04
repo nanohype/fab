@@ -21,29 +21,30 @@ export default defineConfig({
         // out of unit scope by design.
         'src/repl.ts',
       ],
-      // Honest floors set just below the measured actuals (see the numbers in
-      // the comment on each threshold) so the gate catches a regression — a
-      // new untested module dragging the denominator down — without flaking
-      // on minor fluctuation. Run via `npm run test:coverage`.
+      // Floors rather than targets: each sits below what the suite measures, so
+      // the gate catches a regression — a new untested module dragging the
+      // denominator down — without failing on minor fluctuation. What the suite
+      // measures is what `npm run test:coverage` prints; the org floor these
+      // are held against is branches 60 / functions 75 / lines 75 /
+      // statements 75 in nanohype/standards/testing-rubric.json.
       //
-      // Statements and lines clear the org floor (branches 60 / functions 75 /
-      // lines 75 / statements 75 in nanohype/standards/testing-rubric.json);
-      // functions still sits under it. What remains of the gap is
-      // `runtimes/sdk-k8s.ts` and `runtimes/claude-cli.ts` — one needs a live
-      // apiserver to dispatch against, the other a `claude` subprocess to
-      // drive. They are not excluded, so they count against these numbers
-      // rather than being hidden by them.
+      // The widest gap is `runtimes/sdk-k8s.ts` and `runtimes/claude-cli.ts`,
+      // and what is uncovered in them is the stream side: a pod log tailed from
+      // an apiserver, a subprocess's stdout translated as it arrives. Dispatch
+      // and spawn are driven. Neither file is excluded, so both count against
+      // these numbers rather than being hidden by them.
       //
-      // `runtimes/sdk.ts` and `k8s.ts` are no longer part of that gap. The sdk
-      // runtime's query-options builder is a pure function and its session
-      // takes the SDK module as a constructor argument; the k8s client's log
-      // follow is exercised against a stubbed `fetch`. Both go through seams
-      // the production code already has, not mocks of the packages under test.
+      // `runtimes/sdk.ts` and `k8s.ts` sit outside that gap. The sdk runtime's
+      // query-options builder is a pure function and its session takes the SDK
+      // module as a constructor argument; the k8s client's log follow is
+      // exercised against a stubbed `fetch`. What a fixture stands in for is
+      // the substrate a transport talks to — an apiserver, a subprocess, an
+      // agent loop — and never fab's own code.
       thresholds: {
-        lines: 75, // measured 76.42
-        functions: 70, // measured 70.73
-        branches: 72, // measured 73.23
-        statements: 75, // measured 76.22
+        lines: 75,
+        functions: 70,
+        branches: 72,
+        statements: 75,
 
         // Per-file 100%, above the global floor, on the two files where an
         // uncovered branch is an unproven control rather than a coverage

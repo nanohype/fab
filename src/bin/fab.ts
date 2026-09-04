@@ -87,11 +87,11 @@ function requireKey(): string {
 
 /**
  * Construct the Managed Agents client. In managed-agents mode the API key
- * is mandatory — the client is exercised against the REST API. In sdk /
- * sdk-k8s / claude-cli mode the client is constructed but never invoked —
- * none of those three runtimes calls the REST API — so a missing key is
- * acceptable. Returning a placeholder here lets `executeWorkflow`'s
- * `createRuntime(api)` call take the same argument across all four.
+ * is mandatory — the client is exercised against the REST API. Every other
+ * transport constructs the client and never invokes it, since none of them
+ * calls the REST API, so a missing key is acceptable there. Returning a
+ * placeholder here lets `executeWorkflow`'s `createRuntime(api)` call take the
+ * same argument whichever transport resolves.
  */
 function client(): AnthropicAgents {
   const kind = resolveRuntimeKind();
