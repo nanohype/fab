@@ -42,6 +42,14 @@ import { buildHttpMcpServers, type HttpMcpServer } from '../mcp.js';
  * Bedrock (see `src/inference.ts`); the default is the Anthropic API.
  */
 export class SdkRuntime implements AgentRuntime {
+  /**
+   * How the Agent SDK is obtained. Defaulted to the real loader, so production
+   * takes it; a caller supplies one to observe what `runRoleSession` hands the
+   * query, which is the only place the configured spend ceiling is read and
+   * passed down.
+   */
+  constructor(private readonly loadSdkModule: () => Promise<AgentSdkModule> = loadSdk) {}
+
   async runRoleSession(
     role: TeamRole,
     message: string,
@@ -58,10 +66,10 @@ export class SdkRuntime implements AgentRuntime {
     const backend = resolveInferenceBackend();
     const model = resolveModelId(member.model, backend);
     // Native per-run budget: the SDK stops the loop with an error_max_budget_usd
-    // result when this USD cap is exceeded. This is how budget enforcement
-    // reaches the sdk/sdk-k8s transports — managed-agents enforces it via span
-    // accumulation + interrupt in streamSessionWithAdvisor, which never fires
-    // here (these transports emit no cost spans).
+    // result when this USD cap is exceeded. It is a second ceiling, independent
+    // of the one the pipeline applies — streamSessionWithAdvisor accumulates the
+    // per-request cost spans this transport emits and interrupts on breach, and
+    // that path reaches every transport that emits them.
     const budgetUsd = await getBudgetLimit();
     // Wire the role's MCP servers into the in-process loop. Without this the sdk
     // transport ran with NO MCP tools — roles lost github/linear/etc. and could
@@ -74,7 +82,7 @@ export class SdkRuntime implements AgentRuntime {
       );
     }
 
-    const sdk = await loadSdk();
+    const sdk = await this.loadSdkModule();
     const session = new SdkAgentSession(
       sdk,
       model,
@@ -171,6 +179,8 @@ export class SdkAgentSession implements AgentSession {
   private closed = false;
   private sdkQuery: SdkQuery | null = null;
   private capturedSessionId: string | null = null;
+  /** Turns already charged for; one API turn arrives as several messages. */
+  private readonly seenTurns = new Set<string>();
 
   constructor(
     private readonly sdk: AgentSdkModule,
@@ -326,14 +336,20 @@ export class SdkAgentSession implements AgentSession {
     }
     try {
       for await (const raw of this.sdkQuery) {
-        const event = translateSdkMessage(raw, (id) => {
-          this.capturedSessionId = id;
-        });
-        if (event) yield event;
-        // After a terminal result the loop ends naturally; close the input
-        // iterable so the SDK's process can shut down cleanly.
-        if (event && isTerminal(event)) {
-          this.closeInput();
+        const events = translateSdkMessage(
+          raw,
+          (id) => {
+            this.capturedSessionId = id;
+          },
+          this.seenTurns,
+        );
+        for (const event of events) {
+          yield event;
+          // After a terminal result the loop ends naturally; close the input
+          // iterable so the SDK's process can shut down cleanly.
+          if (isTerminal(event)) {
+            this.closeInput();
+          }
         }
       }
     } finally {
