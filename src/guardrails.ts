@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { describeRefusal, type PathRefusal, repoPathRefusal } from './paths.js';
 
 /**
  * Prompt-injection hardening for untrusted input.
@@ -113,16 +114,46 @@ export function untrustedBlock(
 // the next phrasing walks through it, while a path that is one line, relative,
 // and bounded cannot carry an instruction no matter what it says.
 
-/** One line, repo-relative, no traversal, bounded length. */
-const SAFE_REPO_PATH = /^[A-Za-z0-9._][A-Za-z0-9._\-/]{0,199}$/;
+/**
+ * The characters a directory may be spelled with, and nothing about where it
+ * points.
+ *
+ * This is the prompt-shape half: an entry is rendered into a markdown list in a
+ * system prompt, so it has to be plain and it has to be one line. Where the
+ * path points is {@link isContainedRepoPath}'s question, and keeping the two
+ * apart is deliberate — a constant that claimed containment while a clause
+ * beside it supplied it would hand the next call site a guarantee it does not
+ * carry.
+ */
+const PROMPT_SAFE_SEGMENTS = /^[A-Za-z0-9._][A-Za-z0-9._\-/]{0,199}$/;
 
 /**
  * Return every entry that is not a plausible repo-relative directory.
+ *
+ * Both halves apply: the spelling, so the entry cannot carry prose into a
+ * system prompt, and containment, so it cannot name somewhere outside the
+ * repository the roles are scoped to.
  *
  * Returns the offenders rather than a boolean, and all of them rather than the
  * first, so the caller can name what was wrong with the brief instead of
  * reporting that something was.
  */
 export function unsafeSourceDirs(dirs: readonly string[]): string[] {
-  return dirs.filter((d) => !SAFE_REPO_PATH.test(d) || d.split('/').includes('..'));
+  return dirs.filter((d) => sourceDirRefusal(d) !== null);
+}
+
+/**
+ * Why an entry is not a usable source directory, in words, or null when it is.
+ *
+ * The halt message goes to whoever wrote the brief, and "this entry is wrong" is
+ * not something they can act on. Both halves can be the reason, so both can say
+ * so.
+ */
+export function sourceDirRefusal(dir: string): string | null {
+  const refusal: PathRefusal | null = repoPathRefusal(dir);
+  if (refusal) return describeRefusal(refusal);
+  if (!PROMPT_SAFE_SEGMENTS.test(dir)) {
+    return 'is not spelled as a repo-relative directory (letters, digits, dot, dash, underscore and slash, at most 200 characters)';
+  }
+  return null;
 }

@@ -32,7 +32,7 @@ import {
 import { type GateArtifact, resolveGateWorkspace, type ShellRunner } from './workspace.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
-import { unsafeSourceDirs, untrustedBlock } from './guardrails.js';
+import { sourceDirRefusal, unsafeSourceDirs, untrustedBlock } from './guardrails.js';
 
 const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = [
   'typescript',
@@ -999,7 +999,8 @@ export async function executeWorkflow(
       console.log(
         `${RED}${BOLD}Halted: ${unsafe.length} source_dirs entr(y/ies) are not repo-relative directories.${RESET}`,
       );
-      for (const d of unsafe) console.log(`${DIM}  rejected: ${JSON.stringify(d)}${RESET}`);
+      for (const d of unsafe)
+        console.log(`${DIM}  rejected: ${JSON.stringify(d)} — ${sourceDirRefusal(d)}${RESET}`);
       return {
         ok: false,
         reason: `${workflow.name} halted: source_dirs must be one-line, repo-relative directory paths; ${unsafe.length} entr(y/ies) were not.`,

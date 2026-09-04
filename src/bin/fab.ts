@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { AnthropicAgents } from '../api.js';
+import { collectArtifacts, type EventPage, writeArtifacts } from '../export.js';
 import { TEAM } from '../team.js';
 import { formatEvent } from '../stream.js';
 import { startRepl } from '../repl.js';
@@ -1284,57 +1285,33 @@ async function exportSession(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const { writeFile, mkdir } = await import('node:fs/promises');
-  const { join, dirname } = await import('node:path');
-
   const api = client();
   const outputDir =
     typeof args.flags.output === 'string' ? args.flags.output : `./export-${sessionId.slice(-8)}`;
 
-  // Paginate through all events
-  let page: string | null = null;
-  const files: { path: string; content: string }[] = [];
-
-  do {
-    const url = `/v1/sessions/${sessionId}/events?limit=100&order=asc${page ? `&page=${page}` : ''}`;
-    const result = await (
+  const files = await collectArtifacts((page) =>
+    (
       api as unknown as {
-        get: (p: string) => Promise<{
-          data: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
-          next_page: string | null;
-        }>;
+        get: (p: string) => Promise<EventPage>;
       }
-    ).get(url);
-
-    for (const event of result.data) {
-      if (event.type === 'agent.tool_use' && event.name === 'write' && event.input) {
-        const filePath = String(event.input.file_path ?? event.input.path ?? '');
-        const content = String(event.input.content ?? '');
-        if (filePath && content) {
-          files.push({ path: filePath, content });
-        }
-      }
-    }
-    page = result.next_page;
-  } while (page);
+    ).get(`/v1/sessions/${sessionId}/events?limit=100&order=asc${page ? `&page=${page}` : ''}`),
+  );
 
   if (files.length === 0) {
     console.log('No file artifacts found in session.');
     return;
   }
 
-  // Write files locally
-  for (const file of files) {
-    // Normalize: /workspace/artifacts/product/prd.md → product/prd.md
-    const relativePath = file.path
-      .replace(/^\/workspace\/artifacts\//, '')
-      .replace(/^\/workspace\//, '');
-    const dest = join(outputDir, relativePath);
-    await mkdir(dirname(dest), { recursive: true });
-    await writeFile(dest, file.content, 'utf-8');
-  }
+  const { written, refused } = await writeArtifacts(files, outputDir);
 
-  console.log(`Exported ${files.length} files to ${outputDir}/`);
+  console.log(`Exported ${written.length} files to ${outputDir}/`);
+  if (refused.length > 0) {
+    console.log(
+      `${refused.length} file(s) were not written — the session named a path this export cannot place:`,
+    );
+    for (const r of refused) console.log(`  ${r}`);
+    console.log('  Re-run the role with a repo-relative artifact path to place them.');
+  }
 }
 
 // ── Revise command ──────────────────────────────────────────────────
