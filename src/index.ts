@@ -18,7 +18,7 @@ export {
   streamWithAdvisor,
 } from './workflows.js';
 export { ADVISOR_TOOL, callAdvisor } from './advisor.js';
-export { loadPerf, collectSessionMetrics, formatPerfReport } from './perf.js';
+export { loadPerf, recordSessionMetrics, formatPerfReport } from './perf.js';
 export { appendQualityRun, loadQualityRuns, formatQualityTrend, gradeToGpa } from './quality.js';
 export type { QualityRun } from './quality.js';
 export { deliverResult } from './webhook.js';

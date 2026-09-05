@@ -1,7 +1,8 @@
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// In-memory fs so collectSessionMetrics' read-modify-write of .fab-perf.json
-// never touches the real working tree.
+// In-memory fs so the read-modify-write of .fab-perf.json never touches the
+// real working tree.
 const files = new Map<string, string>();
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(async (p: string) => {
@@ -14,67 +15,103 @@ vi.mock('node:fs/promises', () => ({
   }),
 }));
 
-import { collectSessionMetrics, loadPerf } from '../src/perf.js';
-import type { AnthropicAgents } from '../src/api.js';
-import type { FabState } from '../src/types.js';
+import {
+  formatPerfReport,
+  loadPerf,
+  recordSessionMetrics,
+  type SessionObservation,
+} from '../src/perf.js';
 
-function fakeApi(events: unknown[]): AnthropicAgents {
-  return {
-    getSession: vi.fn(async () => ({
-      agent: { id: 'agent-product' },
-      usage: { input_tokens: 1200, output_tokens: 800 },
-    })),
-    listEvents: vi.fn(async () => ({ data: events })),
-  } as unknown as AnthropicAgents;
-}
-
-const state = {
-  agents: [{ agentId: 'agent-product', role: 'product' }],
-} as unknown as FabState;
+const observation = (over: Partial<SessionObservation> = {}): SessionObservation => ({
+  role: 'product',
+  inputTokens: 1200,
+  outputTokens: 800,
+  costUsd: 0.25,
+  advisorCalls: 1,
+  selfEvalPass: 1,
+  selfEvalFail: 0,
+  revisions: 0,
+  ...over,
+});
 
 beforeEach(() => {
   files.clear();
 });
 
-describe('collectSessionMetrics', () => {
-  it('folds a session into the per-role perf table', async () => {
-    const api = fakeApi([
-      { type: 'agent.message', content: [{ text: 'SELF-EVAL: PASS' }] },
-      { type: 'agent.message', content: [{ text: 'Revising the plan' }] },
-      { type: 'agent.custom_tool_use', name: 'consult_advisor' },
-    ]);
-
-    await collectSessionMetrics(api, 'sess-1', state);
+describe('recordSessionMetrics', () => {
+  it('folds one session into the per-role table', async () => {
+    await recordSessionMetrics(observation());
 
     const perf = await loadPerf();
     expect(perf.product.sessions).toBe(1);
     expect(perf.product.totalInputTokens).toBe(1200);
     expect(perf.product.totalOutputTokens).toBe(800);
+    expect(perf.product.totalCostUsd).toBeCloseTo(0.25, 6);
     expect(perf.product.selfEvalPass).toBe(1);
-    expect(perf.product.revisions).toBe(1);
     expect(perf.product.advisorCalls).toBe(1);
     expect(perf.product.lastActive).not.toBe('');
   });
 
   it('accumulates across sessions for the same role', async () => {
-    const api = fakeApi([]);
-    await collectSessionMetrics(api, 'sess-1', state);
-    await collectSessionMetrics(api, 'sess-2', state);
+    await recordSessionMetrics(observation());
+    await recordSessionMetrics(observation());
 
     const perf = await loadPerf();
     expect(perf.product.sessions).toBe(2);
     expect(perf.product.totalInputTokens).toBe(2400);
+    expect(perf.product.totalCostUsd).toBeCloseTo(0.5, 6);
   });
 
-  it('maps a session whose agent is not in state to the "unknown" role', async () => {
-    const api = {
-      getSession: vi.fn(async () => ({ agent: { id: 'ghost' }, usage: {} })),
-      listEvents: vi.fn(async () => ({ data: [] })),
-    } as unknown as AnthropicAgents;
-
-    await collectSessionMetrics(api, 'sess-x', state);
+  it('keeps one role out of another role’s row', async () => {
+    await recordSessionMetrics(observation({ role: 'product' }));
+    await recordSessionMetrics(observation({ role: 'pr-reviewer', inputTokens: 7 }));
 
     const perf = await loadPerf();
-    expect(perf.unknown.sessions).toBe(1);
+    expect(perf.product.totalInputTokens).toBe(1200);
+    expect(perf['pr-reviewer'].totalInputTokens).toBe(7);
+  });
+
+  it('serializes concurrent records rather than losing one to the other', async () => {
+    // A parallel workflow batch runs several role sessions at once, and each
+    // ends with a read-modify-write of one file. Two that interleave read the
+    // same table and the second write erases the first increment.
+    await Promise.all([
+      recordSessionMetrics(observation()),
+      recordSessionMetrics(observation()),
+      recordSessionMetrics(observation()),
+    ]);
+
+    const perf = await loadPerf();
+    expect(perf.product.sessions).toBe(3);
+  });
+
+  it('prints the cost that was recorded, not one re-derived from the tokens', async () => {
+    // The table is the surface an operator reads and an exporter would publish.
+    // Re-pricing the stored token counts here would put a second number beside
+    // the one the ceiling acted on, and the two disagree by construction: the
+    // record carries the transport's billed total where it reported one, and a
+    // recompute has neither that nor the per-request model.
+    await recordSessionMetrics(observation({ inputTokens: 10, outputTokens: 20, costUsd: 1.23 }));
+
+    const report = formatPerfReport(await loadPerf());
+    // The role's own line, not the report: a total computed one way and a row
+    // computed another both appear in it, and matching anywhere would accept
+    // the disagreement this pins.
+    const lines = report.split('\n');
+    expect(lines.find((l) => l.startsWith('product'))).toContain('$1.23');
+    expect(lines.find((l) => l.includes('TOTAL'))).toContain('$1.23');
+  });
+
+  it('reads a table written before a field existed as zero, not as a gap', async () => {
+    // A row on disk is whatever the version that wrote it knew about. Read back
+    // short of a field, it renders as an empty column rather than a zero, and a
+    // total over it is NaN.
+    files.set(
+      join(process.cwd(), '.fab-perf.json'),
+      JSON.stringify({ product: { sessions: 1, totalInputTokens: 10 } }),
+    );
+    const perf = await loadPerf();
+    expect(perf.product?.totalCostUsd).toBe(0);
+    expect(perf.product?.selfEvalFail).toBe(0);
   });
 });

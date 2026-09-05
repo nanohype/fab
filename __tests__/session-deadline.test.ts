@@ -1,6 +1,3 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { initLine, startFakeClaudeSession } from './helpers/fake-claude.js';
 import {
