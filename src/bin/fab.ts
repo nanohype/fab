@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { AnthropicAgents } from '../api.js';
+import type { AnthropicAgents } from '../api.js';
+import { apiClient, runtimeClient } from '../client.js';
 import { collectArtifacts, type EventPage, writeArtifacts } from '../export.js';
 import { TEAM } from '../team.js';
 import { formatEvent } from '../stream.js';
@@ -77,32 +78,6 @@ import type {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function requireKey(): string {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) {
-    console.error('ANTHROPIC_API_KEY is not set');
-    process.exit(1);
-  }
-  return key;
-}
-
-/**
- * Construct the Managed Agents client. In managed-agents mode the API key
- * is mandatory — the client is exercised against the REST API. Every other
- * transport constructs the client and never invokes it, since none of them
- * calls the REST API, so a missing key is acceptable there. Returning a
- * placeholder here lets `executeWorkflow`'s `createRuntime(api)` call take the
- * same argument whichever transport resolves.
- */
-function client(): AnthropicAgents {
-  const kind = resolveRuntimeKind();
-  if (kind === 'managed-agents') {
-    return new AnthropicAgents(requireKey());
-  }
-  const key = process.env.ANTHROPIC_API_KEY ?? 'unused-in-non-managed-runtime';
-  return new AnthropicAgents(key);
-}
-
 async function createSession(
   api: AnthropicAgents,
   agentId: string,
@@ -168,7 +143,7 @@ let deployAllowCreate = false;
 
 async function deploy(args: ParsedArgs): Promise<void> {
   const dryRun = !!args.flags['dry-run'];
-  const api = dryRun ? null : client();
+  const api = dryRun ? null : apiClient();
   const skipSkills = !!args.flags['skip-skills'];
   const fastMode = !!args.flags['fast'];
   deployAllowCreate = !!args.flags['allow-create'];
@@ -373,7 +348,7 @@ async function status(): Promise<void> {
     return;
   }
 
-  const api = client();
+  const api = apiClient();
   const roleW = Math.max(...state.agents.map((a) => a.role.length));
 
   console.log(`${'ROLE'.padEnd(roleW)}  ${'AGENT ID'.padEnd(30)}  STATUS`);
@@ -395,7 +370,7 @@ async function teardown(): Promise<void> {
     return;
   }
 
-  const api = client();
+  const api = apiClient();
   console.log('Archiving fab...\n');
 
   for (const entry of state.agents) {
@@ -429,7 +404,7 @@ async function session(args: ParsedArgs): Promise<void> {
     return;
   }
 
-  const api = client();
+  const api = apiClient();
   const title = typeof args.flags.title === 'string' ? args.flags.title : undefined;
   const sess = await createSession(api, entry.agentId, title);
   console.log(`Session created: ${sess.id}`);
@@ -457,7 +432,7 @@ async function send(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  const api = apiClient();
   await api.sendMessage(sessionId, message);
   console.log('Message sent. Streaming response...\n');
   await streamWithAdvisor(api, sessionId);
@@ -470,7 +445,9 @@ async function stream(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  // Carried, not called: `streamWithAdvisor` resolves a runtime and resumes a
+  // session on it, and this command does nothing else with the client.
+  const api = runtimeClient();
   console.log(`Streaming session ${sessionId}...\n`);
   await streamWithAdvisor(api, sessionId);
 }
@@ -482,7 +459,7 @@ async function events(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  const api = apiClient();
   const result = await api.listEvents(sessionId);
 
   for (const event of result.data) {
@@ -498,7 +475,7 @@ async function threads(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  const api = apiClient();
   const result = await api.listThreads(sessionId);
 
   if (result.data.length === 0) {
@@ -512,7 +489,7 @@ async function threads(args: ParsedArgs): Promise<void> {
 }
 
 async function listSessions(): Promise<void> {
-  const api = client();
+  const api = apiClient();
   const result = await api.listSessions();
 
   if (result.data.length === 0) {
@@ -530,7 +507,7 @@ async function listSessions(): Promise<void> {
 }
 
 async function listAgents(): Promise<void> {
-  const api = client();
+  const api = apiClient();
   const result = await api.listAgents();
 
   if (result.data.length === 0) {
@@ -561,7 +538,7 @@ async function adopt(args: ParsedArgs): Promise<void> {
   }
 
   // Verify the agent exists on the platform
-  const api = client();
+  const api = apiClient();
   const agent = await api.getAgent(agentId);
 
   const state = await loadState();
@@ -581,7 +558,7 @@ async function adopt(args: ParsedArgs): Promise<void> {
 // ── Standup command ─────────────────────────────────────────────────
 
 async function standup(args: ParsedArgs): Promise<void> {
-  const api = client();
+  const api = apiClient();
 
   // Route through chief-of-staff for cross-team rollup; fall back to --session
   // when the caller wants to continue an existing rollup thread.
@@ -615,7 +592,7 @@ Format the report as a structured standup with each role as a section. Be concis
 // ── Usage command ───────────────────────────────────────────────────
 
 async function usage(args: ParsedArgs): Promise<void> {
-  const api = client();
+  const api = apiClient();
   const state = await loadState();
 
   let since: Date | undefined;
@@ -672,7 +649,7 @@ async function workflow(args: ParsedArgs): Promise<void> {
   if (!skipIntake) {
     const intakeEntry = await getAgentByRole('intake-analyst');
     if (intakeEntry) {
-      const api = client();
+      const api = apiClient();
       console.log(`\x1b[2mRunning intake analysis...\x1b[0m\n`);
       const intakeSess = await createSession(api, intakeEntry.agentId, `intake: ${name}`);
       await api.sendMessage(intakeSess.id, buildIntakeMessage(name, prompt));
@@ -714,7 +691,7 @@ async function workflow(args: ParsedArgs): Promise<void> {
         });
       };
 
-  const outcome = await executeWorkflow(client(), wf, enrichedPrompt, {
+  const outcome = await executeWorkflow(runtimeClient(), wf, enrichedPrompt, {
     onGate,
     noGates,
     sequential,
@@ -749,7 +726,7 @@ async function chat(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  const api = apiClient();
   const role = roleName as TeamRole;
   let sessionId = typeof args.flags.session === 'string' ? args.flags.session : undefined;
 
@@ -799,7 +776,7 @@ async function skills(args: ParsedArgs): Promise<void> {
 }
 
 async function skillsList(): Promise<void> {
-  const api = client();
+  const api = apiClient();
   const result = await api.listSkills();
 
   if (result.data.length === 0) {
@@ -816,7 +793,7 @@ async function skillsList(): Promise<void> {
 }
 
 async function skillsUpload(args: ParsedArgs): Promise<void> {
-  const api = client();
+  const api = apiClient();
   const nanohypePath = resolveNanohypePath(
     typeof args.flags['nanohype-path'] === 'string' ? args.flags['nanohype-path'] : undefined,
   );
@@ -881,7 +858,7 @@ async function skillsTeardown(): Promise<void> {
     return;
   }
 
-  const api = client();
+  const api = apiClient();
   for (const [role, id] of ids) {
     try {
       await api.archiveSkill(id);
@@ -1045,7 +1022,7 @@ async function vaultSetup(): Promise<void> {
     if (val) env[key] = val;
   }
 
-  const api = client();
+  const api = apiClient();
   const { getRegistry } = await import('../mcp.js');
   const registry = getRegistry();
 
@@ -1285,7 +1262,7 @@ async function exportSession(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  const api = apiClient();
   const outputDir =
     typeof args.flags.output === 'string' ? args.flags.output : `./export-${sessionId.slice(-8)}`;
 
@@ -1323,7 +1300,7 @@ async function revise(args: ParsedArgs): Promise<void> {
     console.error('Usage: fab revise <session-id> <feedback...>');
     process.exit(1);
   }
-  await reviseWorkflow(client(), sessionId, feedback);
+  await reviseWorkflow(runtimeClient(), sessionId, feedback);
 }
 
 // ── Scaffold command ────────────────────────────────────────────────
@@ -1337,7 +1314,7 @@ async function scaffold(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const api = client();
+  const api = apiClient();
   const entry = await getAgentByRole('chief-of-staff');
   if (!entry) {
     console.error('No deployed chief-of-staff. Run: fab deploy');
@@ -1398,7 +1375,7 @@ async function sprint(args: ParsedArgs): Promise<void> {
 
   switch (sub) {
     case 'start': {
-      const api = client();
+      const api = apiClient();
       const entry = await getAgentByRole('chief-of-staff');
       if (!entry) {
         console.error('No deployed chief-of-staff. Run: fab deploy');
@@ -1428,7 +1405,7 @@ async function sprint(args: ParsedArgs): Promise<void> {
         process.exit(1);
         return;
       }
-      const api = client();
+      const api = apiClient();
       const backlogSummary =
         config.backlog.length > 0
           ? config.backlog
@@ -1584,7 +1561,7 @@ EXAMPLES
 // ── Recover ────────────────────────────────────────────────────────
 
 async function recover(): Promise<void> {
-  const api = client();
+  const api = apiClient();
   const state = await loadState();
 
   console.log('Recovering state from API...\n');
