@@ -87,12 +87,22 @@ function requireKey(): string {
 }
 
 /**
- * Construct the Managed Agents client. In managed-agents mode the API key
- * is mandatory — the client is exercised against the REST API. Every other
- * transport constructs the client and never invokes it, since none of them
- * calls the REST API, so a missing key is acceptable there. Returning a
- * placeholder here lets `executeWorkflow`'s `createRuntime(api)` call take the
- * same argument whichever transport resolves.
+ * Construct the Managed Agents client.
+ *
+ * On the default transport the API key is mandatory: the client is the
+ * transport, and a run without a key fails here rather than at the first
+ * request. Away from it, the workflow path passes this client to
+ * `createRuntime` and the runtime it resolves to never invokes it — the sdk,
+ * pod and subprocess transports reach a model without the REST API — so a
+ * placeholder is enough to keep `executeWorkflow`'s call taking one argument
+ * whichever transport resolves.
+ *
+ * That holds for the workflow path and not for the commands that use the client
+ * directly. `standup`, `export`, `usage`, `sessions` and the rest are
+ * managed-agents operations whatever `FAB_RUNTIME` says, and they send the
+ * placeholder: without a key they fail on an authentication error naming the
+ * endpoint, where the same command on the default transport reports the missing
+ * key before reaching the network.
  */
 function client(): AnthropicAgents {
   const kind = resolveRuntimeKind();
