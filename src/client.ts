@@ -15,11 +15,19 @@ import { resolveRuntimeKind } from './runtimes/index.js';
 // run that a stale variable made look wrong while the credential was there all
 // along.
 //
-// The workflow path is the other caller. It hands a client to `createRuntime`
-// and the runtime decides whether to use it: the default one is the API, and
-// the sdk, pod and subprocess transports reach a model without it. There the
-// argument is carried rather than called, so a key is required exactly where it
-// would be spent.
+// The other caller hands its client to `createRuntime` and does nothing else
+// with it — running a workflow, sending a revision, resuming a stream — and
+// there the runtime decides whether the client is used at all: the default one
+// is the API, and the sdk, pod and subprocess transports reach a model without
+// it. The argument is carried rather than called, so a key is required on the
+// default transport and nowhere else.
+//
+// What separates the two is the call site, not the command: a key is required
+// exactly where it would be spent. Choosing wrong fails one way round — the
+// carried constructor where the client is used defers the failure to an
+// authentication error naming an endpoint the operator did not mean to call,
+// and the used constructor where it is carried refuses a run that would have
+// worked. The second is the one that says what happened.
 
 /**
  * A missing credential, raised rather than exited on.
