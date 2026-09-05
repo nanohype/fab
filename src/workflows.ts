@@ -20,6 +20,7 @@ import {
   compareGrades,
   parseCitations,
   aggregateGrades,
+  parseSelfEval,
 } from './gate.js';
 import type { GateVerdict, Grade, GradeDrift, FileReader } from './gate.js';
 import { appendQualityRun } from './quality.js';
@@ -79,6 +80,16 @@ export type RoleRunner = (
   role: TeamRole,
   message: string,
   workflowName: string,
+  /**
+   * Which attempt this is: 0 for a role's first run, and one more for each time
+   * a gate sent the work back.
+   *
+   * A parameter rather than something read off the output, because a revision
+   * is a decision this file makes. The loop that revises cannot advance without
+   * incrementing it, so a run that revised eight times cannot be recorded as a
+   * run that revised none.
+   */
+  attempt: number,
 ) => Promise<string>;
 
 export interface WorkflowOptions {
@@ -1057,6 +1068,7 @@ ${renderWorkflowContext(head, entries)}
 Your task:
 ${s.instruction}`,
               workflow.name,
+              attempt,
             ).then((out) => ({ role: s.role, out })),
           ),
         );
@@ -1085,6 +1097,7 @@ ${renderWorkflowContext(head, entries)}
 Your task:
 ${step.instruction}`,
             workflow.name,
+            attempt,
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -1169,6 +1182,8 @@ All four merge-gate roles have APPROVED. Open the PR now.
 
 Return the PR URL prominently in your response.`,
           workflow.name,
+          // The release step runs once, after the gate has already approved.
+          0,
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -1444,6 +1459,7 @@ ${context}
 Your task:
 Review the PR candidate against your role's merge-gate criteria per FACTORY_PREAMBLE. End your response with the full block: GATE_VERDICT, GATE_FEEDBACK, TRANSCRIPTS, CITATIONS, QUALITY_GRADES — EVIDENCE_CONTRACT auto-downgrades APPROVE/REQUEST_CHANGES without transcripts + citations to REJECT.`,
           workflowName,
+          attempt,
         );
       } catch (err) {
         // A gate role that can't run yields no verdict, which parseGateVerdict
@@ -1594,6 +1610,9 @@ ${context}
 Your task:
 Apply the 10-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_GRADES block with all 10 dimensions (N/A where a dimension doesn't apply). Include per-dimension key findings with file:line CITATIONS. Do not emit GATE_VERDICT — you are advisory.`,
       workflowName,
+      // Calibration is a cold first look every time it runs; it is never a
+      // re-run of the external reviewer's own work.
+      0,
     );
   } catch (err) {
     // Calibration is advisory; a failed session fails open (skip it) rather than
@@ -1722,6 +1741,7 @@ async function runRoleSession(
   role: TeamRole,
   message: string,
   workflowName: string,
+  attempt: number,
 ): Promise<string> {
   // The runtime is responsible for the deployment-vs-sdk check
   // (ManagedAgentsRuntime errors loudly if the role isn't deployed;
@@ -1734,6 +1754,7 @@ async function runRoleSession(
     agentId: entry?.agentId ?? `sdk:${role}`,
     agentRole: role,
     workflow: workflowName,
+    attempt,
   });
   return output;
 }
@@ -1753,6 +1774,12 @@ export interface StreamOptions {
   model?: string;
   /** Hard cap on advisor consultations per session. Default: 3. */
   maxAdvisorCalls?: number;
+  /**
+   * Which attempt this session is: 0 for a role's first run, one more for each
+   * time a gate sent the work back. Anything above zero is a revision, and that
+   * is what the per-role table counts.
+   */
+  attempt?: number;
 }
 
 /**
@@ -1796,7 +1823,9 @@ export async function streamSessionWithAdvisor(
   let outputTokens = 0;
   let selfEvalPass = 0;
   let selfEvalFail = 0;
-  let revisions = 0;
+  // A revision is a decision the workflow made, not a word to look for in what
+  // the model wrote back.
+  const revisions = (options?.attempt ?? 0) > 0 ? 1 : 0;
   const maxAdvisorCalls = options?.maxAdvisorCalls ?? 3;
   const pendingToolCalls = new Map<
     string,
@@ -1805,13 +1834,14 @@ export async function streamSessionWithAdvisor(
 
   for await (const event of session.events) {
     if (event.type === 'agent.message') {
-      const text = event.content
-        .filter((c) => c.type === 'text')
-        .map((c) => c.text)
-        .join('');
-      if (text.includes('SELF-EVAL: PASS')) selfEvalPass += 1;
-      if (text.includes('SELF-EVAL: FAIL')) selfEvalFail += 1;
-      if (text.includes('Revising')) revisions += 1;
+      const verdict = parseSelfEval(
+        event.content
+          .filter((c) => c.type === 'text')
+          .map((c) => c.text)
+          .join(''),
+      );
+      if (verdict === 'pass') selfEvalPass += 1;
+      if (verdict === 'fail') selfEvalFail += 1;
     }
 
     const formatted = formatEvent(event);

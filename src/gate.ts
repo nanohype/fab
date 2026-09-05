@@ -639,3 +639,31 @@ export function compareGrades(
   }
   return { drifted, maxDrift, compared, uncompared };
 }
+
+// ── The self-evaluation a role closes with ──────────────────────────
+//
+// One string, demanded in one place and read in one place. A prompt that asks
+// for a line and a consumer that looks for a different one is a metric that
+// reads zero while every role is answering correctly, and neither half can
+// notice: the prompt is prose to the consumer and the consumer is prose to the
+// prompt.
+
+/** The line every role is asked to close with, rendered into its system prompt. */
+export const SELF_EVAL_LINE = 'SELF-EVAL: PASS | FAIL (failed: [list])';
+
+/**
+ * The verdict a role reported, or null when it reported none.
+ *
+ * Anchored to the start of a line and refusing the alternation, because the
+ * instruction itself is a line beginning `SELF-EVAL:` and naming both outcomes.
+ * A role that quotes the contract back — or echoes the section it was given —
+ * is describing the form rather than answering in it, and counting that scores
+ * a session nobody evaluated. The anchor also makes the answer one verdict
+ * rather than two, where a search for each word over the same text finds a pass
+ * and a fail in one sentence.
+ */
+export function parseSelfEval(text: string): 'pass' | 'fail' | null {
+  const m = /^[ \t]*SELF-EVAL:[ \t]*(PASS|FAIL)\b(?![ \t]*\|)/m.exec(text);
+  if (!m) return null;
+  return m[1] === 'PASS' ? 'pass' : 'fail';
+}

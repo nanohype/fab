@@ -1,6 +1,7 @@
 import type { FabState, TeamMember, TeamRole } from './types.js';
 import { FACTORY_PREAMBLE, LANGUAGE_TOOLCHAIN } from './standards.js';
 import { normalizeDelimiters, untrustedBlock } from './guardrails.js';
+import { SELF_EVAL_LINE } from './gate.js';
 
 /**
  * Build the final system prompt for an agent by augmenting the base
@@ -128,7 +129,7 @@ ${qualityChecks}
 
 If any check fails, fix it (up to 3 iterations) before reporting.
 
-SELF-EVAL: PASS | FAIL (failed: [list])
+${SELF_EVAL_LINE}
 ARTIFACTS: [every file path, URL, and ID you created]`);
 
   // ── Template Scaffolding (Engineering only) ───────────────────
