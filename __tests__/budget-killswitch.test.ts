@@ -1,8 +1,7 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ClaudeCliRuntime } from '../src/runtimes/claude-cli.js';
 import { SdkAgentSession, SdkRuntime } from '../src/runtimes/sdk.js';
 import { streamSessionWithAdvisor } from '../src/workflows.js';
 import { streamEventsToJsonl } from '../src/runtimes/role-session.js';
@@ -453,25 +452,3 @@ describe('the cost span stays out of the operator transcript', () => {
     }
   });
 });
-
-async function waitForFile(path: string): Promise<void> {
-  // Generous because process startup is not what this file measures: under a
-  // full suite a child can take seconds to boot, and a bound that fired before
-  // it had spoken would end the case for the wrong reason.
-  for (let i = 0; i < 1200; i++) {
-    if (existsSync(path)) return;
-    await new Promise((res) => setTimeout(res, 25));
-  }
-  throw new Error(`the fake claude never started: ${path} was not written`);
-}
-
-async function waitForExit(pid: number): Promise<void> {
-  for (let i = 0; i < 200; i++) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return;
-    }
-    await new Promise((res) => setTimeout(res, 25));
-  }
-}

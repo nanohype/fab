@@ -1,9 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { AnthropicAgents } from './api.js';
-import type { FabState } from './types.js';
-import { rateFor } from './pricing.js';
-import { TEAM } from './team.js';
 
 const PERF_FILE = join(process.cwd(), '.fab-perf.json');
 
@@ -15,6 +11,16 @@ export interface RoleMetrics {
   revisions: number;
   totalInputTokens: number;
   totalOutputTokens: number;
+  /**
+   * What the run cost, as the ceiling priced it.
+   *
+   * Carried rather than derived from the token totals: the ceiling accumulates
+   * per-request spans at the running model and the transport's own run total
+   * replaces that at idle, and neither is recoverable from two summed counters
+   * afterwards. A second pricing pass over a coarser input answers a different
+   * question than the one a spend dashboard is asking.
+   */
+  totalCostUsd: number;
   lastActive: string;
 }
 
@@ -28,13 +34,21 @@ const EMPTY_METRICS: RoleMetrics = {
   revisions: 0,
   totalInputTokens: 0,
   totalOutputTokens: 0,
+  totalCostUsd: 0,
   lastActive: '',
 };
 
 export async function loadPerf(): Promise<PerfData> {
   try {
     const raw = await readFile(PERF_FILE, 'utf-8');
-    return JSON.parse(raw) as PerfData;
+    const parsed = JSON.parse(raw) as Record<string, Partial<RoleMetrics>>;
+    // A table written before a field existed is missing it, and a row read back
+    // short of one renders as a gap rather than a zero. Filling from the empty
+    // row costs nothing and keeps a reader from having to know which fields are
+    // older than which file.
+    const filled: PerfData = {};
+    for (const [role, m] of Object.entries(parsed)) filled[role] = { ...EMPTY_METRICS, ...m };
+    return filled;
   } catch {
     return {};
   }
@@ -49,17 +63,34 @@ async function savePerf(data: PerfData): Promise<void> {
 let writeChain: Promise<void> = Promise.resolve();
 
 /**
- * Scan a session's events and update perf metrics for the participating role.
- * Serialized against any in-flight collection so the perf file is never lost to
- * a concurrent write.
+ * What one role session produced, counted by the consumer that watched it.
+ *
+ * Every field is something the event stream carries, which is why this is the
+ * shape recorded rather than a session id to go and ask about afterwards: the
+ * stream is the one surface every transport has. A transport-specific read —
+ * fetching the session and its events back from an API — measures the one
+ * transport that has that API, and measures the others as zero.
  */
-export function collectSessionMetrics(
-  api: AnthropicAgents,
-  sessionId: string,
-  state: FabState,
-): Promise<void> {
-  const run = writeChain.then(() => collectSessionMetricsInner(api, sessionId, state));
-  // Keep the chain alive even if one collection rejects.
+export interface SessionObservation {
+  readonly role: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly costUsd: number;
+  readonly advisorCalls: number;
+  readonly selfEvalPass: number;
+  readonly selfEvalFail: number;
+  readonly revisions: number;
+}
+
+/**
+ * Fold one session's observation into the per-role table.
+ *
+ * Serialized against any in-flight record so a parallel batch of role sessions
+ * cannot lose an increment to a concurrent write.
+ */
+export function recordSessionMetrics(observation: SessionObservation): Promise<void> {
+  const run = writeChain.then(() => recordSessionMetricsInner(observation));
+  // Keep the chain alive even if one record rejects.
   writeChain = run.then(
     () => {},
     () => {},
@@ -67,44 +98,19 @@ export function collectSessionMetrics(
   return run;
 }
 
-async function collectSessionMetricsInner(
-  api: AnthropicAgents,
-  sessionId: string,
-  state: FabState,
-): Promise<void> {
+async function recordSessionMetricsInner(o: SessionObservation): Promise<void> {
   const perf = await loadPerf();
-  const agentIdToRole = new Map<string, string>();
-  for (const a of state.agents) {
-    agentIdToRole.set(a.agentId, a.role);
-  }
-
-  // Get session to identify the primary agent role
-  const session = await api.getSession(sessionId);
-  const primaryRole = agentIdToRole.get(session.agent?.id ?? '') ?? 'unknown';
-
-  // Initialize metrics
-  if (!perf[primaryRole]) perf[primaryRole] = { ...EMPTY_METRICS };
-  perf[primaryRole].sessions++;
-  perf[primaryRole].lastActive = new Date().toISOString();
-
-  // Track tokens from session usage
-  perf[primaryRole].totalInputTokens += session.usage.input_tokens ?? 0;
-  perf[primaryRole].totalOutputTokens += session.usage.output_tokens ?? 0;
-
-  // Scan events for self-eval and advisor patterns
-  const result = await api.listEvents(sessionId, 100, 'asc');
-  for (const event of result.data) {
-    if (event.type === 'agent.message') {
-      const text = event.content.map((c) => c.text).join('');
-      if (text.includes('SELF-EVAL: PASS')) perf[primaryRole].selfEvalPass++;
-      if (text.includes('SELF-EVAL: FAIL')) perf[primaryRole].selfEvalFail++;
-      if (text.includes('Revising')) perf[primaryRole].revisions++;
-    }
-    if (event.type === 'agent.custom_tool_use' && event.name === 'consult_advisor') {
-      perf[primaryRole].advisorCalls++;
-    }
-  }
-
+  const m = perf[o.role] ?? { ...EMPTY_METRICS };
+  m.sessions += 1;
+  m.totalInputTokens += o.inputTokens;
+  m.totalOutputTokens += o.outputTokens;
+  m.totalCostUsd += o.costUsd;
+  m.advisorCalls += o.advisorCalls;
+  m.selfEvalPass += o.selfEvalPass;
+  m.selfEvalFail += o.selfEvalFail;
+  m.revisions += o.revisions;
+  m.lastActive = new Date().toISOString();
+  perf[o.role] = m;
   await savePerf(perf);
 }
 
@@ -126,34 +132,22 @@ export function formatPerfReport(perf: PerfData): string {
   );
 
   for (const [role, m] of roles) {
-    const rate = rateFor(TEAM.find((t) => t.role === role)?.model);
-    const cost =
-      (m.totalInputTokens / 1e6) * rate.input + (m.totalOutputTokens / 1e6) * rate.output;
     lines.push(
-      `${role.padEnd(22)} ${String(m.sessions).padStart(4)} ${String(m.selfEvalPass).padStart(4)} ${String(m.selfEvalFail).padStart(4)} ${String(m.advisorCalls).padStart(4)} ${String(m.revisions).padStart(4)} ${fmtTok(m.totalInputTokens).padStart(10)} ${fmtTok(m.totalOutputTokens).padStart(10)} ${('$' + cost.toFixed(2)).padStart(8)}`,
+      `${role.padEnd(22)} ${String(m.sessions).padStart(4)} ${String(m.selfEvalPass).padStart(4)} ${String(m.selfEvalFail).padStart(4)} ${String(m.advisorCalls).padStart(4)} ${String(m.revisions).padStart(4)} ${fmtTok(m.totalInputTokens).padStart(10)} ${fmtTok(m.totalOutputTokens).padStart(10)} ${('$' + m.totalCostUsd.toFixed(2)).padStart(8)}`,
     );
   }
 
   const totals = roles.reduce(
-    (acc, [role, m]) => {
-      const rate = rateFor(TEAM.find((t) => t.role === role)?.model);
-      return {
-        sessions: acc.sessions + m.sessions,
-        input: acc.input + m.totalInputTokens,
-        output: acc.output + m.totalOutputTokens,
-        // Sum the model-aware per-role costs — the roster mixes tiers, so a flat
-        // rate on the aggregate would mis-price (Opus roles especially).
-        cost:
-          acc.cost +
-          (m.totalInputTokens / 1e6) * rate.input +
-          (m.totalOutputTokens / 1e6) * rate.output,
-      };
-    },
+    (acc, [, m]) => ({
+      sessions: acc.sessions + m.sessions,
+      input: acc.input + m.totalInputTokens,
+      output: acc.output + m.totalOutputTokens,
+      cost: acc.cost + m.totalCostUsd,
+    }),
     { sessions: 0, input: 0, output: 0, cost: 0 },
   );
-  const totalCost = totals.cost;
   lines.push(
-    `${DIM}${'TOTAL'.padEnd(22)} ${String(totals.sessions).padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${fmtTok(totals.input).padStart(10)} ${fmtTok(totals.output).padStart(10)} ${('$' + totalCost.toFixed(2)).padStart(8)}${RESET}`,
+    `${DIM}${'TOTAL'.padEnd(22)} ${String(totals.sessions).padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${''.padStart(4)} ${fmtTok(totals.input).padStart(10)} ${fmtTok(totals.output).padStart(10)} ${('$' + totals.cost.toFixed(2)).padStart(8)}${RESET}`,
   );
 
   return lines.join('\n');

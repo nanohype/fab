@@ -32,6 +32,7 @@ import {
 import { type GateArtifact, resolveGateWorkspace, type ShellRunner } from './workspace.js';
 import { slugForBranch, createBranchIfMissing, fetchRepoFile } from './git.js';
 import { estimateCost } from './pricing.js';
+import { recordSessionMetrics } from './perf.js';
 import { sourceDirRefusal, unsafeSourceDirs, untrustedBlock } from './guardrails.js';
 
 const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = [
@@ -1734,14 +1735,6 @@ async function runRoleSession(
     agentRole: role,
     workflow: workflowName,
   });
-  // Best-effort per-role perf metrics — managed-agents only (a no-op on the
-  // other transports). A metrics write must never break the role session.
-  try {
-    await runtime.collectSessionMetrics?.(session.id);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.log(`${DIM}Perf metrics not recorded for ${role} (${msg}).${RESET}`);
-  }
   return output;
 }
 
@@ -1795,6 +1788,15 @@ export async function streamSessionWithAdvisor(
   let output = '';
   let sessionCost = 0;
   let advisorCalls = 0;
+  // What this session produced, counted where it arrives. The stream is the
+  // one surface every transport has, so a total read off it is a total for
+  // every transport; asking a session's own API for it afterwards answers for
+  // the transport that has that API and answers zero for the rest.
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let selfEvalPass = 0;
+  let selfEvalFail = 0;
+  let revisions = 0;
   const maxAdvisorCalls = options?.maxAdvisorCalls ?? 3;
   const pendingToolCalls = new Map<
     string,
@@ -1802,6 +1804,16 @@ export async function streamSessionWithAdvisor(
   >();
 
   for await (const event of session.events) {
+    if (event.type === 'agent.message') {
+      const text = event.content
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text)
+        .join('');
+      if (text.includes('SELF-EVAL: PASS')) selfEvalPass += 1;
+      if (text.includes('SELF-EVAL: FAIL')) selfEvalFail += 1;
+      if (text.includes('Revising')) revisions += 1;
+    }
+
     const formatted = formatEvent(event);
     if (formatted) {
       process.stdout.write(formatted);
@@ -1829,6 +1841,8 @@ export async function streamSessionWithAdvisor(
     // is reported to have cost.
     if (event.type === 'span.model_request_end' && !event.is_error) {
       sessionCost += estimateCost(event.model_usage, options?.model);
+      inputTokens += event.model_usage.input_tokens;
+      outputTokens += event.model_usage.output_tokens;
 
       // Budget enforcement
       if (budgetLimit !== null && sessionCost > budgetLimit) {
@@ -1993,6 +2007,34 @@ export async function streamSessionWithAdvisor(
       }
       process.stdout.write('\n');
       break;
+    }
+  }
+
+  // Recorded once the stream has ended, by whichever end it reached: idle, a
+  // reported error, a termination, or the ceiling interrupting the session.
+  // Every one of those leaves the loop above, and the spend up to that point is
+  // spend either way.
+  //
+  // A session resumed by id has no role to attribute to — the revision path
+  // sends one and names no role, which is the same fact that prices its turns
+  // at the default tier — so it is streamed and not recorded, rather than
+  // recorded against a role that did not run it.
+  if (options?.agentRole) {
+    try {
+      await recordSessionMetrics({
+        role: options.agentRole,
+        inputTokens,
+        outputTokens,
+        costUsd: sessionCost,
+        advisorCalls,
+        selfEvalPass,
+        selfEvalFail,
+        revisions,
+      });
+    } catch (err) {
+      // A metrics write must never take the role's output with it.
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stdout.write(`${DIM}Perf metrics not recorded (${msg}).${RESET}\n`);
     }
   }
   return output;
