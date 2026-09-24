@@ -23,7 +23,7 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export type LayerSource = 'env' | 'user' | 'project' | 'bundled';
@@ -47,18 +47,23 @@ interface Layer {
  * relative path is `../skills/`. From `src/overlay.ts` (dev / tests),
  * it's also `../skills/`. Same path either way.
  */
-function bundledDir(): string {
+export function bundledDir(): string {
   const thisDir = fileURLToPath(new URL('.', import.meta.url));
   return resolve(thisDir, '..', 'skills');
 }
 
 /**
- * Compute the priority-ordered list of layers. Exposed for tests and
- * for `fab skills layers` style CLI introspection.
+ * Compute the priority-ordered list of layers. Exported for tests;
+ * resolveSkillPath is the runtime caller.
+ *
+ * Every resolver below takes `bundled` for the same reason it takes `env` and
+ * `cwd`: a test that needs a bundled-layer file writes it to a directory of its
+ * own, never into the package's `skills/`, which other suites read in parallel.
  */
 export function overlayLayers(
   env: NodeJS.ProcessEnv = process.env,
   cwd: string = process.cwd(),
+  bundled: string = bundledDir(),
 ): Layer[] {
   // `env.HOME` is honored when passed (lets tests inject a sandbox).
   // Falls through to `os.homedir()` when the caller doesn't override it.
@@ -67,7 +72,7 @@ export function overlayLayers(
     { source: 'env', dir: env.FAB_SKILLS_DIR ? resolve(env.FAB_SKILLS_DIR) : null },
     { source: 'user', dir: join(home, '.fab', 'skills') },
     { source: 'project', dir: join(cwd, '.fab', 'skills') },
-    { source: 'bundled', dir: bundledDir() },
+    { source: 'bundled', dir: bundled },
   ];
 }
 
@@ -81,8 +86,9 @@ export function resolveSkillPath(
   skillName: string,
   env: NodeJS.ProcessEnv = process.env,
   cwd: string = process.cwd(),
+  bundled: string = bundledDir(),
 ): SkillOverlayResolution {
-  const layers = overlayLayers(env, cwd);
+  const layers = overlayLayers(env, cwd, bundled);
 
   let base: string | null = null;
   let baseSource: LayerSource | null = null;
@@ -123,8 +129,9 @@ export async function loadSkillWithOverlay(
   skillName: string,
   env: NodeJS.ProcessEnv = process.env,
   cwd: string = process.cwd(),
+  bundled: string = bundledDir(),
 ): Promise<string | null> {
-  const { base, appends } = resolveSkillPath(skillName, env, cwd);
+  const { base, appends } = resolveSkillPath(skillName, env, cwd, bundled);
   if (!base) return null;
 
   const parts = [await readFile(base, 'utf-8')];
@@ -145,8 +152,9 @@ export async function appendOverlays(
   skillName: string,
   env: NodeJS.ProcessEnv = process.env,
   cwd: string = process.cwd(),
+  bundled: string = bundledDir(),
 ): Promise<string> {
-  const { appends } = resolveSkillPath(skillName, env, cwd);
+  const { appends } = resolveSkillPath(skillName, env, cwd, bundled);
   if (appends.length === 0) return body;
   const parts = [body];
   for (const entry of appends) {
@@ -154,8 +162,3 @@ export async function appendOverlays(
   }
   return parts.join('\n\n');
 }
-
-// `dirname` is imported for potential future use (e.g., resolving relative
-// includes inside overlay skills). Suppress the unused-import lint that
-// strict ESLint configs may otherwise raise.
-void dirname;

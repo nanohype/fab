@@ -1,6 +1,6 @@
 ---
 name: quality-check
-description: Grade a codebase across the ten production-bar dimensions with file:line evidence. Read-only audit. Pattern-aware — each dimension carries a lens, canonical reading, pattern-to-solution catalog, domain-specific frames, anti-pattern grep, good-pattern grep, and cross-refs.
+description: Grade a codebase across the ten quality-rubric dimensions with file:line evidence. Read-only audit. Pattern-aware — each dimension carries a lens, canonical reading, pattern-to-solution catalog, domain-specific frames, anti-pattern grep, good-pattern grep, and cross-refs.
 version: 1
 ---
 
@@ -8,7 +8,7 @@ version: 1
 
 Run a thorough quality check on this codebase. Assess every dimension below, report findings with `file:line` evidence, and assign a letter grade (A–F) per dimension.
 
-This is a **read-only audit**. Do not edit files. Launch up to 4 parallel agents for data collection, then synthesize into a single scored report.
+This is a **read-only audit**. Do not edit files. Launch up to 4 parallel agents for data collection, then synthesize into a single scored report. Collecting agents propose caps; the synthesizer applies a cap only after checking it against the code and the rule text.
 
 Always approach the code as a production build being appended to, never as a cookie-cutter starter. The codebase IS the work product — it must reflect real engineering, not boilerplate.
 
@@ -31,25 +31,26 @@ A consolidated bibliography is at the end.
 
 ## 0. Apply the published standards
 
-Before grading the dimensions, resolve the **nanohype standards** that apply to _this_ deliverable's type and grade conformance against them. The standards are the machine-readable production bar and the single source of truth; this rubric **consumes** them rather than restating their criteria — so adding a new standard shows up here automatically, no rubric edit. Findings fold into the dimension they belong to — no new grade keys.
+Before grading the dimensions, resolve the **nanohype standards** and grade conformance against every one that applies to _this_ deliverable. The standards are the machine-readable published bar; this rubric consumes them rather than restating their criteria. Findings fold into the dimensions the standard names, and no standard adds a grade key.
 
-**Resolve them** from any of: the `@nanohype/mcp` server (`list_standards`, then `get_standard <name>`), the SDK (`loadStandards`), or the repo (`nanohype/standards/*.json` plus the normative `standards/README.md`).
+**Resolve them** from any of: the `@nanohype/mcp` server (`list_standards`, then `get_standard <name>`), the SDK (`loadStandards`), or the repo (`nanohype/standards/*.json` plus the normative `standards/README.md`). Grade against the whole set that resolves, not a remembered list.
 
-**Apply only what fits the deliverable** — each standard names when it applies; mark the rest N/A rather than inventing conformance for a surface that isn't there.
+**Each standard declares where it applies and what it grades**, in two top-level fields beside `summary`:
 
-| Standard                    | Applies to                          | Feeds dimension                         |
-| --------------------------- | ----------------------------------- | --------------------------------------- |
-| `language-toolchain`        | every build                         | Code Quality (build/lint/test/docs run) |
-| `version-currency`          | every build                         | Code Quality                            |
-| `testing-rubric`            | every build                         | Testing                                 |
-| `observability-slo`         | any long-running service / pipeline | Systems                                 |
-| `platform-tenant-contract`  | any k8s-native deliverable          | Architecture · Systems                  |
-| `resource-tagging`          | any cloud / k8s resources           | Consistency · Systems                   |
-| `llm-policy`                | any LLM workload                    | AI & Agent Systems                      |
-| `seo-baseline`              | any public web deliverable          | Frontend · Consistency                  |
-| `quality-rubric-dimensions` | the dimension set itself            | —                                       |
+- `applies_to` names the deliverables the standard governs, including any stack scoping such as "on the nanohype substrate". A standard whose `applies_to` does not cover this deliverable is N/A: list it as N/A with the reason, and invent no conformance for a surface that is not there. A rule the standard itself scopes to the nanohype substrate is N/A for a deliverable outside it, while the rest of that standard still applies.
+- `grades` lists the dimension keys the standard feeds, from `quality-rubric-dimensions`. Its findings land on those dimensions. A rule may carry its own `grades`, narrower than its standard's; a violation of that rule lands only on those. `quality-rubric-dimensions` grades nothing: it is the dimension set.
 
-**Severity maps to the grade.** A violated `reject`-severity rule in an applicable standard **caps its host dimension at D**, named with `file:line` (or the missing artifact). A violated `warn` rule is a documented deduction. Worked example: a public site that serves both apex and www with `200`, or redirects apex→www, violates `seo-baseline`'s `apex-canonical` (reject) — Frontend/Consistency is capped until it's fixed.
+A standard that declares no `applies_to` or `grades` is applied as its `summary` scopes it, and its findings deduct and never cap.
+
+`agent-access` governs how AI agents reach a public web deliverable: its `agent_fetchers` roster, its `rules` and its `probe` are graded like any other standard's.
+
+The report carries a Standards line: every standard as applied or N/A with the reason from its `applies_to`, and each `reject`-severity rule checked with its result.
+
+**Severity maps to the grade.** A violated `reject`-severity rule in an applicable standard caps at D every dimension in that rule's `grades`, or in the standard's `grades` when the rule declares none, named with `file:line` (or the missing artifact). A violated `warn` rule is a documented deduction on the same dimensions: the rule's `grades`, or the standard's when the rule declares none. Worked example: a public site that serves both apex and www with `200`, or redirects apex→www, violates `seo-baseline`'s `apex-canonical` (reject), so Frontend and Consistency are both capped until it is fixed.
+
+Severity means the `severity` field a rule declares: the `severity` on any `rules[]` item (telemetry-pipeline's sit under `content.signal_contract.rules`), or on an `llm-policy` requirement. The `page`, `ticket` and `critical` values in `observability-slo` and `telemetry-pipeline` are alert tiers, not grading tiers. A requirement, do or do-not item, or required artifact that declares no severity is a documented deduction on its standard's dimensions and never caps. `documentation-voice` is graded by reading (`content.method.conformance_is_read`) and deducts only.
+
+**Rules written against factory artifacts** map this way in a run with no factory. A rule about the intake brief (`version-currency`'s `intake-version-pinning`, `llm-policy`'s "if the intake brief requires it") is N/A; list it as N/A. The architecture artifact is the repo's own design docs (`architecture.md`, `threat-model.md`, ADRs), and a missing one is a Documentation finding, not N/A. A rule that reviews a report (`version-currency`'s `supply-chain-review`) is applied by doing the review: a registry lookup plus a CVE audit of stale majors. "Or the missing artifact" never covers an artifact that only the factory produces.
 
 ---
 
@@ -216,7 +217,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 - `CircuitBreaker` class import or per-dependency breaker wiring
 - `correlation_id` / `trace_id` threaded through every log line
 - DLQ + visibility timeout on every queue consumer
-- `RED` metrics: `requests_total`, `errors_total`, `request_duration_seconds_histogram`
+- `RED` metrics per `observability-slo`: `<metric>_requests_total`, `<metric>_errors_total`, and a `<metric>_request_duration_seconds` histogram (read via `_bucket`/`_count`)
 
 **Cross-references:** Code Quality (timeouts + error handling), Security (failure-mode security), Performance (load handling).
 
@@ -256,12 +257,12 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 - Distribution: roughly 5% static, 25% unit, 60% integration, 10% e2e (vary by domain — strict trophy targets confidence-per-effort)
 - Integration tests for any module orchestrating 3+ siblings or making 2+ external calls
 - Property tests for code with mathematical invariants
-- Coverage threshold enforced in CI (≥75% on production-critical surfaces, 100% branch on security-critical)
+- Coverage floor encoded in the test-runner config at `testing-rubric`'s `coverage_floor` (`enforce-floor-in-config`), with the per-file 100% branch/line/function override on security-critical paths (`security-critical-100`)
 - Tests run in CI on every PR, distinct job per phase
 
 **Anti-pattern grep:**
 
-- `jest.mock(...)` or `vi.mock(...)` of external SDK packages (`@aws-sdk/...`, `pg`, etc.) at module level — module-level SDK mocking is rubric-enforced REJECT
+- `jest.mock(...)` or `vi.mock(...)` of external SDK packages (`@aws-sdk/...`, `pg`, etc.) at module level in a test that claims to cover an orchestrator → the orchestration path never runs; it does not satisfy the integration-test requirement above (orchestrators with 3+ siblings or 2+ external calls)
 - `toMatchSnapshot()` as the only assertion → snapshot-as-assertion (brittle, no semantic meaning)
 - `await new Promise(r => setTimeout(r, 100))` in tests → flaky waits
 - Tests that read implementation details (private function calls) rather than observed behavior
@@ -271,9 +272,13 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 - `import { mockClient } from 'aws-sdk-client-mock'` (client-level injection)
 - `testcontainers` or `pg-mem` for hermetic DB tests
 - `fast-check` / `hypothesis` for property tests
-- Coverage thresholds in `vitest.config.ts` / `pyproject.toml` set above 70%
+- Coverage thresholds at or above `testing-rubric`'s `coverage_floor`, in the runner's own config:
+  - vitest: `coverage.thresholds` in `vitest.config.*`
+  - jest: `coverageThreshold.global` in `jest.config.*` or `package.json`
+  - coverage.py: `fail_under` under `[tool.coverage.report]` in `pyproject.toml` (or `.coveragerc`)
+  - Go: `go test` has no threshold setting, so a CI step reads `go tool cover -func` over the coverprofile and fails below the floor
 
-**Cross-references:** Security (100% branch on security-critical code), Code Quality (no test = no merge).
+**Cross-references:** Security (the 100% override on security-critical paths), Code Quality (no test = no merge).
 
 ---
 
@@ -284,7 +289,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 **Canonical reading:**
 
 - Brad Frost, _Atomic Design_ — component hierarchy from atoms to templates
-- Eric Eliott, _Composing Software_ — function/component composition principles
+- Eric Elliott, _Composing Software_ — function/component composition principles
 - Sara Soueidan / Heydon Pickering, on accessibility — `aria-*`, focus management, semantic HTML
 
 **Pattern-to-solution map:**
@@ -300,7 +305,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 **Domain-specific frames:**
 
-- **Web app** — React + design system; SSR via Next.js or remix for content-heavy pages
+- **Web app** — React + design system; SSR via Next.js or React Router (framework mode) for content-heavy pages
 - **Realtime UI** — optimistic updates, presence indicators, conflict resolution UI
 - **Agent system UI** — streaming UI for token-by-token output, tool-call visualization, eval-result tables
 - N/A for headless services (data pipelines, backends-only)
@@ -346,15 +351,15 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 **Pattern-to-solution map:**
 
-| Problem shape        | Patterns that fit                                                | Anti-patterns                                                       |
-| -------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Auth                 | OIDC / SAML / OAuth via vetted libraries, IRSA for AWS workloads | Custom JWT verification, API keys in code, "we'll fix auth later"   |
-| Identity propagation | Real upstream IdP (Okta SCIM, WorkOS Directory)                  | Constructing email from user ID, trusting Slack user_id as identity |
-| Secrets              | KMS-envelope, secrets manager, IAM-role auth                     | Secrets in env vars, secrets in code, secrets in logs               |
-| Input validation     | Zod / Pydantic / JSON Schema at every boundary                   | Trusting client input shape, manual `if (typeof x === ...)` checks  |
-| SQL queries          | Parameterized queries, ORM with prepared statements              | String concat / template literals into SQL                          |
-| File uploads         | Strict MIME + size cap + virus scan + segregated bucket          | Trust client `Content-Type`, no size limit                          |
-| Supply chain         | SBOM, signed builds, dependency scanning that FAILS the build    | Audit-warn-only, never updating deps                                |
+| Problem shape        | Patterns that fit                                                                                                                                                             | Anti-patterns                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Auth                 | OIDC / SAML / OAuth via vetted libraries; workload IAM through the runtime's native role binding (EKS Pod Identity, ECS task role, Lambda execution role), never a static key | Custom JWT verification, API keys in code, "we'll fix auth later", `eks.amazonaws.com/role-arn` on a Platform tenant's ServiceAccount (`platform-tenant-contract`) |
+| Identity propagation | Real upstream IdP (Okta SCIM, WorkOS Directory)                                                                                                                               | Constructing email from user ID, trusting Slack user_id as identity                                                                                                |
+| Secrets              | KMS-envelope, secrets manager, IAM-role auth                                                                                                                                  | Secrets in env vars, secrets in code, secrets in logs                                                                                                              |
+| Input validation     | Zod / Pydantic / JSON Schema at every boundary                                                                                                                                | Trusting client input shape, manual `if (typeof x === ...)` checks                                                                                                 |
+| SQL queries          | Parameterized queries, ORM with prepared statements                                                                                                                           | String concat / template literals into SQL                                                                                                                         |
+| File uploads         | Strict MIME + size cap + virus scan + segregated bucket                                                                                                                       | Trust client `Content-Type`, no size limit                                                                                                                         |
+| Supply chain         | SBOM, signed builds, dependency scanning that FAILS the build                                                                                                                 | Audit-warn-only, never updating deps                                                                                                                               |
 
 **Domain-specific frames:**
 
@@ -403,7 +408,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 - John Ousterhout, _A Philosophy of Software Design_ — deep modules, complexity, the cost of change
 - Robert C. Martin, _Clean Code_ — naming, function size, abstraction levels
 - Brian Goetz, _Java Concurrency in Practice_ (and equivalents per language) — concurrency without surprises
-- Edsger Dijkstra, "Go To Statement Considered Harmful" — control flow discipline (still applicable)
+- Edsger Dijkstra, "Go To Statement Considered Harmful" — control flow discipline
 
 **Pattern-to-solution map:**
 
@@ -438,7 +443,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 **Anti-pattern grep:**
 
-- `// TODO:` referenced in shipped code without ticket linkage → silent debt
+- `// TODO:` / `// FIXME:` in shipped code → silent debt. Either do the work, or remove the comment and record the gap where the build tracks debt (for a factory build, the architecture artifact under `PRODUCTION_BAR`'s stub waiver). An internal ticket id in the comment does not fix it, because `documentation-voice` flags internal issue references in shipped prose unless they are on the repo's exclusion list.
 - `function .*(input: any)` → untyped boundary
 - `// Replace with actual X` / `// Hardcoded for demo` → aspirational comment
 - `console.log` outside `*.test.*` files → debugging residue
@@ -465,7 +470,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 - Daniele Procida, _Diátaxis_ — the four-quadrant doc framework (diataxis.fr)
 - Andrew Hunt & David Thomas, _The Pragmatic Programmer_ — the "DRY for docs" principle and rubber-ducking
-- Yevgeniy Brikman, _Hello, Startup_ — runbooks and how to write them
+- Betsy Beyer, Chris Jones, Jennifer Petoff & Niall Richard Murphy (eds.), _Site Reliability Engineering_, and Beyer et al., _The Site Reliability Workbook_ — on-call, playbooks, emergency response
 
 **Pattern-to-solution map:**
 
@@ -521,7 +526,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 **Canonical reading:**
 
-- George Kelling & James Wilson, "Broken Windows" (theory applies broadly) — small inconsistencies invite more
+- George Kelling & James Wilson, "Broken Windows" — small inconsistencies invite more
 - Andrew Hunt & David Thomas, _The Pragmatic Programmer_ — the camp-site rule + DRY
 - Donald Knuth, _Literate Programming_ — code as communication
 
@@ -558,7 +563,7 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 **Anti-pattern grep:**
 
 - Multiple `.prettierrc` / `.eslintrc` / `pyproject.toml` files at varying levels with conflicting rules → split-brain formatting
-- `// FINDING-02: <claim>` adjacent to code that doesn't deliver the claim → aspirational comment
+- `// FINDING-<id>: <claim>` or any comment citing a threat-model or audit finding ID, adjacent to code that does not deliver the claim → aspirational comment (grep `FINDING-[0-9]+`)
 - Both `it(...)` and `test(...)` for tests in the same file → mixed style
 - `// Replace with actual X` / `// Mock for now` → known-broken claim
 
@@ -640,9 +645,32 @@ Before grading the dimensions, resolve the **nanohype standards** that apply to 
 
 ## Output format
 
-A report ends with three blocks, in this order: `TRANSCRIPTS:`, `CITATIONS:`, `QUALITY_GRADES:`. They carry the same required keys the merge gate enforces on a gate role — `EVIDENCE_KEY` in `src/gate.ts` — so an interactive grade and a factory grade are the same artifact held to the same bar, and a report written here can be read there without translation.
+A report opens with a summary table of the ten dimension grades, then a section per dimension, and ends with three blocks, in this order: `TRANSCRIPTS:`, `CITATIONS:`, `QUALITY_GRADES:`. The blocks carry the keys the merge gate requires of every gate verdict (`EVIDENCE_KEY` in fab's `src/gate.ts`), so an interactive report and a gate verdict are held to the same evidence bar.
 
 A report that carries grades but no `TRANSCRIPTS:` block, or no `CITATIONS:` block, is not a grade. The gate rewrites a verdict in that shape to REJECT; interactively it has exactly the same standing, which is none. Grades are the conclusion, and a conclusion shipped without its evidence is an impression presented as a measurement.
+
+### Grades
+
+Mark a dimension N/A only when its condition in this table holds. The conditions match the N/A column of `QUALITY_RUBRIC` in fab's `src/standards.ts`, and `__tests__/quality-contract.test.ts` holds the two tables to each other.
+
+| Key           | Mark N/A when                                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| architecture  | never — always applicable                                                                                                        |
+| patterns      | trivial single-module scripts                                                                                                    |
+| systems       | pure libraries with no I/O                                                                                                       |
+| testing       | never — always applicable                                                                                                        |
+| frontend      | no user-facing UI                                                                                                                |
+| security      | never — always applicable                                                                                                        |
+| code_quality  | never — always applicable                                                                                                        |
+| documentation | never — always applicable                                                                                                        |
+| consistency   | never — always applicable                                                                                                        |
+| ai_systems    | no LLM call, no agent-facing tool surface, and no machine-readable surface (structured output, JSON-LD, manifests, tool-call UI) |
+
+For each dimension that earns < B, include a one-paragraph rationale + file:line citations. For dimensions that earn ≥ A-, briefly note what makes the implementation exemplary (so the team learns from successes, not just failures).
+
+For each capped dimension, the per-dimension section states `<capped> (merit <grade>) — cap: <rule text> at <rule file:line>; trigger <code file:line>`, and the summary table carries a Merit column. `QUALITY_GRADES:` carries only the capped grade.
+
+When an overall grade is asked for, it is the unweighted mean of the non-N/A dimension grades on A=4.0, A-=3.7, B+=3.3, B=3.0, B-=2.7, C+=2.3, C=2.0, C-=1.7, D=1.0, F=0, rounded to the nearest grade. Where caps apply, also give the same mean over merit grades. The headline sits above the `QUALITY_GRADES:` block as prose (`Overall: …`), never as a `key: grade` line inside or after it, because the parser reads any lowercase key line in the block as a dimension. The overall is never a gate input.
 
 ### TRANSCRIPTS
 
@@ -679,7 +707,7 @@ A fragment that appears nowhere in the cited file is fabrication rather than a t
 
 ### QUALITY_GRADES
 
-Close with this exact block (parsed by the merge gate):
+Close with this exact block. Its keys and their order are `QUALITY_DIMENSIONS` in fab's `src/standards.ts`, its grade scale is `QUALITY_GRADE_TOKENS` there, and `__tests__/quality-contract.test.ts` holds this block to both.
 
 ```
 QUALITY_GRADES:
@@ -695,7 +723,7 @@ QUALITY_GRADES:
   ai_systems: <grade>
 ```
 
-For each dimension that earns < B, include a one-paragraph rationale + file:line citations. For dimensions that earn ≥ A-, briefly note what makes the implementation exemplary (so the team learns from successes, not just failures).
+One grade token per line and nothing after it: no parenthetical, bullet, bold or backticks. Put every rationale above the block; the block is the last thing in the report.
 
 ---
 
@@ -718,7 +746,7 @@ Per-dimension canonical reading. When grading, cite specific books to ground cla
 
 **Systems Thinking:**
 
-- Kleppmann, _Designing Data-Intensive Applications_ (2017) — the modern systems bible
+- Kleppmann, _Designing Data-Intensive Applications_ (2017) — replication, partitioning, batch and stream processing, failure modes
 - Nygard, _Release It!_ (2007 / 2018 2nd ed.) — stability patterns
 - Gregg, _Systems Performance_ (2013 / 2020 2nd ed.) — observability
 
@@ -731,8 +759,8 @@ Per-dimension canonical reading. When grading, cite specific books to ground cla
 **Frontend Architecture & Design Systems:**
 
 - Frost, _Atomic Design_ (2016) — component hierarchy
-- Eliott, _Composing Software_ (2018) — function/component composition
-- WCAG 2.1 (W3C) — accessibility baseline; supplement with Soueidan + Pickering writing
+- Elliott, _Composing Software_ (2018) — function/component composition
+- WCAG 2.2 (W3C Recommendation) — accessibility baseline; supplement with Soueidan + Pickering writing
 
 **Security:**
 
@@ -750,7 +778,7 @@ Per-dimension canonical reading. When grading, cite specific books to ground cla
 
 - Procida, _Diátaxis_ (diataxis.fr) — four-quadrant docs
 - Hunt & Thomas, _The Pragmatic Programmer_ (1999 / 2019 2nd ed.) — DRY, rubber-ducking
-- Various, "How to Write a Runbook" (industry talks) — on-call ergonomics
+- Beyer, Jones, Petoff & Murphy (eds.), _Site Reliability Engineering_ (2016), and Beyer et al., _The Site Reliability Workbook_ (2018) — on-call, playbooks, emergency response
 
 **Consistency & Polish:**
 
@@ -765,4 +793,4 @@ Per-dimension canonical reading. When grading, cite specific books to ground cla
 - OWASP, _Top 10 for LLM Applications_ — the LLM-app risk checklist
 - Anthropic, _Building Effective Agents_ (2024) — workflows vs. agents, tool design, the agent loop
 
-The user's private overlay at `~/.fab/skills/quality-check.md` may deepen any dimension further — additional architects, additional anti-pattern catalogs, additional taste. This baseline is the floor.
+A `quality-check.append.md` in any overlay layer (`$FAB_SKILLS_DIR`, `~/.fab/skills/`, `<cwd>/.fab/skills/`) deepens this rubric; a `quality-check.md` there replaces it. See `skills/README.md`.

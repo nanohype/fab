@@ -6,11 +6,10 @@ import type { GateDecision } from './types.js';
 
 // ── Quality trend — the factory's own grade record ──────────────────
 //
-// The merge gate grades every PR across the 10 QUALITY_RUBRIC dimensions,
-// and the external-reviewer calibration re-grades cold. Those grades decide
-// one ship/block call and are then spent. This module appends one record per
-// gated run so a second question is answerable from them: are the factory's
-// grades trending up or down across engagements?
+// The merge gate grades every PR on each QUALITY_DIMENSIONS entry, and the
+// external-reviewer calibration re-grades cold. This module appends one
+// record per gated run so the factory can report whether its grades trend up
+// or down across engagements.
 //
 // The log lives next to state.json under ~/.fab so the signal spans every
 // repo the factory ships — a cross-engagement trend, not one working tree.

@@ -42,7 +42,7 @@ export default defineConfig({
       // agent loop — and never fab's own code.
       thresholds: {
         lines: 75,
-        functions: 70,
+        functions: 75,
         branches: 72,
         statements: 75,
 
@@ -50,8 +50,8 @@ export default defineConfig({
         // uncovered branch is an unproven control rather than a coverage
         // number. The floor above is deliberately low because of the alternate
         // transports, which makes an average an especially bad guardian for
-        // these two — the package could sit comfortably above 70 with the gap
-        // sitting in the approval gate.
+        // these two — the package could sit comfortably above its floor with the
+        // gap sitting in the approval gate.
         //
         // gate.ts decides whether a factory PR ships: it parses each role's
         // verdict, enforces the evidence contract by verifying that every

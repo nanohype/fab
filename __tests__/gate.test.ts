@@ -329,6 +329,43 @@ describe('parseQualityGrades', () => {
     // Letter regex expects uppercase; lowercase should not parse.
     expect(parseQualityGrades(out)).toEqual({});
   });
+
+  it('maps an off-scale token to the declared scale instead of dropping the dimension', () => {
+    const out = [
+      'QUALITY_GRADES:',
+      '  architecture: A+',
+      '  patterns: D+',
+      '  systems: D-',
+      '  testing: B-',
+    ].join('\n');
+    expect(parseQualityGrades(out)).toEqual({
+      architecture: 'A',
+      patterns: 'D',
+      systems: 'D',
+      testing: 'B-',
+    });
+  });
+
+  it('takes the header only where it opens a line', () => {
+    // A sentence that ends in the header's text is prose, not the block. Read as
+    // the header, it would start the block there and the real header below
+    // would end it before a single grade line.
+    const out = [
+      'The block below follows the format that ends with QUALITY_GRADES:',
+      '',
+      'QUALITY_GRADES:',
+      '  architecture: B',
+      '  patterns: C+',
+    ].join('\n');
+    expect(parseQualityGrades(out)).toEqual({ architecture: 'B', patterns: 'C+' });
+  });
+
+  it('drops a grade line that carries anything after the token', () => {
+    // The Output format rule: one token per line and nothing after it. The
+    // parser holds a line to that, so a trailing note costs the dimension.
+    const out = ['QUALITY_GRADES:', '  frontend: N/A (headless)', '  security: B'].join('\n');
+    expect(parseQualityGrades(out)).toEqual({ security: 'B' });
+  });
 });
 
 describe('compareGrades', () => {

@@ -502,6 +502,19 @@ const VALID_GRADES: ReadonlyArray<Grade> = [
 
 const GRADE_VALUES = new Set<string>(VALID_GRADES);
 
+/**
+ * Tokens the parser reads that sit outside the declared scale
+ * (QUALITY_GRADE_TOKENS in standards.ts), each mapped to the nearest declared
+ * token. A grader that writes one anyway keeps the dimension, and the quality
+ * trend stays on the one scale every prompt declares; skipping the line would
+ * instead drop the dimension from calibration.
+ */
+export const OFF_SCALE_GRADES: Readonly<Record<string, Grade>> = {
+  'A+': 'A',
+  'D+': 'D',
+  'D-': 'D',
+};
+
 function letterLevel(grade: Grade): number {
   // Unreachable from the sole caller, which filters N/A before comparing — kept
   // because this function's contract is "map any Grade to a level", and a future
@@ -528,6 +541,14 @@ function letterLevel(grade: Grade): number {
 }
 
 /**
+ * The QUALITY_GRADES header. It must open its line: a prose sentence that
+ * happens to end in "QUALITY_GRADES:" would otherwise be taken for it, and the
+ * real header below would then end the block before a single grade line.
+ * Not global, so `test` carries no state between calls.
+ */
+export const QUALITY_GRADES_HEADER = /^[ \t]*QUALITY_GRADES:[ \t]*$/im;
+
+/**
  * Extract the QUALITY_GRADES block from a gate role's output.
  *
  * Expected shape:
@@ -539,13 +560,13 @@ function letterLevel(grade: Grade): number {
  *
  * Returns an empty object when the block is absent. Invalid grade values
  * (typos, unknown dimensions with invalid grades) are skipped silently —
- * the caller can check Object.keys for presence.
+ * the caller can check Object.keys for presence. A+, D+ and D- are read and
+ * stored as their OFF_SCALE_GRADES mapping.
  */
 export function parseQualityGrades(output: string): Record<string, Grade> {
   // Locate the header, slice from immediately after it until the next
   // top-level ALL_CAPS header (or end of input), then scan grade lines.
-  const headerRe = /QUALITY_GRADES:\s*$/im;
-  const headerMatch = output.match(headerRe);
+  const headerMatch = output.match(QUALITY_GRADES_HEADER);
   if (!headerMatch || headerMatch.index === undefined) return {};
 
   const headerEnd = headerMatch.index + headerMatch[0].length;
@@ -557,8 +578,8 @@ export function parseQualityGrades(output: string): Record<string, Grade> {
   const grades: Record<string, Grade> = {};
   const lineRe = /^\s*([a-z][a-z0-9_]*)\s*:\s*(A\+|A-|A|B\+|B-|B|C\+|C-|C|D\+|D-|D|F|N\/A)\s*$/gm;
   for (const m of block.matchAll(lineRe)) {
-    const dim = m[1].toLowerCase();
-    const grade = m[2] as Grade;
+    const dim = m[1];
+    const grade = OFF_SCALE_GRADES[m[2]] ?? (m[2] as Grade);
     // Redundant against the regex above, which already enumerates the valid
     // grades — the false arm is unreachable while the two agree. That is the
     // point: the regex and VALID_GRADES are separate declarations of the same

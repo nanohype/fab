@@ -384,7 +384,7 @@ describe('the claude-cli transport honours title', () => {
   it('puts it on the command line', () => {
     const args = buildClaudeArgs({
       sessionId: 's',
-      systemPrompt: 'p',
+      systemPromptFile: '/tmp/p.md',
       model: 'claude-sonnet-5',
       mcpConfigPath: null,
       bare: false,

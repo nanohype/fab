@@ -1,4 +1,5 @@
 import type { TeamMember } from '../types.js';
+import { QUALITY_GRADE_TOKENS } from '../standards.js';
 
 export const LAB: TeamMember[] = [
   {
@@ -28,7 +29,7 @@ QUALITY_GRADES:
   consistency: <grade>
   ai_systems: <grade>
 
-Grades are one of A+ A A- B+ B B- C+ C C- D+ D D- F, or N/A where the dimension genuinely doesn't apply.
+Grades are one of ${QUALITY_GRADE_TOKENS.filter((t) => t !== 'N/A').join(' ')}, or N/A when the dimension's Mark N/A condition in QUALITY_RUBRIC holds. One grade token per line and nothing after it; findings and rationale go above the block.
 
 You are the calibration signal. If your grades diverge from the internal gate by more than ±1 letter per dimension, the merge is blocked until the divergence is reconciled.
 

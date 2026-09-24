@@ -80,6 +80,12 @@ type LlmPolicyStandard = PublicStandard<
   }
 >;
 
+/** The published testing rubric — the coverage floor every build is held to. */
+type TestingRubricStandard = PublicStandard<
+  'nanohype/standards/testing-rubric',
+  { coverage_floor: { branches: number; lines: number; functions: number; statements: number } }
+>;
+
 function loadPublicStandard<T>(name: string): T {
   const path = resolve(NANOHYPE_STANDARDS, `${name}.json`);
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
@@ -88,6 +94,7 @@ function loadPublicStandard<T>(name: string): T {
 const PUBLIC_LANGUAGE_TOOLCHAIN =
   loadPublicStandard<LanguageToolchainStandard>('language-toolchain');
 const PUBLIC_LLM_POLICY = loadPublicStandard<LlmPolicyStandard>('llm-policy');
+const PUBLIC_TESTING_RUBRIC = loadPublicStandard<TestingRubricStandard>('testing-rubric');
 
 // Re-exported so existing call sites (prompts.ts, build verification dispatch)
 // keep working unchanged. The `Toolchain` shape mirrors the public JSON.
@@ -124,6 +131,20 @@ export const MODEL_TIERS: Readonly<Record<'default' | 'escalation' | 'light', st
   escalation: canonicalModelId(LLM_MODELS.escalation),
   light: canonicalModelId(LLM_MODELS.light),
 };
+
+/**
+ * The coverage floor from the public testing rubric, per metric, in percent.
+ *
+ * `PRODUCTION_BAR` and the engineering roles' Build Verification Protocol render
+ * it through `COVERAGE_FLOOR_TEXT`, so the floor a factory build is gated on is
+ * the one the org publishes.
+ */
+export const COVERAGE_FLOOR = PUBLIC_TESTING_RUBRIC.content.coverage_floor;
+
+/** `COVERAGE_FLOOR` as prose: "lines 75%, statements 75%, functions 75%, branches 60%". */
+export const COVERAGE_FLOOR_TEXT = (['lines', 'statements', 'functions', 'branches'] as const)
+  .map((metric) => `${metric} ${COVERAGE_FLOOR[metric]}%`)
+  .join(', ');
 
 /**
  * A Bedrock inference-profile id reduced to the canonical Anthropic API id:
@@ -241,18 +262,23 @@ CITATIONS:
 
 Applies to: APPROVE and REQUEST_CHANGES verdicts. REJECT verdicts may ship without TRANSCRIPTS/CITATIONS — the point there is to fail fast, not to gather paperwork.
 
-The anti-pattern this prevents: gate saying "42 tests passing" when zero tests exist; artifact-auditor saying "all 11 artifacts verified" when 10 don't exist on disk; threat-model citing an ACL SQL fragment that appears nowhere in the codebase. All three were real Dispatch/Chorus slip-throughs. Citation-bound verdicts and pipeline-level evidence enforcement stop them.`;
+The anti-pattern this prevents: gate saying "42 tests passing" when zero tests exist; artifact-auditor saying "all 11 artifacts verified" when 10 don't exist on disk; threat-model citing an ACL SQL fragment that appears nowhere in the codebase. Citation-bound verdicts and pipeline-level evidence enforcement stop them.`;
 
-// ── Quality rubric (10 dimensions, imported from /quality-check) ───
+// ── Quality rubric (10 dimensions) ─────────────────────────────────
 //
-// The dimension list and its per-role assignment are declared here as data,
-// not only as prose, because three things have to agree for the rubric to
-// mean anything: the text below, the QUALITY_GRADES: block each gate role
-// declares in its own prompt, and parseQualityGrades in gate.ts. When they
-// drift the grades parse to nothing and the external-reviewer calibration
-// has nothing to compare — silently, since an empty grade map reads the same
-// as a workflow that never reached the gate. `__tests__/quality-contract`
-// holds all three to these constants.
+// The dimension list, its grade scale and its per-role assignment are declared
+// here as data, not only as prose, because several things have to agree for
+// the rubric to mean anything: the text below, the QUALITY_GRADES: block each
+// gate role declares in its own prompt, the block in the quality-check
+// rubric's Output format, and parseQualityGrades in gate.ts. When they drift
+// the grades parse to nothing and the external-reviewer calibration has
+// nothing to compare — silently, since an empty grade map reads the same as a
+// workflow that never reached the gate. `__tests__/quality-contract` holds all
+// of them to these constants.
+//
+// What each grade means lives in the quality-check rubric (skills/quality-check.md
+// plus every quality-check.append.md in the overlay chain). Gate roles and the
+// external reviewer receive its dimension sections through rubric.ts.
 
 export const QUALITY_DIMENSIONS = [
   'architecture',
@@ -270,6 +296,28 @@ export const QUALITY_DIMENSIONS = [
 export type QualityDimension = (typeof QUALITY_DIMENSIONS)[number];
 
 /**
+ * The grade scale a QUALITY_GRADES line may carry. Every prompt and rubric that
+ * shows the scale renders or is tested against this list, so a grader is never
+ * offered a token another grader cannot write. parseQualityGrades in gate.ts
+ * also reads A+, D+ and D- and maps each to the nearest token here.
+ */
+export const QUALITY_GRADE_TOKENS = [
+  'A',
+  'A-',
+  'B+',
+  'B',
+  'B-',
+  'C+',
+  'C',
+  'C-',
+  'D',
+  'F',
+  'N/A',
+] as const;
+
+export type QualityGradeToken = (typeof QUALITY_GRADE_TOKENS)[number];
+
+/**
  * Which gate role grades which dimensions. The values partition
  * QUALITY_DIMENSIONS: every dimension has exactly one owner, so the internal
  * grade map the external reviewer is calibrated against is complete.
@@ -283,22 +331,22 @@ export const QUALITY_DIMENSION_OWNERS: Record<string, readonly QualityDimension[
 
 export const QUALITY_RUBRIC = `## Quality rubric
 
-Grade every dimension A-F per the \`/quality-check\` methodology. A is exceptional, B is solid, C is adequate, D has significant issues, F is broken. Most production code is B-/C+ — grade inflation helps no one.
+Grade every dimension A-F per the quality-check rubric. Gate roles and the external-reviewer receive its dimension sections, with every overlay append, as the Quality rubric depth section of their prompt. A is exceptional, B is solid, C is adequate, D has significant issues, F is broken. Most production code is B-/C+ — grade inflation helps no one.
 
 Dimensions are assigned across gate roles. Every gate verdict ends with a \`QUALITY_GRADES:\` block covering that role's assigned dimensions. The external-reviewer runs all ten dimensions cold (no internal verdicts, no prior context) as a calibration check; >1 letter drift on any dimension between internal and external grades blocks the release.
 
-| #  | Dimension                                  | Graded by           | Mark N/A when                      |
-| -- | ------------------------------------------ | ------------------- | ---------------------------------- |
-| 1  | Architecture & Domain Modeling             | pr-reviewer         | never — always applicable          |
-| 2  | Design Patterns & Reuse                    | pr-reviewer         | trivial single-module scripts      |
-| 3  | Systems Thinking                           | qa-security         | pure libraries with no I/O         |
-| 4  | Testing Strategy (Testing Trophy)          | build-verifier      | never — always applicable          |
-| 5  | Frontend Architecture & Design Systems     | pr-reviewer         | no user-facing UI                  |
-| 6  | Security                                   | qa-security         | never — always applicable          |
-| 7  | Code Quality & Craft                       | pr-reviewer         | never — always applicable          |
-| 8  | Documentation & Developer Experience       | artifact-auditor    | never — always applicable          |
-| 9  | Consistency & Polish                       | artifact-auditor    | never — always applicable          |
-| 10 | AI & Agent Systems                         | qa-security         | builds with no LLM / agent surface |
+| #  | Dimension                              | Graded by        | Mark N/A when                                                                                                                    |
+| -- | -------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | Architecture & Domain Modeling         | pr-reviewer      | never — always applicable                                                                                                        |
+| 2  | Design Patterns & Reuse                | pr-reviewer      | trivial single-module scripts                                                                                                    |
+| 3  | Systems Thinking                       | qa-security      | pure libraries with no I/O                                                                                                       |
+| 4  | Testing Strategy (Testing Trophy)      | build-verifier   | never — always applicable                                                                                                        |
+| 5  | Frontend Architecture & Design Systems | pr-reviewer      | no user-facing UI                                                                                                                |
+| 6  | Security                               | qa-security      | never — always applicable                                                                                                        |
+| 7  | Code Quality & Craft                   | pr-reviewer      | never — always applicable                                                                                                        |
+| 8  | Documentation & Developer Experience   | artifact-auditor | never — always applicable                                                                                                        |
+| 9  | Consistency & Polish                   | artifact-auditor | never — always applicable                                                                                                        |
+| 10 | AI & Agent Systems                     | qa-security      | no LLM call, no agent-facing tool surface, and no machine-readable surface (structured output, JSON-LD, manifests, tool-call UI) |
 
 Output shape each role appends:
 
@@ -310,7 +358,7 @@ QUALITY_GRADES:
   frontend: N/A
 \`\`\`
 
-Use snake_case keys: \`${QUALITY_DIMENSIONS.join(', ')}\`. One dimension per indented line under a \`QUALITY_GRADES:\` header that stands alone — the parser reads that shape and nothing else, so an inline \`dimension=letter\` list is read as no grades at all.
+Use snake_case keys: \`${QUALITY_DIMENSIONS.join(', ')}\`. Grades are one of \`${QUALITY_GRADE_TOKENS.join(' ')}\`. One dimension per indented line under a \`QUALITY_GRADES:\` header that stands alone, with nothing after the grade token — the parser reads that shape and nothing else, so an inline \`dimension=letter\` list is read as no grades at all, and a line with a trailing note is dropped.
 
 Quoting the source: "Assign grades honestly. A is exceptional. B is solid. C is adequate. D has significant issues. F is broken. Most production code is B-/C+ — grade inflation helps no one."`;
 
@@ -497,15 +545,15 @@ ${REQUIREMENT_LINES}`;
 
 export const PRODUCTION_BAR = `## Production bar (non-negotiable)
 
-Every factory build must meet all nine requirements below. These are not the QUALITY_RUBRIC dimensions — that rubric grades, this bar passes or fails. Explicit waivers go in the architecture artifact with the role + rationale.
+Every factory build must meet all nine requirements below. These are not the QUALITY_RUBRIC dimensions — that rubric grades, this bar passes or fails. A failure here is a REJECT verdict and caps no grade; grade caps come only from the quality-check rubric (reject-severity rules of an applicable published standard, and any cap an overlay append names). Explicit waivers go in the architecture artifact with the role + rationale.
 
 **Stubs don't count as done.** A function that returns \`[]\`, throws \`'not implemented'\`, has a \`// TODO: implement\` comment, or reads from a hardcoded fixture instead of the real source is a prototype — not a shipped build. If the intake brief did not request a prototype, stub implementations mean you self-REJECT your own work before the gate runs and fix it. Connector shims that return empty results, adapters that only handle the happy path, "we'll wire this up next sprint" functions — all prototype territory. The only acceptable stubs are ones explicitly waived in the architecture artifact with a migration plan and a ticketed follow-up.
 
-**Aspirational comments are the bug.** A comment like \`// FINDING-02: Opt out of Bedrock invocation logging\` next to code that does NOT opt out is worse than no comment — it makes a falsifiable claim that the gate should reject. If you write a comment describing what the code SHOULD do, the code beneath it must do that. If you can't make the code match the claim, delete the comment and surface the gap explicitly in the architecture artifact. Other forbidden patterns: \`// Replace with actual X\`, \`// Mock for now\`, \`// Hardcoded for demo\`, \`// TODO: actually wire this up\`. These ship a known-broken claim and are auto-REJECT at the gate.
+**Aspirational comments are the bug.** A comment like \`// <FINDING-ID>: Opt out of Bedrock invocation logging\` next to code that does NOT opt out is worse than no comment — it makes a falsifiable claim that the gate should reject. If you write a comment describing what the code SHOULD do, the code beneath it must do that. If you can't make the code match the claim, delete the comment and surface the gap explicitly in the architecture artifact. Other forbidden patterns: \`// Replace with actual X\`, \`// Mock for now\`, \`// Hardcoded for demo\`, \`// TODO: actually wire this up\`. These ship a known-broken claim and are auto-REJECT at the gate.
 
 **Conventions inherit from the parent repo.** Every project subdirectory must produce a per-project \`CLAUDE.md\` that explicitly inherits or overrides the parent repo's \`CLAUDE.md\` conventions (test framework, build tool, lint/format setup, file layout). Default to the parent's choices unless the architecture artifact justifies the divergence. The factory does NOT silently switch frameworks (Vitest → Jest, pytest → unittest, Maven → Gradle) or invent new convention layers without explicit waiver. Missing per-project CLAUDE.md is a hard REJECT at artifact-auditor.
 
-1. **Tests** — ≥70% line coverage, contract tests against every external API (Notion, Slack, Bedrock, etc.), load tests for any service claiming a p99 latency budget. Use the stack's idiomatic framework: \`vitest\`/\`jest\` for TS, \`pytest\` for Python, \`go test\` for Go, \`cargo test\` for Rust, JUnit/\`mvn test\` for Java. Zero tests is a hard REJECT at the gate, not a deficiency to defer. **Any file that orchestrates 3+ sibling modules OR makes 2+ external calls requires at least one integration test** — mocks of individual clients in unit tests do not substitute. Use testcontainers (or language equivalents: \`aws-sdk-client-mock\` + \`nock\` for TS, \`moto\` + \`responses\` for Python, \`httptest\` for Go, \`wiremock\` for Java) for hermetic integration coverage of the orchestration path.
+1. **Tests** — coverage at or above the testing-rubric floor (${COVERAGE_FLOOR_TEXT}), encoded in the test runner's own config so a regression fails the build, contract tests against every external API (Notion, Slack, Bedrock, etc.), load tests for any service claiming a p99 latency budget. Use the stack's idiomatic framework: \`vitest\`/\`jest\` for TS, \`pytest\` for Python, \`go test\` for Go, \`cargo test\` for Rust, JUnit/\`mvn test\` for Java. Zero tests is a hard REJECT at the gate, not a deficiency to defer. **Any file that orchestrates 3+ sibling modules OR makes 2+ external calls requires at least one integration test** — mocks of individual clients in unit tests do not substitute. Use testcontainers (or language equivalents: \`aws-sdk-client-mock\` + \`nock\` for TS, \`moto\` + \`responses\` for Python, \`httptest\` for Go, \`wiremock\` for Java) for hermetic integration coverage of the orchestration path.
 2. **Observability** — OpenTelemetry traces (OTLP exporter to AWS Distro or Honeycomb), structured JSON logs with trace ID correlation, RED metrics (rate / errors / duration) per endpoint, \`/healthz\` and \`/readyz\` endpoints, dashboards enumerated in the runbook. **A correlation ID is generated at the request boundary (or propagated from upstream) and threaded through every log line, span, and downstream call** — a failing query that produces N uncorrelated log lines is an observability failure, not a "minor gap."
 3. **Security** — IAM least-privilege (no \`*\` on resources or actions), secrets rotation documented, SAST + dependency scanning in CI (language-appropriate: \`npm audit\`/\`osv-scanner\` for TS, \`pip-audit\`/\`safety\` for Python, \`govulncheck\` for Go, \`cargo-audit\` for Rust, \`dependency-check\` for Java) configured to FAIL the job on findings (soft-warn-only is REJECT). Threat model in the architecture artifact listing top 5 risks + mitigations. **Identity resolution must use the upstream identity provider's API** — fabricated identity strings (e.g., constructing an email from a Slack user ID) are an identity-spoof surface and auto-REJECT at qa-security.
 4. **Reliability** — graceful shutdown handlers, circuit breakers on every external call, retry with exponential backoff + jitter on transient failures, DLQ for async work. No in-memory state on multi-instance deployments — use Redis / DynamoDB / equivalent. **Every external client must have an explicit per-call timeout** (HTTP, AWS SDK, Redis, DB, gRPC). Default-infinity is a production incident waiting to happen — the gate requires explicit timeouts on Okta, Bedrock, OpenSearch, Redis, DynamoDB, etc. **Compliance and audit writes are blocking** — fire-and-forget patterns silently drop compliance trail when the underlying transport fails. Use \`await\` / the language's equivalent blocking call on audit; if you need fire-and-forget for latency, write to a local WAL sink first and have a separate flusher drain to the long-term store.
@@ -513,7 +561,7 @@ Every factory build must meet all nine requirements below. These are not the QUA
 6. **Docs** — runbook with dashboard links, common failure modes + remediation steps, on-call playbook. README with local dev + deploy instructions. \`.env.example\` listing every env var the code reads. Per-project \`CLAUDE.md\` declaring inherited conventions from the parent repo. PR description following the COMMIT_PR_POLICY template. API docs regenerated by the \`docs\` phase (see FOUR_PHASE_CONTRACT) and kept in sync with source.
 7. **CI** — CI config (\`.github/workflows/ci.yml\` or equivalent) runs build + lint + test + docs on every pull_request as four distinct jobs (see FOUR_PHASE_CONTRACT). Dependency scanning configured to fail the job on HIGH/CRITICAL findings, not warn-only. Absence of CI is a hard REJECT at the gate.
 8. **Code shape** — orchestrators (functions composing 3+ sibling modules into a request-response pipeline) are not 70-line procedural scripts. Use an explicit pipeline pattern (named stages, typed handoffs) so each stage is independently testable. Discriminated unions / tagged enums / sum types for state ("unverified" vs "verified" vs "redacted") instead of boolean flags on a single shape that changes meaning.
-9. **Versions** — see VERSION_CURRENCY_POLICY. Latest stable across language runtime, frameworks, and top-level dependencies. EOL runtime = hard REJECT. ≥1 major stale without \`@pin\` annotation = REJECT.
+9. **Versions** — see VERSION_CURRENCY_POLICY. Latest stable across language runtime, frameworks, and top-level dependencies. EOL runtime = hard REJECT. More than one major behind current stable without an adjacent \`@pin <reason>\` = REJECT (see VERSION_CURRENCY_POLICY).
 
 See FOUR_PHASE_CONTRACT (build / lint / test / docs idiom), VERSION_CURRENCY_POLICY (latest-first rule), EVIDENCE_CONTRACT (transcripts + citations on verdicts), QUALITY_RUBRIC (10-dimension grading).`;
 
@@ -611,7 +659,7 @@ CITATIONS:
       <verbatim from file>
 
 QUALITY_GRADES:
-  <dimension>: <A|A-|B+|B|B-|C+|C|C-|D|F|N/A>
+  <dimension>: <${QUALITY_GRADE_TOKENS.join('|')}>
 \`\`\`
 
 Verdict merge rules:

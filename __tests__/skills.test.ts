@@ -13,7 +13,8 @@
  * order the README promises rather than the resolver's own return value.
  */
 
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -96,6 +97,21 @@ describe('the skill catalog', () => {
 
   it('returns undefined for a role that is not on the roster', () => {
     expect(getSkillDef('not-a-role')).toBeUndefined();
+  });
+
+  it('bundles no baseline that no role loads', async () => {
+    // A bundled file resolves only under the name of a SkillDef, so one named
+    // for nothing ships with the package and reaches no agent. quality-check is
+    // the exception: the gate roles and the external reviewer load it through
+    // rubric.ts rather than as a role skill.
+    const names = new Set(getAllSkillDefs().map(([, def]) => def.name));
+    const bundled = (await readdir(fileURLToPath(new URL('../skills', import.meta.url))))
+      .filter((f) => f.endsWith('.md') && f !== 'README.md' && f !== 'quality-check.md')
+      .map((f) => f.replace(/\.md$/, ''));
+    expect(bundled.length).toBeGreaterThan(0);
+    for (const name of bundled) {
+      expect(names, `skills/${name}.md matches no SkillDef name`).toContain(name);
+    }
   });
 });
 

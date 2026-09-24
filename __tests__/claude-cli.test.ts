@@ -1,5 +1,24 @@
-import { describe, it, expect } from 'vitest';
-import { buildClaudeArgs, buildMcpConfigJson } from '../src/runtimes/claude-cli.js';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import {
+  ClaudeCliRuntime,
+  _buildClaudeCliSystemPrompt,
+  buildClaudeArgs,
+  buildMcpConfigJson,
+} from '../src/runtimes/claude-cli.js';
+import { loadState } from '../src/state.js';
+import type { FabState } from '../src/types.js';
 
 describe('buildClaudeArgs', () => {
   const baseEnv = {} as NodeJS.ProcessEnv;
@@ -7,7 +26,7 @@ describe('buildClaudeArgs', () => {
   it('emits the canonical flag set for a fresh session', () => {
     const args = buildClaudeArgs({
       sessionId: '00000000-0000-4000-8000-000000000001',
-      systemPrompt: 'role prompt',
+      systemPromptFile: '/tmp/fab-prompt-1.md',
       model: 'claude-sonnet-4-6',
       mcpConfigPath: '/tmp/mcp-1.json',
       bare: false,
@@ -30,8 +49,9 @@ describe('buildClaudeArgs', () => {
     expect(args[args.indexOf('--permission-mode') + 1]).toBe('bypassPermissions');
     expect(args).toContain('--model');
     expect(args[args.indexOf('--model') + 1]).toBe('claude-sonnet-4-6');
-    expect(args).toContain('--append-system-prompt');
-    expect(args[args.indexOf('--append-system-prompt') + 1]).toBe('role prompt');
+    expect(args).toContain('--append-system-prompt-file');
+    expect(args[args.indexOf('--append-system-prompt-file') + 1]).toBe('/tmp/fab-prompt-1.md');
+    expect(args).not.toContain('--append-system-prompt');
     expect(args).toContain('--mcp-config');
     expect(args[args.indexOf('--mcp-config') + 1]).toBe('/tmp/mcp-1.json');
     expect(args).toContain('--strict-mcp-config');
@@ -46,7 +66,7 @@ describe('buildClaudeArgs', () => {
   it('adds --effort when a role sets an effort level', () => {
     const args = buildClaudeArgs({
       sessionId: '00000000-0000-4000-8000-000000000002',
-      systemPrompt: 'role prompt',
+      systemPromptFile: '/tmp/fab-prompt-1.md',
       model: 'claude-sonnet-4-6',
       mcpConfigPath: null,
       bare: false,
@@ -63,7 +83,7 @@ describe('buildClaudeArgs', () => {
   it('omits --effort when effort is unset', () => {
     const args = buildClaudeArgs({
       sessionId: '00000000-0000-4000-8000-000000000003',
-      systemPrompt: 'role prompt',
+      systemPromptFile: '/tmp/fab-prompt-1.md',
       model: 'claude-sonnet-4-6',
       mcpConfigPath: null,
       bare: false,
@@ -78,7 +98,7 @@ describe('buildClaudeArgs', () => {
   it('adds --bare and drops --setting-sources when bare mode is on', () => {
     const args = buildClaudeArgs({
       sessionId: '00000000-0000-4000-8000-000000000002',
-      systemPrompt: 'role prompt',
+      systemPromptFile: '/tmp/fab-prompt-1.md',
       model: 'claude-sonnet-4-6',
       mcpConfigPath: null,
       bare: true,
@@ -96,7 +116,7 @@ describe('buildClaudeArgs', () => {
   it('switches --session-id for --resume when resuming', () => {
     const args = buildClaudeArgs({
       sessionId: 'ignored-during-resume',
-      systemPrompt: null,
+      systemPromptFile: null,
       model: null,
       mcpConfigPath: null,
       bare: false,
@@ -113,12 +133,13 @@ describe('buildClaudeArgs', () => {
     // Model + system-prompt omitted when null — resume inherits the original
     expect(args).not.toContain('--model');
     expect(args).not.toContain('--append-system-prompt');
+    expect(args).not.toContain('--append-system-prompt-file');
   });
 
   it('adds --add-dir for repo-mounted workflows', () => {
     const args = buildClaudeArgs({
       sessionId: 'sess',
-      systemPrompt: 'p',
+      systemPromptFile: '/tmp/p.md',
       model: 'm',
       mcpConfigPath: null,
       bare: false,
@@ -135,7 +156,7 @@ describe('buildClaudeArgs', () => {
   it('appends FAB_CLAUDE_EXTRA_ARGS verbatim', () => {
     const args = buildClaudeArgs({
       sessionId: 'sess',
-      systemPrompt: 'p',
+      systemPromptFile: '/tmp/p.md',
       model: 'm',
       mcpConfigPath: null,
       bare: false,
@@ -154,7 +175,7 @@ describe('buildClaudeArgs', () => {
   it('passes --name when title supplied', () => {
     const args = buildClaudeArgs({
       sessionId: 'sess',
-      systemPrompt: 'p',
+      systemPromptFile: '/tmp/p.md',
       model: 'm',
       mcpConfigPath: null,
       bare: false,
@@ -251,4 +272,112 @@ describe('buildMcpConfigJson', () => {
     const config = JSON.parse(json!);
     expect(Object.keys(config.mcpServers)).toEqual(['github']);
   });
+});
+
+// ── The system prompt reaches the subprocess through a file ─────────
+//
+// Linux caps one execve argument at MAX_ARG_STRLEN. A gate role's prompt
+// carries the rubric depth plus every overlay append, so it can pass that cap,
+// and a prompt passed as an argument would then fail the spawn with E2BIG
+// before the role runs. macOS has no per-argument cap, so only a measurement
+// shows it.
+
+const MAX_ARG_STRLEN = 131_072;
+
+describe('the system prompt a claude-cli session hands its subprocess', () => {
+  let dir: string;
+  let home: string;
+  const record = (): string => join(dir, 'record.json');
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'fab-cli-prompt-'));
+    home = join(dir, 'home');
+    mkdirSync(join(home, '.fab', 'skills'), { recursive: true });
+
+    // State with every section that adds to a gate role's prompt.
+    const state: Partial<FabState> = {
+      journal: { enabled: true, basePath: '/workspace/.fab/journal' },
+      repos: [
+        {
+          type: 'github_repository',
+          url: 'https://github.com/acme/widgets',
+          authorization_token: 'ghp_test',
+          mount_path: '/workspace/widgets',
+        },
+      ],
+      sourceDirs: ['services/api', 'services/worker', 'packages/shared'],
+      projectLanguage: 'typescript',
+    };
+    writeFileSync(join(dir, 'state.json'), JSON.stringify(state));
+
+    // A stand-in for `claude` that records its arguments and the prompt file
+    // it was handed, read at startup as the real binary reads it, then waits.
+    const stub = join(dir, 'claude');
+    writeFileSync(
+      stub,
+      [
+        '#!/usr/bin/env node',
+        "const fs = require('node:fs');",
+        'const argv = process.argv.slice(2);',
+        "const at = argv.indexOf('--append-system-prompt-file');",
+        "const prompt = at === -1 ? null : fs.readFileSync(argv[at + 1], 'utf-8');",
+        `fs.writeFileSync(${JSON.stringify(`${record()}.tmp`)}, JSON.stringify({ argv, prompt }));`,
+        `fs.renameSync(${JSON.stringify(`${record()}.tmp`)}, ${JSON.stringify(record())});`,
+        'process.stdin.resume();',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    chmodSync(stub, 0o755);
+
+    vi.stubEnv('HOME', home);
+    vi.stubEnv('FAB_SKILLS_DIR', undefined);
+    vi.stubEnv('FAB_STATE_FILE', join(dir, 'state.json'));
+    vi.stubEnv('FAB_CLAUDE_PATH', stub);
+    vi.stubEnv('FAB_CLAUDE_MCP_DIR', dir);
+    vi.stubEnv('MCP_GATEWAY_TOKEN', 'gateway-token');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('keeps every argument under the per-argument limit when the prompt is over it', async () => {
+    // An overlay of about 40 KB, grown when the bundled rubric alone leaves the
+    // prompt short of the limit, so the case always measures a prompt past it.
+    const bare = Buffer.byteLength(_buildClaudeCliSystemPrompt('qa-security', await loadState()));
+    const rule = '- A personal grading rule that deepens one dimension of the rubric.\n';
+    const lines = Math.ceil(Math.max(40_000, MAX_ARG_STRLEN - bare + 4_096) / rule.length);
+    writeFileSync(
+      join(home, '.fab', 'skills', 'quality-check.append.md'),
+      `## Personal additions\n\n${rule.repeat(lines)}`,
+    );
+    const expected = _buildClaudeCliSystemPrompt('qa-security', await loadState());
+    expect(Buffer.byteLength(expected)).toBeGreaterThan(MAX_ARG_STRLEN);
+
+    const session = await new ClaudeCliRuntime().runRoleSession('qa-security', 'go');
+    try {
+      for (let i = 0; i < 3000 && !existsSync(record()); i++) {
+        await new Promise((res) => setTimeout(res, 25));
+      }
+      const { argv, prompt } = JSON.parse(readFileSync(record(), 'utf-8')) as {
+        argv: string[];
+        prompt: string | null;
+      };
+
+      for (const arg of argv) {
+        expect(Buffer.byteLength(arg), 'one argv element').toBeLessThan(MAX_ARG_STRLEN);
+      }
+      // Each build wraps untrusted input in a fresh random tag.
+      const untagged = (text: string | null) => text?.replace(/untrusted-[0-9a-f]+/g, 'untrusted');
+      expect(untagged(prompt)).toBe(untagged(expected));
+
+      const promptFile = argv[argv.indexOf('--append-system-prompt-file') + 1];
+      expect(statSync(promptFile).mode & 0o777).toBe(0o600);
+      await session.interrupt();
+      expect(existsSync(promptFile), 'the prompt file outlived its session').toBe(false);
+    } finally {
+      await session.interrupt();
+    }
+  }, 90_000);
 });

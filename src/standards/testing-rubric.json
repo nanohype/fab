@@ -1,0 +1,48 @@
+{
+  "$schema": "../schemas/standards.schema.json",
+  "kind": "nanohype/standards/testing-rubric",
+  "version": "1",
+  "title": "Testing rubric — the org test baseline",
+  "summary": "The testing shape and coverage floor every build on the nanohype stack is held to: a Testing-Trophy distribution (static base, integration-heavy middle, thin e2e), a global coverage floor, stricter enforcement on security-critical files, and a few non-negotiable practices. Read this when setting up a project's test runner or grading the testing dimension. The deeper per-language enforcement lives in the reference client's bundled quality-check skill.",
+  "content": {
+    "shape": "Testing Trophy (Dodds): a wide static-analysis base (strict types + lint, the cheapest signal), an integration-heavy middle that carries the bulk of confidence (real collaborators wired together, external boundaries faked hermetically), and a thin end-to-end cap over the few critical user paths. Favor integration tests over isolated unit tests for orchestration code; reserve unit tests for pure logic with real branching.",
+    "coverage_floor": {
+      "branches": 60,
+      "lines": 75,
+      "functions": 75,
+      "statements": 75
+    },
+    "rules": [
+      {
+        "id": "enforce-floor-in-config",
+        "summary": "Encode the coverage floor in the test-runner config (vitest `coverage.thresholds`, jest `coverageThreshold.global`), not just a CI flag — a regression must fail the build, not pass silently. A project that ships no thresholds at all is the anti-pattern this prevents.",
+        "severity": "reject"
+      },
+      {
+        "id": "security-critical-100",
+        "summary": "Files on a security- or compliance-critical path (auth, audit ledgers, approval gates, secret handling, signature verification) carry a per-file 100% branch/line/function override above the global floor.",
+        "severity": "reject"
+      },
+      {
+        "id": "typecheck-includes-tests",
+        "summary": "The typecheck step covers test files. vitest/jest don't type-check at runtime, so test-only type drift (wrong mock shapes, stale fixtures) is invisible unless tsc sees the tests.",
+        "severity": "reject"
+      },
+      {
+        "id": "hermetic-integration",
+        "summary": "Integration tests run against hermetic fakes or local containers for external services — no live network in the default test run. Orchestrators are exercised end-to-end against those fakes.",
+        "severity": "reject"
+      },
+      {
+        "id": "contract-tests",
+        "summary": "Every external API the service depends on has a contract test pinning the request/response shape the code relies on, so an upstream change surfaces as a test failure rather than a production incident.",
+        "severity": "warn"
+      },
+      {
+        "id": "per-package-floors",
+        "summary": "Monorepos may set per-package coverage floors; a package may exceed the global floor but never drop below it. Coverage exclusions (bootstrap entrypoints, generated code, type-only files) are listed explicitly, never blanket-disabled.",
+        "severity": "warn"
+      }
+    ]
+  }
+}

@@ -12,11 +12,12 @@ import {
   setProjectLanguage,
   setSourceDirs,
 } from './state.js';
-import { CODE_GATE_ROLES, DOCS_GATE_ROLES } from './standards.js';
+import { CODE_GATE_ROLES, DOCS_GATE_ROLES, QUALITY_DIMENSIONS } from './standards.js';
 import {
   parseGateVerdict,
   mergeGateVerdicts,
   parseQualityGrades,
+  QUALITY_GRADES_HEADER,
   compareGrades,
   parseCitations,
   aggregateGrades,
@@ -1570,19 +1571,23 @@ async function recordQuality(
 
 /**
  * Cold-context external-reviewer calibration. Runs AFTER the four gate
- * roles approve. The external-reviewer grades the 10 QUALITY_RUBRIC
- * dimensions against the post-merge tree without seeing any internal
+ * roles approve. The external-reviewer grades every QUALITY_DIMENSIONS
+ * dimension against the post-merge tree without seeing any internal
  * verdicts. The pipeline compares its grades against the aggregate of
  * internal grades; >1-letter drift on any dimension blocks release.
  *
- * Returns null only when the external-reviewer produced no parseable
- * grades. Otherwise returns the internal + external grades and the drift,
- * with `block` set to a blocking GateResult (decision: 'reject') when drift
- * is detected — the feedback names which dimension(s) diverged so the next
- * attempt can re-invoke the right role, and the grades feed the quality log.
+ * Returns null only when the external-reviewer session threw or its output
+ * carries no QUALITY_GRADES header. Otherwise returns the internal + external
+ * grades and the drift, with `block` set to a blocking GateResult
+ * (decision: 'reject') when the cold review left a dimension ungraded,
+ * including every dimension when no line under its header parses, when the
+ * internal gate left one
+ * uncompared, or when drift is detected — the feedback names the
+ * dimension(s) so the next attempt can re-invoke the right role, and the
+ * grades feed the quality log.
  */
 interface CalibrationResult {
-  block: GateResult | null; // blocking REJECT when drift detected, else null
+  block: GateResult | null; // blocking REJECT when calibration fails, else null
   internal: Record<string, Grade>;
   external: Record<string, Grade>;
   drift: GradeDrift;
@@ -1608,7 +1613,7 @@ Context (intake brief + feature branch reference — internal gate verdicts inte
 ${context}
 
 Your task:
-Apply the 10-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY_GRADES block with all 10 dimensions (N/A where a dimension doesn't apply). Include per-dimension key findings with file:line CITATIONS. Do not emit GATE_VERDICT — you are advisory.`,
+Apply the 10-dimension QUALITY_RUBRIC, with the Quality rubric depth section of your instructions, to the post-merge tree. Output the QUALITY_GRADES block with all 10 dimensions (N/A only where the rubric's Mark N/A condition holds). Include per-dimension key findings with file:line CITATIONS. Do not emit GATE_VERDICT — you are advisory.`,
       workflowName,
       // Calibration is a cold first look every time it runs; it is never a
       // re-run of the external reviewer's own work.
@@ -1624,22 +1629,46 @@ Apply the 10-dimension QUALITY_RUBRIC to the post-merge tree. Output the QUALITY
     return null;
   }
 
-  const externalGrades = parseQualityGrades(output);
-  if (Object.keys(externalGrades).length === 0) {
+  // With no header the reviewer produced no review to calibrate against, the
+  // same as a session that threw, so calibration is skipped. A header whose
+  // lines do not parse is a review that graded nothing readable, and falls to
+  // the incompleteness check below with every dimension missing.
+  if (!QUALITY_GRADES_HEADER.test(output)) {
     console.log(
-      `${YELLOW}External-reviewer returned no parseable QUALITY_GRADES — skipping calibration (proceeding with internal gate).${RESET}\n`,
+      `${YELLOW}External-reviewer returned no QUALITY_GRADES block — skipping calibration (proceeding with internal gate).${RESET}\n`,
     );
     return null;
   }
+  const externalGrades = parseQualityGrades(output);
 
   const internalGrades = aggregateGrades(internalVerdicts);
 
   const fmt = (g: Record<string, Grade>) =>
-    Object.entries(g)
-      .map(([k, v]) => `  ${k}: ${v}`)
-      .join('\n');
+    Object.keys(g).length === 0
+      ? '  (none readable)'
+      : Object.entries(g)
+          .map(([k, v]) => `  ${k}: ${v}`)
+          .join('\n');
 
   const drift = compareGrades(internalGrades, externalGrades);
+
+  // The cold review is the reference every internal grade is checked against,
+  // so a dimension it left without a line is a dimension nothing checks. A
+  // line the parser could not read (a trailing note, a bullet, a renamed key)
+  // looks the same from here as one never written. Either way the calibration
+  // covers less than it reports, so it fails and names what is missing.
+  const missing = QUALITY_DIMENSIONS.filter((d) => !(d in externalGrades));
+  if (missing.length > 0) {
+    return {
+      block: {
+        decision: 'reject',
+        feedback: `External-reviewer calibration is incomplete: the cold review's QUALITY_GRADES block has no readable line for ${missing.length} dimension(s): ${missing.join(', ')}. Every dimension carries one line with one grade token, N/A included, so those dimensions were not calibrated. Re-run the calibration with a block covering every dimension.\n\nInternal grades:\n${fmt(internalGrades)}\n\nExternal grades:\n${fmt(externalGrades)}`,
+      },
+      internal: internalGrades,
+      external: externalGrades,
+      drift,
+    };
+  }
 
   // A dimension the cold reviewer scored and the internal gate did not is an
   // absence, not an agreement. Blocking on it is the same rule the shared

@@ -1,16 +1,21 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { afterAll, describe, it, expect, vi } from 'vitest';
 import { TEAM } from '../src/team.js';
-import { parseGateVerdict, parseQualityGrades } from '../src/gate.js';
+import { OFF_SCALE_GRADES, parseGateVerdict, parseQualityGrades } from '../src/gate.js';
+import { buildSystemPrompt } from '../src/prompts.js';
+import { RUBRIC_DEPTH_END } from '../src/rubric.js';
 import {
   QUALITY_DIMENSIONS,
   QUALITY_DIMENSION_OWNERS,
+  QUALITY_GRADE_TOKENS,
   QUALITY_RUBRIC,
   MERGE_GATE_CONTRACT,
 } from '../src/standards.js';
-import type { TeamRole } from '../src/types.js';
+import type { FabState, TeamRole } from '../src/types.js';
 
 // The grading loop only closes if three independent things agree: the block a
 // gate role declares in its own prompt, the parser that reads it, and the
@@ -20,10 +25,67 @@ import type { TeamRole } from '../src/types.js';
 // the gate, so the external-reviewer calibration compares nothing against
 // nothing and passes.
 //
-// These tests read each role's prompt as the artifact it is, extract the block
-// it tells the model to emit, and run it through the real parser.
+// These tests read each role's prompt as the artifact it is — the system prompt
+// buildSystemPrompt assembles, rubric depth included — extract the block it
+// tells the model to emit, and run it through the real parser.
 
 const GRADE = 'B+';
+
+// The built prompt carries the quality-check rubric resolved through the
+// overlay chain, whose user layer is $HOME/.fab/skills. An empty HOME keeps a
+// developer's own overlay out of these assertions. Stubbed at module load, not
+// in a hook: the describe blocks below build their prompts while the suite is
+// collected, before any hook runs.
+const home = mkdtempSync(join(tmpdir(), 'fab-quality-contract-'));
+vi.stubEnv('HOME', home);
+vi.stubEnv('FAB_SKILLS_DIR', undefined);
+afterAll(() => {
+  vi.unstubAllEnvs();
+  rmSync(home, { recursive: true, force: true });
+});
+
+const STATE: FabState = {
+  agents: [],
+  skillIds: {},
+  environmentId: null,
+  memory: { enabled: false, storeId: null },
+  journal: { enabled: false, basePath: '/workspace/.fab/journal' },
+  repos: [],
+  modelOverrides: {},
+  sprint: null,
+  vaultIds: [],
+  budgetLimit: null,
+  projectLanguage: 'typescript',
+  sourceDirs: [],
+};
+
+const BASELINE = readFileSync(
+  fileURLToPath(new URL('../skills/quality-check.md', import.meta.url)),
+  'utf-8',
+);
+
+/** The baseline from its Output format heading on. */
+const BASELINE_OUTPUT_FORMAT = BASELINE.slice(BASELINE.indexOf(RUBRIC_DEPTH_END));
+
+/** The cells of each row of the first markdown table after `anchor`, header and rule excluded. */
+function tableRows(text: string, anchor: string): string[][] {
+  const from = text.indexOf(anchor);
+  if (from === -1) throw new Error(`no "${anchor}" in the text`);
+  const rows: string[][] = [];
+  for (const line of text.slice(from).split('\n')) {
+    if (!line.startsWith('|')) {
+      if (rows.length > 0) break;
+      continue;
+    }
+    rows.push(
+      line
+        .replace(/^\||\|$/g, '')
+        .split('|')
+        .map((cell) => cell.trim()),
+    );
+  }
+  return rows.slice(2);
+}
 
 /** Pull the QUALITY_GRADES block out of a prompt and fill in the placeholders. */
 function declaredBlock(prompt: string): string | null {
@@ -40,7 +102,19 @@ function declaredBlock(prompt: string): string | null {
 function roleprompt(role: TeamRole): string {
   const member = TEAM.find((m) => m.role === role);
   if (!member) throw new Error(`no such role: ${role}`);
-  return member.system;
+  return buildSystemPrompt(member, STATE);
+}
+
+/** The Quality rubric depth section of a built prompt. */
+function rubricDepth(prompt: string): string {
+  const start = prompt.indexOf('# Quality rubric depth');
+  if (start === -1) throw new Error('the prompt has no Quality rubric depth section');
+  // The section runs to the next section buildSystemPrompt appends, each of
+  // which opens with a level-two heading naming it.
+  const next = prompt
+    .slice(start)
+    .search(/\n## (?:Personal Journal|Repository Access|Source Directory Scope|Self-Evaluation)\b/);
+  return next === -1 ? prompt.slice(start) : prompt.slice(start, start + next);
 }
 
 describe('quality-grade contract', () => {
@@ -83,6 +157,13 @@ describe('quality-grade contract', () => {
         }
       });
 
+      it('receives a rubric depth that declares no grades block of its own', () => {
+        // The role's block is the only one addressed to it. A QUALITY_GRADES
+        // block inside the rubric text would be a second instruction naming
+        // dimensions this role does not own.
+        expect(rubricDepth(prompt)).not.toMatch(/^\s*QUALITY_GRADES:/m);
+      });
+
       it('survives a whole verdict, not just the block', () => {
         // parseGateVerdict slices the output into blocks before grading, so a
         // block that parses alone can still be lost in context.
@@ -120,6 +201,72 @@ describe('quality-grade contract', () => {
       // checked against — the calibration silently covers less than it claims.
       expect(Object.keys(parsed).sort()).toEqual([...QUALITY_DIMENSIONS].sort());
     });
+
+    it('offers only the grade tokens the scale declares', () => {
+      const line = prompt.match(/^Grades are one of ([^,]+), or N\/A/m);
+      expect(line, 'the external reviewer names its grade scale').not.toBeNull();
+      expect((line as RegExpMatchArray)[1].split(' ')).toEqual(
+        QUALITY_GRADE_TOKENS.filter((t) => t !== 'N/A'),
+      );
+    });
+  });
+
+  describe('the quality-check baseline', () => {
+    const block = declaredBlock(BASELINE_OUTPUT_FORMAT);
+
+    it('declares every dimension, in QUALITY_DIMENSIONS order', () => {
+      expect(block, 'the baseline Output format declares no QUALITY_GRADES block').not.toBeNull();
+      // The baseline shows the scale on its first line and <grade> on the rest;
+      // a grader copying either form has to produce something the parser reads.
+      const filled = (block as string).replace(/<A\|[^>]*>/g, GRADE);
+      expect(Object.keys(parseQualityGrades(filled))).toEqual([...QUALITY_DIMENSIONS]);
+    });
+
+    it('shows the grade scale QUALITY_GRADE_TOKENS declares', () => {
+      const scale = (block as string).match(/<(A\|[^>]*)>/);
+      expect(scale, 'the baseline block shows no grade scale').not.toBeNull();
+      expect((scale as RegExpMatchArray)[1].split('|')).toEqual([...QUALITY_GRADE_TOKENS]);
+    });
+
+    it('marks N/A under the same condition QUALITY_RUBRIC does, per dimension', () => {
+      // QUALITY_RUBRIC reaches the gate roles; the baseline table reaches an
+      // interactive grader. A condition that differs between them is a
+      // dimension one grader scores and the other excuses.
+      const rubric = new Map(
+        tableRows(QUALITY_RUBRIC, '| #  | Dimension').map((cells) => [
+          QUALITY_DIMENSIONS[Number(cells[0]) - 1],
+          cells[3],
+        ]),
+      );
+      const baseline = new Map(
+        tableRows(BASELINE_OUTPUT_FORMAT, '| Key').map((cells) => [cells[0], cells[1]]),
+      );
+      expect([...rubric.keys()]).toEqual([...QUALITY_DIMENSIONS]);
+      expect([...baseline.keys()]).toEqual([...QUALITY_DIMENSIONS]);
+      for (const dimension of QUALITY_DIMENSIONS) {
+        expect(baseline.get(dimension), dimension).toBe(rubric.get(dimension));
+      }
+    });
+  });
+
+  describe('the grade scale', () => {
+    it('is the scale the merge-gate contract shows every gate role', () => {
+      expect(MERGE_GATE_CONTRACT).toContain(`<${QUALITY_GRADE_TOKENS.join('|')}>`);
+    });
+
+    it('parses every declared token to itself', () => {
+      const block = ['QUALITY_GRADES:', ...QUALITY_GRADE_TOKENS.map((t, i) => `  d${i}: ${t}`)];
+      expect(Object.values(parseQualityGrades(block.join('\n')))).toEqual([
+        ...QUALITY_GRADE_TOKENS,
+      ]);
+    });
+
+    it('maps each off-scale token onto a declared one', () => {
+      for (const [token, mapped] of Object.entries(OFF_SCALE_GRADES)) {
+        expect(QUALITY_GRADE_TOKENS as readonly string[], token).not.toContain(token);
+        expect(QUALITY_GRADE_TOKENS as readonly string[], token).toContain(mapped);
+      }
+    });
   });
 
   describe('the preamble the roles are graded against', () => {
@@ -138,7 +285,10 @@ describe('quality-grade contract', () => {
 
     it('does not promise a dimension count it does not have', () => {
       const count = QUALITY_DIMENSIONS.length;
-      const wrong = [/all nine (?:QUALITY_RUBRIC )?dimensions/i, /\b9 (?:quality )?dimensions/i];
+      const wrong = [
+        /all nine (?:QUALITY_RUBRIC )?dimensions/i,
+        /\b9 (?:QUALITY_RUBRIC |quality )?dimensions/i,
+      ];
       for (const text of [QUALITY_RUBRIC, MERGE_GATE_CONTRACT]) {
         for (const re of wrong) {
           expect(text, `stale dimension count (there are ${count})`).not.toMatch(re);

@@ -161,7 +161,7 @@ What you check:
 - Secret hygiene: nothing in code, proper .env.example, .gitignore covers credentials.
 - Dependency CVEs: pinned versions, no known critical/high CVEs.
 - Systems: timeouts, circuit breakers, retry safety, no unbounded queues.
-- AI & agent systems: structured output over free-text parsing, tool-call surfaces, prompt-injection boundaries on untrusted input reaching a model, eval coverage for LLM-shaped work. Mark ai_systems N/A only when the build has no LLM or agent surface at all.
+- AI & agent systems: structured output over free-text parsing, tool-call surfaces, prompt-injection boundaries on untrusted input reaching a model, eval coverage for LLM-shaped work. Mark ai_systems N/A only when the build has no LLM call, no agent-facing tool surface, and no machine-readable surface (structured output, JSON-LD, manifests, tool-call UI).
 
 You emit a GATE_VERDICT block:
 
@@ -196,7 +196,7 @@ Report: verdict file path, Linear issue IDs.`,
 
 What you do:
 - Run each phase from a clean checkout. Capture stdout + stderr + exit code per command.
-- Run \`<versionLookup>\` for every top-level dependency in the manifest. Flag any ≥1 major stale without an adjacent \`@pin <reason>\` annotation.
+- Run \`<versionLookup>\` for every top-level dependency in the manifest. Flag any dependency more than one major behind current stable without an adjacent \`@pin <reason>\` annotation.
 - Verify EOL runtime versions per VERSION_CURRENCY_POLICY.
 - Verify CI config (\`.github/workflows/ci.yml\` or equivalent) runs install + build + lint + test + docs as four distinct jobs on pull_request.
 

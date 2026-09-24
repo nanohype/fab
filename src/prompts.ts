@@ -1,7 +1,25 @@
 import type { FabState, TeamMember, TeamRole } from './types.js';
-import { FACTORY_PREAMBLE, LANGUAGE_TOOLCHAIN } from './standards.js';
+import {
+  CODE_GATE_ROLES,
+  COVERAGE_FLOOR_TEXT,
+  DOCS_GATE_ROLES,
+  FACTORY_PREAMBLE,
+  LANGUAGE_TOOLCHAIN,
+  QUALITY_RUBRIC,
+} from './standards.js';
 import { normalizeDelimiters, untrustedBlock } from './guardrails.js';
 import { SELF_EVAL_LINE } from './gate.js';
+import { qualityRubricDepth } from './rubric.js';
+
+/**
+ * The roles that grade QUALITY_RUBRIC dimensions: every merge-gate role, and
+ * the external reviewer that re-grades cold for calibration.
+ */
+const RUBRIC_GRADERS: ReadonlySet<TeamRole> = new Set<TeamRole>([
+  ...CODE_GATE_ROLES,
+  ...DOCS_GATE_ROLES,
+  'external-reviewer',
+]);
 
 /**
  * Build the final system prompt for an agent by augmenting the base
@@ -17,6 +35,19 @@ export function buildSystemPrompt(member: TeamMember, state: FabState): string {
   // merge gate).
   if (member.group === 'factory') {
     sections.push(FACTORY_PREAMBLE);
+  }
+
+  // ── Quality rubric (graders only) ─────────────────────────────
+  // The external reviewer sits outside the factory group, so it gets the
+  // dimension table and N/A criteria directly rather than through the
+  // preamble; PRODUCTION_BAR stays out, since it grades nothing. Every grader
+  // then gets the rubric's dimension sections, so a gate grade and its cold
+  // calibration grade read the same definitions.
+  if (member.role === 'external-reviewer') {
+    sections.push(QUALITY_RUBRIC);
+  }
+  if (RUBRIC_GRADERS.has(member.role)) {
+    sections.push(qualityRubricDepth());
   }
 
   // ── Agent Journal ─────────────────────────────────────────────
@@ -163,9 +194,9 @@ Before reporting completion or creating a PR, run the four-phase contract for th
 1. **Install** — \`${tc.install}\` — all dependencies resolve from the lockfile (\`${tc.lockfile}\`).
 2. **Build** — \`${tc.build}\` — exit 0, artifact produced.
 ${typecheckLine ? `   a. Plus: ${typecheckLine.trim()}\n` : ''}3. **Lint** — \`${tc.lint}\` — static analysis + formatter check, exit 0.
-4. **Test** — \`${tc.test}\` — all tests pass with ≥70% line coverage.
+4. **Test** — \`${tc.test}\` — all tests pass, with coverage at or above the testing-rubric floor (${COVERAGE_FLOOR_TEXT}) encoded in the test runner's config.
 5. **Docs** — \`${tc.docs}\` — API docs regenerated from source (see FOUR_PHASE_CONTRACT); the generated tree must match the committed docs tree.
-6. **Version currency** — for every top-level dependency in \`${tc.manifest}\`, confirm it is at most one major behind current stable via \`${tc.versionLookup}\` (registry: ${tc.registry}). Entries ≥1 major stale without an adjacent \`@pin <reason>\` annotation are REJECT (see VERSION_CURRENCY_POLICY).
+6. **Version currency** — for every top-level dependency in \`${tc.manifest}\`, confirm it is at most one major behind current stable via \`${tc.versionLookup}\` (registry: ${tc.registry}). Entries more than one major behind current stable without an adjacent \`@pin <reason>\` annotation are REJECT (see VERSION_CURRENCY_POLICY).
 7. **Dependency audit** — for each declared dependency, grep source files for an actual import. Remove any package nothing imports. For each dev dependency, verify its config exists (e.g., eslint needs eslint config, vitest needs vitest config, golangci-lint needs .golangci.yml).
 8. **No hardcoded project names in source** — project identity comes from the manifest's name field or env vars, never string literals scattered across files.
 9. **No broken scripts** — every entry in the manifest's script section runs to exit 0 or is removed. Shipping a broken script = hard REJECT.

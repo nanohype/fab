@@ -18,7 +18,7 @@ Naming convention: `-curator` (knowledge stewardship) vs `-engineer` (production
 
 Trade-offs documented in [`docs/transports.md`](docs/transports.md).
 
-`src/team.ts` is the barrel re-exporting per-phase modules. `src/workflows.ts` is the source of truth for built-in workflows. **`skills/` is the bundled baseline of agent instructions** — quality-check rubric, factory preamble, intake guide, 31 curator/engineer baselines — that any user can override via the [skill overlay](skills/README.md) without forking.
+`src/team.ts` is the barrel re-exporting per-phase modules. `src/workflows.ts` is the source of truth for built-in workflows. **`skills/` is the bundled baseline of agent instructions** — the quality-check rubric and the per-role curation/engineering baselines — that any user can override via the [skill overlay](skills/README.md) without forking. The factory preamble is assembled in `src/standards.ts` (`FACTORY_PREAMBLE`), and the brief-authoring guide is [`docs/INTAKE_GUIDE.md`](docs/INTAKE_GUIDE.md).
 
 > **The system, customized.** Fab ships baseline skills that produce solid output out of the box. Your personal recipe — your sharper quality-check, your tuned voice, your taste — drops into `~/.fab/skills/` and overlays on top. No fork, no permission, no migration when fab updates.
 

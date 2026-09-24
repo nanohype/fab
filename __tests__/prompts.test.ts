@@ -1,7 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { buildSystemPrompt } from '../src/prompts.js';
+import { RUBRIC_DEPTH_END, RUBRIC_DEPTH_START } from '../src/rubric.js';
+import {
+  CODE_GATE_ROLES,
+  COVERAGE_FLOOR_TEXT,
+  DOCS_GATE_ROLES,
+  QUALITY_RUBRIC,
+} from '../src/standards.js';
 import { TEAM } from '../src/team.js';
-import type { FabState } from '../src/types.js';
+import type { FabState, TeamRole } from '../src/types.js';
+
+// Gate-role prompts carry the quality-check rubric resolved through the skill
+// overlay chain, whose user layer is $HOME/.fab/skills. Every test here runs
+// against an empty HOME, so a developer's own overlay cannot change a prompt.
+let home: string;
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'fab-prompts-'));
+  vi.stubEnv('HOME', home);
+  vi.stubEnv('FAB_SKILLS_DIR', undefined);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  rmSync(home, { recursive: true, force: true });
+});
 
 function makeState(overrides?: Partial<FabState>): FabState {
   return {
@@ -35,6 +59,7 @@ const nodeEngineer = TEAM.find((m) => m.role === 'node-engineer')!;
 const buildVerifier = TEAM.find((m) => m.role === 'build-verifier')!;
 const learner = TEAM.find((m) => m.role === 'learner')!;
 const salesLead = TEAM.find((m) => m.role === 'sales-lead')!;
+const member = (role: TeamRole) => TEAM.find((m) => m.role === role)!;
 
 describe('buildSystemPrompt', () => {
   it('includes base system prompt', () => {
@@ -107,6 +132,29 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('## Build Verification Protocol');
     expect(prompt).toContain('npm run build');
     expect(prompt).toContain('BUILD VERIFICATION');
+  });
+
+  it('holds the build verification protocol to the published coverage floor and version threshold', () => {
+    // The protocol is its own section, separate from PRODUCTION_BAR in the
+    // preamble, so it is sliced out and read alone: the preamble carrying the
+    // right wording would not stop this section drifting from it.
+    const prompt = buildSystemPrompt(nodeEngineer, makeState({ projectLanguage: 'typescript' }));
+    const start = prompt.indexOf('## Build Verification Protocol');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const next = prompt.indexOf('\n## ', start + 1);
+    const protocol = prompt.slice(start, next === -1 ? undefined : next);
+
+    expect(protocol).toContain(COVERAGE_FLOOR_TEXT);
+    expect(protocol).not.toMatch(/≥\s*\d+%\s*line coverage/);
+    expect(protocol).toContain('more than one major behind current stable');
+    expect(protocol).not.toMatch(/≥\s*1 major stale/);
+    expect(prompt).not.toMatch(/≥\s*\d+%\s*line coverage/);
+    expect(prompt).not.toMatch(/≥\s*1 major stale/);
+  });
+
+  it("holds build-verifier's own instructions to the published version threshold", () => {
+    expect(buildVerifier.system).toContain('more than one major behind current stable');
+    expect(buildVerifier.system).not.toMatch(/≥\s*1 major stale/);
   });
 
   it('omits build verification for non-engineering roles', () => {
@@ -188,5 +236,65 @@ describe('buildSystemPrompt', () => {
     expect(buildSystemPrompt(buildVerifier, scoped)).toContain('## Source Directory Scope');
     expect(buildSystemPrompt(product, scoped)).not.toContain('## Source Directory Scope');
     expect(buildSystemPrompt(nodeEngineer, makeState())).not.toContain('## Source Directory Scope');
+  });
+});
+
+describe('buildSystemPrompt — the rubric graders receive', () => {
+  const graders: TeamRole[] = [...new Set([...CODE_GATE_ROLES, ...DOCS_GATE_ROLES])];
+  const APPEND = '## Personal additions\n\n- A marker only the overlay append carries.';
+
+  function writeAppend(): void {
+    mkdirSync(join(home, '.fab', 'skills'), { recursive: true });
+    writeFileSync(join(home, '.fab', 'skills', 'quality-check.append.md'), APPEND);
+  }
+
+  it('gives the external reviewer the dimension table and N/A criteria, not the production bar', () => {
+    // The calibration signal is compared against gate roles that grade with
+    // QUALITY_RUBRIC; without it the two sides grade against different text.
+    const prompt = buildSystemPrompt(member('external-reviewer'), makeState());
+    expect(prompt).toContain(QUALITY_RUBRIC);
+    expect(prompt).toContain('| #  | Dimension');
+    expect(prompt).not.toContain('## Production bar');
+  });
+
+  it('gives every gate role and the external reviewer the rubric depth, appends included', () => {
+    writeAppend();
+    for (const role of [...graders, 'external-reviewer' as TeamRole]) {
+      const prompt = buildSystemPrompt(member(role), makeState());
+      expect(prompt, role).toContain('# Quality rubric depth');
+      expect(prompt, role).toContain(RUBRIC_DEPTH_START);
+      expect(prompt, role).toContain('## 10. AI & Agent Systems');
+      expect(prompt, role).toContain('A marker only the overlay append carries.');
+    }
+  });
+
+  it("leaves out the rubric's run instructions and report format", () => {
+    // A gate role emits the block its own prompt declares. The baseline's
+    // report format asks for every dimension, which a role owning four of them
+    // must not emit.
+    writeAppend();
+    for (const role of ['pr-reviewer', 'external-reviewer'] as TeamRole[]) {
+      const prompt = buildSystemPrompt(member(role), makeState());
+      expect(prompt, role).not.toContain(RUBRIC_DEPTH_END);
+      expect(prompt, role).not.toContain('Launch up to 4 parallel agents');
+      expect(prompt, role).not.toContain('## Bibliography');
+    }
+  });
+
+  it('puts the append after the dimension sections', () => {
+    writeAppend();
+    const prompt = buildSystemPrompt(member('pr-reviewer'), makeState());
+    expect(prompt.indexOf('## 10. AI & Agent Systems')).toBeLessThan(
+      prompt.indexOf('A marker only the overlay append carries.'),
+    );
+  });
+
+  it('gives the rubric depth to no role that does not grade', () => {
+    writeAppend();
+    for (const m of [nodeEngineer, product, salesLead, learner]) {
+      const prompt = buildSystemPrompt(m, makeState());
+      expect(prompt, m.role).not.toContain('# Quality rubric depth');
+      expect(prompt, m.role).not.toContain('A marker only the overlay append carries.');
+    }
   });
 });

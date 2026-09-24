@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
+  COVERAGE_FLOOR,
+  COVERAGE_FLOOR_TEXT,
   LANGUAGE_TOOLCHAIN,
   FOUR_PHASE_CONTRACT,
   VERSION_CURRENCY_POLICY,
@@ -208,6 +211,32 @@ describe('PRODUCTION_BAR', () => {
     expect(PRODUCTION_BAR).toMatch(/go test/);
     expect(PRODUCTION_BAR).toMatch(/cargo test/);
     expect(PRODUCTION_BAR).toMatch(/JUnit|mvn test/);
+  });
+
+  it('gates coverage on the published testing-rubric floor, not a number of its own', () => {
+    // The floor a factory build is held to and the floor the org publishes are
+    // one value: the vendored standard's, rendered in.
+    const vendored = JSON.parse(
+      readFileSync(new URL('../src/standards/testing-rubric.json', import.meta.url), 'utf-8'),
+    ) as { content: { coverage_floor: typeof COVERAGE_FLOOR } };
+    expect(COVERAGE_FLOOR).toEqual(vendored.content.coverage_floor);
+    for (const [metric, floor] of Object.entries(COVERAGE_FLOOR)) {
+      expect(COVERAGE_FLOOR_TEXT).toContain(`${metric} ${floor}%`);
+    }
+    expect(PRODUCTION_BAR).toContain(COVERAGE_FLOOR_TEXT);
+    expect(PRODUCTION_BAR).not.toMatch(/≥\s*\d+%\s*line coverage/);
+  });
+
+  it('rejects a stale dependency at the threshold VERSION_CURRENCY_POLICY sets', () => {
+    // "More than one major behind" is the published threshold; "≥1 major stale"
+    // rejects a dependency the policy allows.
+    expect(VERSION_CURRENCY_POLICY).toMatch(/more than one major behind current stable/i);
+    expect(PRODUCTION_BAR).toMatch(/more than one major behind current stable/i);
+    expect(PRODUCTION_BAR).not.toMatch(/≥\s*1 major stale/);
+  });
+
+  it('is a pass/fail bar that caps no grade', () => {
+    expect(PRODUCTION_BAR).toMatch(/caps no grade/);
   });
 });
 

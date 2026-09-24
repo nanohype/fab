@@ -13,6 +13,10 @@
     {
       "file": "llm-policy.json",
       "sha256": "8a56920bb6fdd718ad08c626d1bd7ea0d6e7b311355ad9d5600545ee5115e8f0"
+    },
+    {
+      "file": "testing-rubric.json",
+      "sha256": "9ddd380f41b1acd6c1b46ea25bf2296fc9650855375457bfc4b45197cdf8261f"
     }
   ]
 }

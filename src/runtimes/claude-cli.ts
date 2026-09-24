@@ -34,7 +34,8 @@ import { boundEvents, resolveSessionDeadlines } from './deadline.js';
  *                                  auto-memory; force ANTHROPIC_API_KEY auth)
  *   - `FAB_CLAUDE_PATH`        override binary lookup (default: `claude`)
  *   - `FAB_CLAUDE_EXTRA_ARGS`  space-separated flags appended to every spawn
- *   - `FAB_CLAUDE_MCP_DIR`     directory for per-session MCP config files
+ *   - `FAB_CLAUDE_MCP_DIR`     directory for per-session files: the MCP
+ *                                  config and the system prompt
  *                                  (default: os.tmpdir())
  *
  * Parity matrix lives in `docs/transports.md`.
@@ -56,11 +57,14 @@ export class ClaudeCliRuntime implements AgentRuntime {
     const repo = await getPrimaryRepo();
 
     const mcpConfig = buildMcpConfigJson(member.mcpServers, process.env);
-    const mcpConfigPath = mcpConfig ? writeMcpConfigFile(sessionId, mcpConfig) : null;
+    const systemPromptFile = writeSessionFile(`fab-prompt-${sessionId}.md`, systemPrompt);
+    const mcpConfigPath = mcpConfig
+      ? writeSessionFile(`fab-mcp-${sessionId}.json`, mcpConfig)
+      : null;
 
     const args = buildClaudeArgs({
       sessionId,
-      systemPrompt,
+      systemPromptFile,
       model: member.model,
       mcpConfigPath,
       bare: process.env.FAB_CLAUDE_BARE === '1',
@@ -75,7 +79,7 @@ export class ClaudeCliRuntime implements AgentRuntime {
       initialArgs: args,
       initialMessage: message,
       sessionId,
-      mcpConfigPath,
+      sessionFiles: mcpConfigPath ? [systemPromptFile, mcpConfigPath] : [systemPromptFile],
       role,
       model: member.model,
     });
@@ -96,7 +100,8 @@ interface SessionConstructorOptions {
   initialArgs: string[];
   initialMessage: string;
   sessionId: string;
-  mcpConfigPath: string | null;
+  /** Files written for this session alone, removed when it ends. */
+  sessionFiles: string[];
   role: TeamRole;
   model: string;
 }
@@ -105,7 +110,7 @@ class ClaudeCliSession implements AgentSession {
   public readonly id: string;
   private readonly role: TeamRole;
   private readonly model: string;
-  private readonly mcpConfigPath: string | null;
+  private readonly sessionFiles: string[];
   private proc: ChildProcessWithoutNullStreams;
   private capturedSessionId: string;
   private stderrBuf = '';
@@ -117,7 +122,7 @@ class ClaudeCliSession implements AgentSession {
   constructor(opts: SessionConstructorOptions) {
     this.id = opts.sessionId;
     this.capturedSessionId = opts.sessionId;
-    this.mcpConfigPath = opts.mcpConfigPath;
+    this.sessionFiles = opts.sessionFiles;
     this.role = opts.role;
     this.model = opts.model;
     this.proc = spawnClaude(opts.initialArgs);
@@ -166,10 +171,11 @@ class ClaudeCliSession implements AgentSession {
    * unkilled child with piped stdio holds fab's own process alive, so the
    * signal needs an escalation that does not depend on cooperation.
    *
-   * The MCP config carries a gateway bearer token and is consumed when the
-   * subprocess starts. The event stream's `finally` unlinks it, but that runs
-   * only when the generator resumes; a session stopped while suspended must
-   * not leave the token behind.
+   * The session's files are read when the subprocess starts: the MCP config
+   * carries a gateway bearer token, and the system prompt carries the role's
+   * instructions and repo scope. The event stream's `finally` unlinks them,
+   * but that runs only when the generator resumes; a session stopped while
+   * suspended must not leave them behind.
    */
   async stop(): Promise<void> {
     if (this.proc.exitCode === null && !this.proc.killed) {
@@ -210,9 +216,9 @@ class ClaudeCliSession implements AgentSession {
   private cleanup(): void {
     if (this.cleaned) return;
     this.cleaned = true;
-    if (this.mcpConfigPath) {
+    for (const path of this.sessionFiles) {
       try {
-        unlinkSync(this.mcpConfigPath);
+        unlinkSync(path);
       } catch {
         // already removed or never created — both fine
       }
@@ -313,7 +319,7 @@ class ResumedClaudeCliSession implements AgentSession {
       const repo = await getPrimaryRepo();
       const args = buildClaudeArgs({
         sessionId: this.id,
-        systemPrompt: null, // resume inherits the original session's system prompt
+        systemPromptFile: null, // resume inherits the original session's system prompt
         model: null,
         mcpConfigPath: null,
         bare: process.env.FAB_CLAUDE_BARE === '1',
@@ -327,7 +333,7 @@ class ResumedClaudeCliSession implements AgentSession {
         initialArgs: args,
         initialMessage: textOfContent(input.content),
         sessionId: this.id,
-        mcpConfigPath: null,
+        sessionFiles: [],
         // Resume sessions don't carry the original role; cost tracking
         // here logs as the calibration role since resume is invoked by
         // the revise flow which is per-role-revision.
@@ -352,7 +358,8 @@ class ResumedClaudeCliSession implements AgentSession {
 
 export interface BuildClaudeArgsOptions {
   sessionId: string;
-  systemPrompt: string | null;
+  /** A file holding the role's system prompt; null on resume. */
+  systemPromptFile: string | null;
   model: string | null;
   mcpConfigPath: string | null;
   bare: boolean;
@@ -403,11 +410,14 @@ export function buildClaudeArgs(opts: BuildClaudeArgsOptions): string[] {
     args.push('--effort', opts.effort);
   }
 
-  // System prompt. `--append-system-prompt` layers on Claude Code's own
-  // default; we keep the default so subprocess tooling stays intact and
-  // append the role's prompt + factory preamble on top.
-  if (opts.systemPrompt) {
-    args.push('--append-system-prompt', opts.systemPrompt);
+  // System prompt. Appending layers on Claude Code's own default, which keeps
+  // subprocess tooling intact, with the role's prompt + factory preamble on
+  // top. It goes by file rather than as an argument: Linux caps a single
+  // argument at MAX_ARG_STRLEN (131072 bytes), a gate role's prompt carries
+  // the rubric depth plus any overlay appends, and past the cap the spawn
+  // fails with E2BIG before the role runs.
+  if (opts.systemPromptFile) {
+    args.push('--append-system-prompt-file', opts.systemPromptFile);
   }
 
   // MCP servers. Pass per-session config; the strict flag prevents the
@@ -507,10 +517,11 @@ function spawnClaude(args: string[]): ChildProcessWithoutNullStreams {
   return proc;
 }
 
-function writeMcpConfigFile(sessionId: string, json: string): string {
+/** Write one of a session's files, readable only by its owner. */
+function writeSessionFile(name: string, content: string): string {
   const dir = process.env.FAB_CLAUDE_MCP_DIR ?? tmpdir();
-  const path = join(dir, `fab-mcp-${sessionId}.json`);
-  writeFileSync(path, json, { encoding: 'utf-8', mode: 0o600 });
+  const path = join(dir, name);
+  writeFileSync(path, content, { encoding: 'utf-8', mode: 0o600 });
   return path;
 }
 

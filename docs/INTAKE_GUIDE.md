@@ -64,7 +64,7 @@ If the build spans languages (e.g., Node backend + Go CLI in the same repo), pic
 
 ### `constraints.language_versions` (required for code workflows)
 
-Object mapping runtime / framework keys to their current stable version strings. Example: `{"node": "22", "typescript": "5.9"}` or `{"python": "3.13", "go": "1.24"}`. The idiom is **latest stable first** — don't inherit whatever the training-data default was. Chorus shipped with `eslint 8` (EOL), `vitest 1.x` (three majors behind), and `typescript 5.4` because nobody declared versions, and the factory picked stale defaults. Never again.
+Object mapping runtime / framework keys to their current stable version strings. Example: `{"node": "22", "typescript": "5.9"}` or `{"python": "3.13", "go": "1.24"}`. The idiom is **latest stable first** — don't inherit whatever the training-data default was. Without declared versions the factory falls back to stale defaults, such as an EOL linter or a test runner several majors behind.
 
 Intake-analyst rejects briefs that pin end-of-life versions (e.g., Python 3.7 or 3.8, Node 16 or 18 post-2025-04, Go 1.20 and older). When in doubt, consult the language's official release calendar before the brief is submitted.
 
@@ -222,7 +222,7 @@ Concrete things that produced weak factory output. All seen in real PRs.
 - **Roles list of 1 or all 80+.** One = no delegation. All = no signal. Pick the 6-12 that matter.
 - **No `existing_systems`** — team has to guess the stack and usually picks something that doesn't integrate with the real environment.
 - **Fabricating client + product names that obviously aren't real** ("Acme Corp", "TestCo"). Acceptable for greenfield demos, but the team's tone shifts when it senses the brief is fake; they ship demo-quality work. Use a name with character even if it's still fictional.
-- **Aspirational language in security_requirements that the factory then just transcribes into code comments.** _"Should opt out of Bedrock invocation logging"_ becomes `// FINDING-02: Opt out of Bedrock invocation logging` in the generated code, with no actual opt-out. Name the implementation: _"Bedrock inference logging set to NONE in CDK via PutModelInvocationLoggingConfiguration."_
+- **Aspirational language in security_requirements that the factory then just transcribes into code comments.** _"Should opt out of Bedrock invocation logging"_ becomes `// <FINDING-ID>: Opt out of Bedrock invocation logging` in the generated code, with no actual opt-out. Name the implementation: _"Bedrock inference logging set to NONE in CDK via PutModelInvocationLoggingConfiguration."_
 - **Reference-repo copying without carving out versions.** When the brief says "match the X theme" or "clone the Y stack", engineers will copy the source repo's `package.json` / `go.mod` / `pyproject.toml` verbatim — including versions that were already stale when that repo was built. The merge gate then REJECTs on `VERSION_CURRENCY_POLICY`. Carve it out in the brief explicitly: "copy structure / components / styling from `<path>` — but look up current stable for every dep independently." The `FACTORY_PREAMBLE` enforces this at write-time, but the brief is the load-bearing place to flag the contradiction.
 
 ---

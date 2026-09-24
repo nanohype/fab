@@ -4,18 +4,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// The vendored standard, held to the copy it claims to be.
+// The vendored standards, held to the copies they claim to be.
 //
 // fab depends on no nanohype package — the reference client has to run on its
 // own — so the standards it reads at runtime travel with it. A travelling copy
-// drifts, and this one had: four files vendored here were read by nothing, and
-// one of those had gone on describing tenant identity as IRSA long after the
-// canonical file said EKS Pod Identity. Nobody noticed, because nothing loaded
-// it and nothing compared it.
-//
-// The four are gone. The one that remains is loaded by standards.ts to dispatch
-// the four-phase contract, and is pinned: the digest below fails if the file is
-// edited, and `npm run standards:check` fails if the pin and upstream disagree.
+// drifts unless something loads it and something compares it. Every file here
+// is loaded by standards.ts, and every one is pinned: the digest below fails if
+// a file is edited, and `npm run standards:check` fails if the pin and upstream
+// disagree.
 
 const STANDARDS = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'standards');
 
@@ -61,9 +57,9 @@ describe('vendored standards', () => {
   });
 
   it('vendors only what the runtime loads', () => {
-    // The rule the four deleted copies broke. Anything vendored must appear in
-    // a loadPublicStandard call; the rest of the production bar reaches agents
-    // as prose, which needs no file here.
+    // Anything vendored must appear in a loadPublicStandard call. A copy
+    // nothing loads is a copy nothing notices going stale; the rest of the
+    // production bar reaches agents as prose, which needs no file here.
     const source = readFileSync(resolve(STANDARDS, '..', 'standards.ts'), 'utf-8');
 
     for (const entry of manifest.files) {

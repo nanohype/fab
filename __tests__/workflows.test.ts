@@ -13,6 +13,7 @@ import {
 } from '../src/workflows.js';
 import type { AnthropicAgents } from '../src/api.js';
 import type { AgentRuntime } from '../src/runtime.js';
+import { QUALITY_DIMENSIONS } from '../src/standards.js';
 
 // The merge gate appends to the cross-engagement quality log; stub that write so
 // the gate test stays hermetic.
@@ -411,6 +412,39 @@ describe('runMergeGate behavior', () => {
     expect(result.decision).toBe('reject');
     expect(result.feedback).toContain('code_quality');
     expect(result.feedback).toContain('drift');
+  });
+
+  it('fails calibration when the cold review leaves a dimension without a readable line', async () => {
+    // The cold review is the reference. A dimension it did not grade, or graded
+    // on a line the parser cannot read, is a dimension nothing calibrated.
+    const runRole: RoleRunner = async (_rt, role) => {
+      if (role === 'external-reviewer') {
+        const { ai_systems: _omitted, ...nine } = TEN('B');
+        return `QUALITY_GRADES:\n${gradeBlock({ ...nine, frontend: 'N/A (headless)' })}`;
+      }
+      return verdictWith('APPROVE', TEN('B'));
+    };
+
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
+    expect(result.decision).toBe('reject');
+    expect(result.feedback).toContain('incomplete');
+    expect(result.feedback).toContain('frontend, ai_systems');
+  });
+
+  it('fails calibration when the cold review has a grades block and no line in it parses', async () => {
+    // Every line carries a trailing note, so the block parses to nothing. The
+    // reviewer did grade, unreadably; that is ten uncalibrated dimensions, not
+    // a review that never happened.
+    const annotated = Object.fromEntries(Object.keys(TEN('B')).map((dim) => [dim, 'B (solid)']));
+    const runRole: RoleRunner = async (_rt, role) => {
+      if (role === 'external-reviewer') return `QUALITY_GRADES:\n${gradeBlock(annotated)}`;
+      return verdictWith('APPROVE', TEN('B'));
+    };
+
+    const result = await runMergeGate(runtime, 'wf', 'code', 'ctx', null, runRole, noPreHook);
+    expect(result.decision).toBe('reject');
+    expect(result.feedback).toContain('incomplete');
+    expect(result.feedback).toContain(`10 dimension(s): ${QUALITY_DIMENSIONS.join(', ')}`);
   });
 
   it('fails open when the external reviewer returns no parseable grades', async () => {
