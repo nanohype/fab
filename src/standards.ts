@@ -174,7 +174,7 @@ Non-negotiables:
 - CI runs all four phases on every pull_request as distinct jobs (not one fused script that short-circuits on the first failure).
 - \`build-verifier\` runs all four and captures stdout + stderr + exit code per phase as \`TRANSCRIPTS:\` evidence. Missing transcript or non-zero exit = hard REJECT.
 - \`artifact-auditor\` re-runs \`docs\` and diffs the output against the committed docs tree. Drift ≥ 1 file = REJECT (docs silently rot otherwise).
-- Absence of a phase script in the project manifest is a hard REJECT at \`scaffold-validator\` — if the project can't run it, it isn't production-ready.
+- A phase the language's \`LANGUAGE_TOOLCHAIN\` entry publishes that the project cannot run as published is a hard REJECT at \`scaffold-validator\`: a manifest script where the entry runs one (\`npm run build\`), a lockfile-resolved dependency providing the bin where the entry runs one through \`npx\`, and any file the command tests for (\`tsconfig.json\` for the TypeScript docs phase). If the project can't run it, it isn't production-ready.
 
 Languages with built-in toolchains (Go, Rust) still need \`docs\` configured (\`go doc\`, \`cargo doc\`); "it builds" is not a docs phase.`;
 
@@ -405,13 +405,13 @@ Every k8s-native factory deliverable lands as a Platform tenant — a self-conta
   chart/
     Chart.yaml
     values.yaml                    # base values (all environments)
-    values-development.yaml        # development delta only
+    values-dev.yaml                # dev delta only
     values-staging.yaml            # staging delta only
     values-production.yaml         # prod delta only
     templates/
       deployment.yaml              # or statefulset.yaml for stateful workloads
       service.yaml
-      serviceaccount.yaml          # no role-arn annotation — operator binds it via a Pod Identity association
+      serviceaccount.yaml          # references the operator's tenant-runtime SA (serviceAccount.create: false); no role-arn annotation
       networkpolicy.yaml           # default-deny + explicit egress allow-list
       <other resources>            # cronjob, ingress, hpa, etc. as needed
   gitops/
@@ -427,7 +427,7 @@ Optional, AI workloads only:
 
 ### Platform CR shape (minimum)
 
-The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, the operator-owned tenant-runtime ServiceAccount, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores and a capability-access policy generated from spec.identity.capabilities — plus the Pod Identity association binding tenant-runtime to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration. NOT YET WIRED END TO END: nothing currently carries a Platform CR's spec.datastores into that module's var.tenants input, which is empty in development, staging and production. Declare the stores — it is correct and forward-compatible — but do not build an app that assumes its database, bucket or queue exists at deploy time.
+The Platform CR declares the tenant boundary AND its stateful substrate. The operator reconciles Namespace (with Pod Security Standards label), ResourceQuota, LimitRange, default-deny NetworkPolicy, ArgoCD AppProject, the operator-owned tenant-runtime ServiceAccount, and the per-Platform IAM role — with a datastore-access policy generated from spec.datastores and a capability-access policy generated from spec.identity.capabilities — plus the Pod Identity association binding tenant-runtime to it. The declared datastores themselves are provisioned by the generic tenant-substrate landing-zone module from that same declaration, in each environment whose tenants.selection.yaml names the tenant (see Datastore vocabulary).
 
 \`\`\`yaml
 apiVersion: platform.nanohype.dev/v1alpha1
@@ -460,11 +460,11 @@ spec:
 
 ### Datastore vocabulary
 
-Declare stateful stores in spec.datastores; never hand-write a landing-zone component for them. Six kinds — relational (Aurora Serverless v2), keyValue (DynamoDB), objectStore (S3), queue (SQS), cache (ElastiCache), stream (MSK Serverless). Each entry carries at most the one typed config block matching its kind; omit it for the young/light defaults (keyValue requires its partitionKey; stream carries none). deletionPolicy defaults to Retain, so deleting the CR orphans the datastore intact. The tenant-substrate module provisions each store and the operator generates the scoped IAM to reach it — tenant count is unbounded because adding one is a declaration, not a new component. The module and the IAM generation both exist; the step that renders a Platform CR's declaration into the module's var.tenants input does not, so no declared store is provisioned in any environment today.
+Declare stateful stores in spec.datastores; never hand-write a landing-zone component for them. Six kinds — relational (Aurora Serverless v2), keyValue (DynamoDB), objectStore (S3), queue (SQS), cache (ElastiCache), stream (MSK Serverless). Each entry carries at most the one typed config block matching its kind; omit it for the young/light defaults (keyValue requires its partitionKey; stream carries none). deletionPolicy defaults to Retain, so deleting the CR orphans the datastore intact. The tenant-substrate module provisions each store and the operator generates the scoped IAM to reach it — tenant count is unbounded because adding one is a declaration, not a new component. landing-zone renders each environment's tenant-substrate var.tenants from the Platform CRs that environment's tenants.selection.yaml names, so a declared store is provisioned in an environment only once its tenant is selected there, and an app must not assume its database, bucket or queue exists at deploy time in an environment that does not.
 
 ### Capability vocabulary
 
-Managed AWS capabilities the datastore vocabulary does not cover — SES send, EventBridge Scheduler — are declared in spec.identity.capabilities, not hand-written managed policies referenced through extraPolicyArns. The operator generates a capability-access policy on the tenant role from the list. \`ses\` grants ses:SendEmail scoped by a ses:FromAddress condition to the tenant's sending domain (the verified sending identity is account-level mail infra in landing-zone, not per-app). \`eventBridgeScheduler\` grants scheduler:*Schedule on the tenant's own schedule prefix plus a Scheduler-service-capped iam:PassRole on an operator-minted <env>-<platform>-scheduler-invoke role that may SendMessage to the tenant's own queue datastores — declare a queue datastore as the schedule's target.
+Managed AWS capabilities the datastore vocabulary does not cover — SES send, EventBridge Scheduler — are declared in spec.identity.capabilities, not hand-written managed policies referenced through extraPolicyArns. The operator generates a capability-access policy on the tenant role from the list. \`ses\` grants ses:SendEmail scoped by a ses:FromAddress condition to the tenant's sending domain (the verified sending identity is account-level mail infra in landing-zone, not per-app). \`eventBridgeScheduler\` grants scheduler:*Schedule on the tenant's own schedule group, <env>-<platform>, which the operator creates, plus a Scheduler-service-capped iam:PassRole on an operator-minted <cluster>-<platform>-scheduler-invoke role that may SendMessage to the tenant's own queue datastores — declare a queue datastore as the schedule's target.
 
 ### Secret access
 
@@ -483,13 +483,15 @@ The cluster-level OTel Collector tags downstream exporters using these attribute
 
 ### What NOT to do
 
-- Do NOT scaffold IAM roles inside the chart, do NOT create a chart-owned ServiceAccount, and do NOT annotate any SA with a role ARN — the operator provisions the per-Platform IAM role (with a datastore-access policy from spec.datastores + a capability-access policy from spec.identity.capabilities), creates the tenant-runtime ServiceAccount, and binds it via a Pod Identity association. The chart references tenant-runtime (serviceAccount.create: false) and carries no role ARN.
-- Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams — declare them in spec.datastores. Cloud-substrate gaps the vocabulary does not cover live in \`nanohype/landing-zone\`; app-level tofu is a hard REJECT.
-- Do NOT reference a hand-written managed policy through extraPolicyArns for SES or EventBridge Scheduler — declare them in spec.identity.capabilities and let the operator generate the grants. extraPolicyArns is the escape hatch only for grants outside both vocabularies.
-- Do NOT rely on a broad Secrets Manager grant for the tenant role. Secrets projected into the pod by the chart's ExternalSecret need no grant (the External Secrets controller reads them under its own identity); for the few a pod reads itself via the SDK, list them in spec.identity.directSecretReads so the operator grants read on exactly those.
-- Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability). Those are gitops-repo concerns.
-- Do NOT skip per-env \`values-{dev,staging,production}.yaml\` — every chart has three deltas even if some are empty (tooling consistency).
-- Do NOT hardcode AWS account IDs, region names, or KMS key ARNs. The Platform reconciler resolves them at scaffolding time and surfaces them in \`status\`.
+Each item names the rule in nanohype's \`standards/platform-tenant-contract.json\` that states it.
+
+- Do NOT scaffold IAM roles inside the chart, do NOT create a chart-owned ServiceAccount, and do NOT annotate any SA with a role ARN — the operator provisions the per-Platform IAM role (with a datastore-access policy from spec.datastores + a capability-access policy from spec.identity.capabilities), creates the tenant-runtime ServiceAccount, and binds it via a Pod Identity association. The chart references tenant-runtime (serviceAccount.create: false) and carries no role ARN (rules no-chart-iam-role, no-chart-serviceaccount, no-role-arn-annotation).
+- Do NOT hand-write a per-app landing-zone component for the tenant's databases, buckets, queues, caches, or streams — declare them in spec.datastores (rule declare-datastores). Cloud-substrate gaps the vocabulary does not cover live in \`nanohype/landing-zone\`; app-level tofu is a hard REJECT.
+- Do NOT reference a hand-written managed policy through extraPolicyArns for SES or EventBridge Scheduler — declare them in spec.identity.capabilities and let the operator generate the grants. extraPolicyArns is the escape hatch only for grants outside both vocabularies (rule declare-capabilities).
+- Do NOT rely on a broad Secrets Manager grant for the tenant role. Secrets projected into the pod by the chart's ExternalSecret need no grant (the External Secrets controller reads them under its own identity); for the few a pod reads itself via the SDK, list them in spec.identity.directSecretReads so the operator grants read on exactly those (rule scoped-secret-reads).
+- Do NOT add cluster-level addons in the chart (ingress controller, cert-manager, External Secrets, observability). Those are gitops-repo concerns (rule no-cluster-addons).
+- Do NOT skip a per-env delta: every chart carries all three, \`values-{dev,staging,production}.yaml\`, even when some are empty (rule per-env-values).
+- Do NOT hardcode an AWS account ID, region name or KMS key ARN in chart values; per-env values plumb them in from landing-zone outputs at deploy time (rule no-hardcoded-account-values).
 
 See IAC_BY_TARGET for the escape-hatch policy (when k8s is the wrong shape and another deploy_target is justified).`;
 

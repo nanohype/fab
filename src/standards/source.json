@@ -3,20 +3,20 @@
   "upstream": {
     "repository": "nanohype/nanohype",
     "path": "standards",
-    "ref": "e57c2485f483fc1260e29990df61e497c71137f0"
+    "ref": "ba8fc1ada0957b56b6bb0cd306742f4df62f5c56"
   },
   "files": [
     {
       "file": "language-toolchain.json",
-      "sha256": "d672c0bfc8c39069979476ba020bf6cefa02b570762269051d2eb5444d09ea1e"
+      "sha256": "17e0986bd32b50c2f1eaf4e716e26d0cc8e47aa4f7e44c1c763efd089b3094aa"
     },
     {
       "file": "llm-policy.json",
-      "sha256": "8a56920bb6fdd718ad08c626d1bd7ea0d6e7b311355ad9d5600545ee5115e8f0"
+      "sha256": "b91a76230072f5d2a82f2bbcf76546258b3b2cdd73659ac87d10c714e57ae060"
     },
     {
       "file": "testing-rubric.json",
-      "sha256": "9ddd380f41b1acd6c1b46ea25bf2296fc9650855375457bfc4b45197cdf8261f"
+      "sha256": "15ccf3722f3ccd340e2a00793b3d3489f23da73bf9f4e0c0b11b87c8a32fb0ac"
     }
   ]
 }

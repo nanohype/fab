@@ -3,7 +3,9 @@
   "kind": "nanohype/standards/testing-rubric",
   "version": "1",
   "title": "Testing rubric — the org test baseline",
-  "summary": "The testing shape and coverage floor every build on the nanohype stack is held to: a Testing-Trophy distribution (static base, integration-heavy middle, thin e2e), a global coverage floor, stricter enforcement on security-critical files, and a few non-negotiable practices. Read this when setting up a project's test runner or grading the testing dimension. The deeper per-language enforcement lives in the reference client's bundled quality-check skill.",
+  "summary": "The testing shape and coverage floor every build on the nanohype stack is held to: a Testing-Trophy distribution (static base, integration-heavy middle, thin e2e), a global coverage floor, stricter enforcement on security-critical files, and a few non-negotiable practices. Read this when setting up a project's test runner or grading the testing dimension.",
+  "applies_to": "Every build that ships code.",
+  "grades": ["testing"],
   "content": {
     "shape": "Testing Trophy (Dodds): a wide static-analysis base (strict types + lint, the cheapest signal), an integration-heavy middle that carries the bulk of confidence (real collaborators wired together, external boundaries faked hermetically), and a thin end-to-end cap over the few critical user paths. Favor integration tests over isolated unit tests for orchestration code; reserve unit tests for pure logic with real branching.",
     "coverage_floor": {

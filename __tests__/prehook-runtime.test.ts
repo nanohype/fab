@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentRuntime } from '../src/runtime.js';
@@ -19,10 +19,10 @@ import { type RoleRunner, runGatePreHook, runMergeGate } from '../src/workflows.
 // runGatePreHook to a subprocess — a real workspace, the real
 // toolchain commands, and an observation a stub cannot forge.
 //
-// Each phase script appends its name to a file in the workspace. A stubbed
-// runner returns transcripts; it does not write to disk. The file is therefore
-// evidence that a process ran, and its contents are evidence of which phases
-// ran and in what order.
+// Each phase the fixture supplies appends its name to a file in the workspace,
+// whether an npm script or a bin runs it. A stubbed runner returns transcripts;
+// it does not write to disk. The file is therefore evidence that a process ran,
+// and its contents are evidence of which phases ran and in what order.
 //
 // Two-sided by construction: the failing fixture must reject with no role
 // invoked, and the passing fixture must approve with the observed stdout
@@ -53,62 +53,131 @@ const ARTIFACT = {
 
 type PhaseSpec = { exit: number; stdout?: string };
 
+/** What the fixture provides so a toolchain command has something to run. */
+type Supply = { script: string } | { bin: string };
+
 /**
- * The npm script a toolchain command invokes: `npm run build` names `build`,
- * `npm test` names `test`. Returns null for a command that is not an npm script
- * call, which is how `install` (`npm ci`) is separated from the rest.
+ * What a toolchain command needs from the fixture: `npm run build` and
+ * `npm test` need an npm script of that name, and `npx typedoc …` needs a
+ * `typedoc` bin in the fixture's own node_modules, which npx runs before it
+ * would reach the registry. Null for the install command (`npm ci`), which runs
+ * as published against the fixture's lockfile.
+ *
+ * Any other shape throws. A command the fixture cannot supply would fail the
+ * passing case for a reason that has nothing to do with the gate, or drop its
+ * phase from the log the cases compare against.
  */
-function scriptName(command: string): string | null {
-  const m = command.match(/^npm (?:run |run-script )?([\w:-]+)$/);
-  return m && m[1] !== 'ci' && m[1] !== 'install' ? m[1] : null;
+function supplyFor(command: string): Supply | null {
+  const npm = command.match(/^npm (?:run |run-script )?([\w:-]+)$/);
+  if (npm) return npm[1] === 'ci' || npm[1] === 'install' ? null : { script: npm[1]! };
+  const npx = command.match(/(?:^|\s)npx ([^\s-]\S*)/);
+  if (npx) return { bin: npx[1]! };
+  throw new Error(`the fixture has no way to supply the toolchain command \`${command}\``);
+}
+
+/** A one-line node program that records `phase` in the phase log, then exits as `spec` says. */
+function recorder(phase: string, spec: PhaseSpec): string {
+  return [
+    `require('node:fs').appendFileSync(${JSON.stringify(PHASE_LOG)}, ${JSON.stringify(`${phase}\n`)});`,
+    spec.stdout ? `console.log(${JSON.stringify(spec.stdout)});` : '',
+    `process.exit(${spec.exit});`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
- * A dependency-free npm package whose toolchain phases are one-line node
- * scripts. `npm ci` resolves against the empty lockfile without reaching the
- * registry, so the install phase is real without being a network dependency.
+ * A TypeScript package, with a tsconfig.json and a source file, whose toolchain
+ * phases are one-line node programs that record themselves in the phase log.
+ * A phase run through an npm script gets a script; a phase run through `npx`
+ * gets a local package providing that bin.
  *
- * The script names are derived from LANGUAGE_TOOLCHAIN's own commands rather
- * than restated, so a phase the standard renames is still dispatched here.
+ * The bin packages are `file:` dependencies, so `npm ci` links them into
+ * node_modules/.bin from the tree without reaching the registry, and the
+ * install phase is real without being a network dependency. `npm ci` empties
+ * node_modules before it installs, so a bin written there directly would be
+ * gone before the phase that runs it.
+ *
+ * What each phase needs is derived from LANGUAGE_TOOLCHAIN's own commands
+ * rather than restated, so a phase the standard renames, or moves between an
+ * npm script and an npx bin, is still dispatched here; any other shape throws
+ * in supplyFor.
  */
 async function fixture(phases: Record<string, PhaseSpec>): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'fab-prehook-'));
+  const committed: string[] = [];
+  const write = async (path: string, content: string, mode?: number) => {
+    await mkdir(dirname(join(dir, path)), { recursive: true });
+    await writeFile(join(dir, path), content, { mode });
+    committed.push(path);
+  };
+
   const scripts: Record<string, string> = {};
+  const devDependencies: Record<string, string> = {};
+  const lockedPackages: Record<string, object> = {};
   for (const [phase, spec] of Object.entries(phases)) {
-    const name = scriptName(LANGUAGE_TOOLCHAIN.typescript[phase as PreHookPhase]);
-    // A toolchain that stopped dispatching through npm would make this fixture
-    // silently cover nothing, so it fails here instead.
-    if (!name) throw new Error(`no npm script in the typescript toolchain's ${phase} command`);
-    const file = `${phase}.cjs`;
-    await writeFile(
-      join(dir, file),
-      [
-        `require('node:fs').appendFileSync(${JSON.stringify(PHASE_LOG)}, ${JSON.stringify(`${phase}\n`)});`,
-        spec.stdout ? `console.log(${JSON.stringify(spec.stdout)});` : '',
-        `process.exit(${spec.exit});`,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    );
-    scripts[name] = `node ${file}`;
+    const command = LANGUAGE_TOOLCHAIN.typescript[phase as PreHookPhase];
+    const supply = supplyFor(command);
+    if (!supply) {
+      throw new Error(
+        `${phase} runs \`${command}\` as published; there is nothing to record it with`,
+      );
+    }
+    if ('script' in supply) {
+      await write(`${phase}.cjs`, recorder(phase, spec));
+      scripts[supply.script] = `node ${phase}.cjs`;
+    } else {
+      const pkg = `fixture-${supply.bin}`;
+      const path = `tools/${supply.bin}`;
+      await write(
+        `${path}/package.json`,
+        JSON.stringify({ name: pkg, version: '1.0.0', bin: { [supply.bin]: 'bin.cjs' } }, null, 2),
+      );
+      // Executable as committed: npm ci marks a linked bin executable in place,
+      // and a mode change on a tracked file is an uncommitted change, which the
+      // pre-hook refuses as not the artifact.
+      await write(`${path}/bin.cjs`, `#!/usr/bin/env node\n${recorder(phase, spec)}\n`, 0o755);
+      devDependencies[pkg] = `file:${path}`;
+      lockedPackages[`node_modules/${pkg}`] = { resolved: path, link: true };
+      lockedPackages[path] = {
+        name: pkg,
+        version: '1.0.0',
+        dev: true,
+        bin: { [supply.bin]: 'bin.cjs' },
+      };
+    }
   }
-  await writeFile(
-    join(dir, 'package.json'),
-    JSON.stringify({ name: 'fixture', version: '1.0.0', private: true, scripts }, null, 2),
+
+  await write(
+    'package.json',
+    JSON.stringify(
+      { name: 'fixture', version: '1.0.0', private: true, scripts, devDependencies },
+      null,
+      2,
+    ),
   );
-  // The phases write into the tree; without this the first case would leave it
-  // dirty and the next would be refused for work that is not the artifact's.
-  await writeFile(join(dir, '.gitignore'), 'node_modules/\nphases.log\n');
-  await writeFile(
-    join(dir, 'package-lock.json'),
+  await write(
+    'package-lock.json',
     JSON.stringify({
       name: 'fixture',
       version: '1.0.0',
       lockfileVersion: 3,
       requires: true,
-      packages: { '': { name: 'fixture', version: '1.0.0' } },
+      packages: {
+        '': { name: 'fixture', version: '1.0.0', devDependencies },
+        ...lockedPackages,
+      },
     }),
   );
+  await write(
+    'tsconfig.json',
+    JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, files: ['index.ts'] }),
+  );
+  await write('index.ts', "export const fixture = 'fixture';\n");
+  // The phases write into the tree; without this, a gated tree would carry
+  // uncommitted changes, which the pre-hook refuses as not the artifact.
+  await write('.gitignore', 'node_modules/\nphases.log\n');
+
   // The pre-hook identifies a workspace by its remote, its branch, its commit
   // against the remote branch, and whether anything is uncommitted. The fixture
   // satisfies all four against a bare repository beside it.
@@ -117,7 +186,7 @@ async function fixture(phases: Record<string, PhaseSpec>): Promise<string> {
   await execAsync(
     [
       `git init -q -b ${ARTIFACT.branch}`,
-      'git add .gitignore package.json package-lock.json *.cjs',
+      `git add -- ${committed.map(shellQuote).join(' ')}`,
       'git -c user.email=fixture@example.invalid -c user.name=fixture commit -q -m fixture',
       `git remote add origin ${shellQuote(bare)}`,
       `git push -q origin ${ARTIFACT.branch}`,
@@ -164,8 +233,11 @@ const fixtureGit: ShellRunner = async (command, cwd) => {
 const localPreHook = (artifact: Parameters<typeof runGatePreHook>[0]) =>
   runGatePreHook(artifact, { run: fixtureGit });
 
-/** The phases the standard dispatches through an npm script, i.e. every one but install. */
-const SCRIPTED_PHASES = PRE_HOOK_PHASES.filter((p) => scriptName(LANGUAGE_TOOLCHAIN.typescript[p]));
+/**
+ * The phases the fixture supplies a command for, and so the ones its log
+ * records: every one but install, which runs as published.
+ */
+const RECORDED_PHASES = PRE_HOOK_PHASES.filter((p) => supplyFor(LANGUAGE_TOOLCHAIN.typescript[p]));
 
 const APPROVE_WITH_EVIDENCE = [
   'GATE_VERDICT: APPROVE',
@@ -198,14 +270,14 @@ describe('runMergeGate drives the real pre-hook', () => {
   beforeAll(async () => {
     passing = await fixture(
       Object.fromEntries(
-        SCRIPTED_PHASES.map((p) => [
+        RECORDED_PHASES.map((p) => [
           p,
           p === 'test' ? { exit: 0, stdout: OBSERVED_TOKEN } : { exit: 0 },
         ]),
       ),
     );
     failing = await fixture(
-      Object.fromEntries(SCRIPTED_PHASES.map((p) => [p, { exit: p === 'build' ? 3 : 0 }])),
+      Object.fromEntries(RECORDED_PHASES.map((p) => [p, { exit: p === 'build' ? 3 : 0 }])),
     );
     priorWorkspace = process.env.FAB_WORKSPACE;
   });
@@ -281,7 +353,12 @@ describe('runMergeGate drives the real pre-hook', () => {
 
     expect(result.decision).toBe('approve');
     const log = await readFile(join(passing, PHASE_LOG), 'utf-8');
-    expect(log.trim().split('\n')).toEqual([...SCRIPTED_PHASES]);
+    expect(log.trim().split('\n')).toEqual([...RECORDED_PHASES]);
+    // Gating a tree leaves it the artifact. The pre-hook refuses a workspace
+    // with uncommitted changes, so a phase that dirtied this one would leave
+    // it ungateable.
+    const { stdout: status } = await execAsync('git status --porcelain', { cwd: passing });
+    expect(status).toBe('');
 
     expect(seen.length).toBeGreaterThan(0);
     for (const message of seen) {

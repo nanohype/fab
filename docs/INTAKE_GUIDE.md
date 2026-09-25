@@ -50,15 +50,7 @@ One of `aws | k8s | fly | vercel | cloudflare`. The factory's branch-creation ho
 
 ### `constraints.language` (required for code workflows)
 
-One of `typescript | go | python | rust | java | kotlin | csharp`. Drives the factory's LANGUAGE_TOOLCHAIN — build / lint / test / docs commands, manifest file, version-lookup command, registry. The gate dispatches these per language:
-
-| language   | build             | lint                           | test            | docs                  | manifest         |
-| ---------- | ----------------- | ------------------------------ | --------------- | --------------------- | ---------------- |
-| typescript | `npm run build`   | `npm run lint`                 | `npm test`      | `npm run docs`        | `package.json`   |
-| go         | `go build ./...`  | `golangci-lint run`            | `go test ./...` | `go doc ./...`        | `go.mod`         |
-| python     | `python -m build` | `ruff check && ruff format -c` | `pytest`        | `pdoc -o docs src`    | `pyproject.toml` |
-| rust       | `cargo build`     | `cargo clippy && cargo fmt -c` | `cargo test`    | `cargo doc --no-deps` | `Cargo.toml`     |
-| java       | `mvn compile`     | `mvn checkstyle:check`         | `mvn test`      | `mvn javadoc:javadoc` | `pom.xml`        |
+One of `typescript | go | python | rust | java | kotlin | csharp`. Selects the language's entry in the factory's LANGUAGE_TOOLCHAIN, which is the vendored [`language-toolchain` standard](../src/standards/language-toolchain.json): its install, build, lint, test and docs commands, and the manifest file, lockfile, version-lookup command and registry that identify the language. The merge gate's pre-hook runs install, build, lint, test and docs, in that order, with that entry's commands against the tree under gate, and rejects at the first non-zero exit before any gate role runs. The engineering roles run the same commands before they report completion (the Build Verification Protocol), plus `typecheck` where the entry publishes one.
 
 If the build spans languages (e.g., Node backend + Go CLI in the same repo), pick the primary and list the others in `language_versions`. Omitting `language` on a code-producing workflow fails the pre-flight checklist — intake-analyst will refuse to pass the brief through.
 

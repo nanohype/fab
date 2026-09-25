@@ -4,6 +4,8 @@
   "version": "1",
   "title": "LLM policy",
   "summary": "Claude is the primary LLM for every build on the nanohype stack. Preferred delivery is AWS Bedrock — it keeps data inside the client's AWS trust boundary and simplifies enterprise compliance posture. This policy names the SDK per language, the model tiers, the preferred regions, and the requirements around prompt caching and provider escapes.",
+  "applies_to": "Any build that calls an LLM. region-single, and the intake-brief clause of no-default-non-anthropic, apply only to deliverables deployed on the nanohype substrate and are N/A for any other.",
+  "grades": ["ai_systems"],
   "content": {
     "primary_provider": "AWS Bedrock",
     "models": {
@@ -23,31 +25,38 @@
     "requirements": [
       {
         "id": "iam-role-auth",
-        "summary": "Authenticate via IAM role assumption (EKS Pod Identity on EKS, ECS task role, Lambda execution role). No API keys in code, env vars, or secrets."
+        "summary": "Authenticate via IAM role assumption (EKS Pod Identity on EKS, ECS task role, Lambda execution role). No API keys in code, env vars, or secrets.",
+        "severity": "reject"
       },
       {
         "id": "default-sonnet",
-        "summary": "Use claude-sonnet-5 for the bulk of inference. Escalate to claude-opus-5 only for complex reasoning or architecture decisions. Use claude-haiku-4-5 for classification, routing, and filter steps."
+        "summary": "Use claude-sonnet-5 for the bulk of inference. Escalate to claude-opus-5 only for complex reasoning or architecture decisions. Use claude-haiku-4-5 for classification, routing, and filter steps.",
+        "severity": "warn"
       },
       {
         "id": "inference-profile-required",
-        "summary": "Invoke every current Claude model through a cross-region inference-profile ID, never the bare foundation-model ID. Bedrock reports inferenceTypesSupported: [INFERENCE_PROFILE] for the whole current Claude family — there is no ON_DEMAND path — so a bare ID such as anthropic.claude-sonnet-5 is refused with a ValidationException on the first call. The geo prefix must match the deploy region — us. for the us-east-1 deployments this catalog targets. Prefer a geo prefix over global. so routing stays inside the intended jurisdiction. Confirm with: aws bedrock list-inference-profiles."
+        "summary": "Invoke every current Claude model through a cross-region inference-profile ID, never the bare foundation-model ID. Bedrock reports inferenceTypesSupported: [INFERENCE_PROFILE] for the whole current Claude family — there is no ON_DEMAND path — so a bare ID such as anthropic.claude-sonnet-5 is refused with a ValidationException on the first call. The geo prefix must match the deploy region — us. for the us-east-1 deployments this catalog targets. Prefer a geo prefix over global. so routing stays inside the intended jurisdiction. Confirm with: aws bedrock list-inference-profiles.",
+        "severity": "reject"
       },
       {
         "id": "verify-region",
-        "summary": "Verify the chosen model is available in the deploy region before committing IaC. Check the model's inference profile is ACTIVE there, not merely that the foundation model is listed."
+        "summary": "Verify the chosen model is available in the deploy region before committing IaC. Check the model's inference profile is ACTIVE there, not merely that the foundation model is listed.",
+        "severity": "warn"
       },
       {
         "id": "region-single",
-        "summary": "us-east-1 is the only preferred region, and regions_preferred is deliberately a one-element list rather than a ranking. A service-control policy denies every non-global action outside us-east-1 in each venture account, so a second entry here would name a region no workload can reach — and the catalog defaults would drift toward it, which is exactly how a denied region reached six skeleton defaults once already. The anchor is us-east-1 because CloudFront requires its ACM certificates to be issued there regardless, so anchoring anywhere else would need a permanent carve-out for the thing every deployment does. Widening this list is a substrate decision, not a template one: change the policy first, then this file. scripts/check-regions.mjs enforces that no skeleton default, .env.example, or documented command names a region this list omits."
+        "summary": "us-east-1 is the only preferred region, and regions_preferred is deliberately a one-element list rather than a ranking. A service-control policy denies every non-global action outside us-east-1 in the accounts this catalog deploys into, so a second entry here would name a region no workload can reach, and the catalog defaults would drift toward it. The anchor is us-east-1 because CloudFront requires its ACM certificates to be issued there regardless, so anchoring anywhere else would need a permanent carve-out for the thing every deployment does. Widening this list is a substrate decision, not a template one: change the policy first, then this file. scripts/check-regions.mjs enforces that no skeleton default, .env.example, or documented command names a region this list omits.",
+        "severity": "warn"
       },
       {
         "id": "prompt-caching-mandatory",
-        "summary": "Use Bedrock cachePoint markers on the system prompt and any stable context prefix. Measure cache-hit ratio and surface it in the architecture artifact."
+        "summary": "Use Bedrock cachePoint markers on the system prompt and any stable context prefix. Measure cache-hit ratio and surface it in the architecture artifact.",
+        "severity": "warn"
       },
       {
         "id": "no-default-non-anthropic",
-        "summary": "Direct Anthropic SDK is permitted only if the intake brief requires it or Bedrock lacks the needed model variant. OpenAI and other providers require explicit brief requirement — never default to GPT."
+        "summary": "Direct Anthropic SDK is permitted only if the intake brief requires it or Bedrock lacks the needed model variant. OpenAI and other providers require explicit brief requirement — never default to GPT.",
+        "severity": "warn"
       }
     ]
   }
