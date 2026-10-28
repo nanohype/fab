@@ -97,8 +97,10 @@ The subprocess inherits `~/.claude/CLAUDE.md`, hooks, user-level skills, and aut
 
 A `Dockerfile` and example manifests under `deploy/` run fab workflows as Kubernetes Jobs. The in-cluster path uses the `sdk` runtime with inference served from AWS Bedrock — the agent loop runs in the pod, and Bedrock auth comes from an EKS Pod Identity association on the ServiceAccount rather than a static key.
 
+Each `v*` tag publishes a multi-arch `ghcr.io/nanohype/fab:<version>` image, keyless-signed with cosign and carrying an SPDX SBOM attestation, from `.github/workflows/release.yml`. `deploy/job.yaml` references the released version; [`docs/runbook.md`](docs/runbook.md#released-images) shows how to verify the signature. To run your own build instead, push it to your registry and set the image in the Job.
+
 ```sh
-# Build and push the image
+# Optional: build and push your own image
 docker build -t <registry>/fab:<tag> .
 docker push <registry>/fab:<tag>
 
@@ -122,7 +124,7 @@ It must run inside the cluster. Apply `deploy/rbac.yaml` for the AgentSandbox + 
 ```sh
 export FAB_RUNTIME=sdk-k8s
 export FAB_K8S_NAMESPACE=eks-agent-platform   # namespace holding the Platform CR
-export FAB_K8S_SESSION_IMAGE=<registry>/fab:<tag>
+export FAB_K8S_SESSION_IMAGE=ghcr.io/nanohype/fab:<version>
 export FAB_K8S_PLATFORM=<platform-name>
 export FAB_K8S_RUNTIME_CLASS=gvisor           # optional isolation dial
 ```

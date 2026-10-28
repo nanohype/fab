@@ -104,7 +104,7 @@ npm run lint         # npm run typecheck (src and __tests__), then biome lint
 npm run format:check # biome format
 ```
 
-`Dockerfile` builds a runtime image (entrypoint `node dist/bin/fab.js`); `deploy/` holds example k8s manifests for running workflows as Jobs with Bedrock inference via a ServiceAccount bound by an EKS Pod Identity association — operator guide in [`docs/runbook.md`](docs/runbook.md). CI builds the image on every PR.
+`Dockerfile` builds a runtime image (entrypoint `node dist/bin/fab.js`); `deploy/` holds example k8s manifests for running workflows as Jobs with Bedrock inference via a ServiceAccount bound by an EKS Pod Identity association — operator guide in [`docs/runbook.md`](docs/runbook.md). CI builds the image on every PR; `.github/workflows/release.yml` publishes and keyless-signs `ghcr.io/nanohype/fab:<version>` on `v*` tags, and the deploy manifests pin the `package.json` version (`__tests__/deploy-image.test.ts`).
 
 ## Style
 

@@ -84,8 +84,21 @@ coverage below a floor, add tests rather than lowering the threshold.
 Lowering a floor is a reviewed decision with a written reason, not a fix.
 
 CI runs every phase as a separate required job — build, lint, test, docs,
-format, plus a hard `npm audit` gate and a signed container build. None is
-advisory.
+format, plus a hard `npm audit` gate and a multi-arch container build. None
+is advisory.
+
+## Releasing
+
+A release is a `v<version>` tag on `main` whose version equals `package.json`
+`version`. `.github/workflows/release.yml` refuses a tag that disagrees, then
+publishes `ghcr.io/nanohype/fab:<version>` and signs it keyless by digest with
+an SPDX SBOM attestation. Signing happens only there: the cluster
+verify-images policy admits images whose Fulcio subject is a `release.yml`
+run on a tag ref.
+
+Bumping `version` means updating the image references that pin it —
+`deploy/job.yaml`, `.env.example` and `docs/runbook.md`.
+`__tests__/deploy-image.test.ts` fails until they match.
 
 ## Tests
 
