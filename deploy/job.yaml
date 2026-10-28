@@ -22,9 +22,10 @@ spec:
           type: RuntimeDefault
       containers:
         - name: fab
-          # Build from the Dockerfile and push to your registry; pin a
-          # digest in production rather than a moving tag.
-          image: ghcr.io/nanohype/fab:latest
+          # A released fab image: published and keyless-signed from
+          # release.yml on the matching v* tag. Pin the digest in production;
+          # a tag is a pointer the registry lets move.
+          image: ghcr.io/nanohype/fab:0.2.0
           args: ['workflow', 'feature-build', '<intake-json>']
           workingDir: /work
           env:

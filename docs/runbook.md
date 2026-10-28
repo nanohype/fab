@@ -12,7 +12,8 @@ executes inside the pod, and Bedrock auth comes from the ServiceAccount's
 EKS Pod Identity association, not a static key (`deploy/job.yaml`).
 
 ```sh
-# 1. Build and push the image (pin a digest in production, not a moving tag)
+# 1. Use the released image (see "Released images"), or build and push your
+#    own. Pin a digest in production, not a tag.
 docker build -t <registry>/fab:<tag> .
 docker push <registry>/fab:<tag>
 
@@ -30,6 +31,29 @@ aws eks create-pod-identity-association \
 kubectl apply -f deploy/job.yaml
 kubectl -n fab wait --for=condition=complete job/fab-feature-build --timeout=2h
 ```
+
+### Released images
+
+`.github/workflows/release.yml` runs on every `v*` tag. It builds
+`ghcr.io/nanohype/fab:<version>` for `linux/amd64` and `linux/arm64`, then
+signs the manifest-list digest keyless with cosign v3 and attaches an SPDX
+SBOM attestation, both as Sigstore bundles. The Fulcio subject is the
+release workflow on the tag ref, which is the identity a cluster
+verify-images policy pins:
+
+```sh
+cosign verify ghcr.io/nanohype/fab:<version> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/nanohype/fab/\.github/workflows/release\.yml@refs/tags/v'
+
+cosign verify-attestation ghcr.io/nanohype/fab:<version> --type spdxjson \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/nanohype/fab/\.github/workflows/release\.yml@refs/tags/v'
+```
+
+CI builds the image on every pull request and push to `main` without
+publishing it; `release.yml` is the only workflow that pushes to
+`ghcr.io/nanohype/fab`.
 
 Shape of the Job (`deploy/job.yaml`):
 
@@ -61,7 +85,7 @@ initContainer running the same image against the same `FAB_STATE_FILE`:
 ```yaml
 initContainers:
   - name: seed-state
-    image: ghcr.io/nanohype/fab:latest # same image as the main container
+    image: ghcr.io/nanohype/fab:0.2.0 # same image as the main container
     command: ['sh', '-c']
     args:
       - >-
