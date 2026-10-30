@@ -98,9 +98,9 @@ floor, so add or change dependencies with npm 11.10.0 or later.
 To take a release younger than the floor on purpose, such as a security fix,
 set its version in `package.json` and run `npm install --min-release-age=0`.
 The comment in `.npmrc` covers how the floor interacts with the Renovate
-preset and its security path. `__tests__/npmrc.test.ts` lists the edits that
-remove all or part of the floor while installs still succeed, and fails on
-each of them.
+preset and its security path. `__tests__/npmrc.test.ts` fails unless `.npmrc`
+sets `min-release-age` at the top level to a positive whole number of days
+and sets neither `before` nor `min-release-age-exclude`.
 
 ## Releasing
 

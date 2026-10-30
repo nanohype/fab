@@ -4,16 +4,16 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The project .npmrc holds every npm resolution in this repository to a
- * release-age floor. Each edit these tests catch removes all or part of that
- * floor while installs keep succeeding:
+ * release-age floor. These tests reject the edits that break it:
  *
  * - npm warns about a key it does not define and then ignores it.
  * - A key under a `[section]` header is not top-level config, so npm does not
  *   apply it.
- * - A `before` in the same file takes precedence over `min-release-age`,
- *   replacing the rolling window with a fixed date.
- * - `min-release-age-exclude` exempts every release of each package it
- *   matches.
+ * - From npm 11.15.0, a `before` in the same file takes precedence over
+ *   `min-release-age`, replacing the rolling window with a fixed date. npm
+ *   11.10.0 to 11.14.1 refuse to run with both keys set.
+ * - `min-release-age-exclude` (npm 11.17.0 and later) exempts every release of
+ *   each package it matches.
  */
 const npmrcPath = fileURLToPath(new URL('../.npmrc', import.meta.url));
 
