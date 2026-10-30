@@ -87,6 +87,25 @@ CI runs every phase as a separate required job — build, lint, test, docs,
 format, plus a hard `npm audit` gate and a multi-arch container build. None
 is advisory.
 
+## Dependency release-age floor
+
+The project [`.npmrc`](.npmrc) sets `min-release-age`, so npm resolves a
+version range only to releases published more than that many days ago — on
+`npm install`, `npm update`, and every lockfile Renovate writes here. npm
+honors the key from 11.10.0; earlier npm does not recognize it and applies no
+floor, so add or change dependencies with npm 11.10.0 or later. A
+`min-release-age` set on the command line or in the environment overrides the
+file, and so does a `before` on npm 11.15.0 and later.
+
+To take a release younger than the floor on purpose, such as a security fix,
+set its version in `package.json` and run `npm install --min-release-age=0`.
+The comment in `.npmrc` covers how the floor interacts with the Renovate
+preset and its security path. `.npmrc` holds the floor and no other setting:
+`__tests__/npmrc.test.ts` fails unless the file holds only blank lines,
+comments and a single `min-release-age=<days>` line with a positive whole
+number of days, so a setting added to `.npmrc` needs a matching change to
+that test.
+
 ## Releasing
 
 A release is a `v<version>` tag on `main` whose version equals `package.json`
