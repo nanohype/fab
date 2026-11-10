@@ -2,7 +2,7 @@
 
 You're an AI client (or the author of one) about to drive the factory or extend it — run a workflow, author an intake brief, pick a transport, pass the merge gate, add a role or skill. This file gets you running. For how fab fits the wider stack, read the [Platform Reference](https://github.com/nanohype/nanohype/blob/main/docs/platform-reference.md).
 
-fab is the open-source reference factory orchestrator: a zero-runtime-dependency TypeScript CLI (Node ≥24, ESM, `@nanohype/fab`, Apache-2.0) that drives 78 Claude agents through a production-grade pipeline — Discovery → Design → Build → Verify → Ship.
+fab is the open-source reference factory orchestrator: a zero-runtime-dependency TypeScript CLI (Node ≥26, ESM, `@nanohype/fab`, Apache-2.0) that drives 78 Claude agents through a production-grade pipeline — Discovery → Design → Build → Verify → Ship.
 
 ## The mental model
 
@@ -96,7 +96,7 @@ npm run lint         # typecheck (src + __tests__ via tsconfig.test.json) then b
 npm run format:check # biome
 ```
 
-Node ≥24, TS strict, ESM, Node16 resolution. Raw arg parsing (no yargs/commander). Zero required runtime deps; `@anthropic-ai/claude-agent-sdk` is an optional dep used only by `sdk`/`sdk-k8s`. Tests live in `__tests__/` and are type-checked separately. CI builds the image on every PR; `.github/workflows/release.yml` publishes and keyless-signs `ghcr.io/nanohype/fab:<version>` on `v*` tags, and the deploy manifests pin the `package.json` version (`__tests__/deploy-image.test.ts`).
+Node ≥26, TS strict, ESM, Node16 resolution. Raw arg parsing (no yargs/commander). Zero required runtime deps; `@anthropic-ai/claude-agent-sdk` is an optional dep used only by `sdk`/`sdk-k8s`. Tests live in `__tests__/` and are type-checked separately. CI builds the image on every PR; `.github/workflows/release.yml` publishes and keyless-signs `ghcr.io/nanohype/fab:<version>` on `v*` tags, and the deploy manifests pin the `package.json` version (`__tests__/deploy-image.test.ts`).
 
 ## Pointers
 

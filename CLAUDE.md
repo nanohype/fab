@@ -43,7 +43,7 @@ Groups (`group` field):
 
 ## Conventions
 
-- Zero required runtime dependencies — managed-agents mode uses native fetch + Node 24+. `@anthropic-ai/claude-agent-sdk` is an optional dependency consumed only when `FAB_RUNTIME=sdk`.
+- Zero required runtime dependencies — managed-agents mode uses native fetch + Node 26+. `@anthropic-ai/claude-agent-sdk` is an optional dependency consumed only when `FAB_RUNTIME=sdk`.
 - TypeScript strict mode, ES2022 target, Node16 module resolution
 - Raw arg parsing (no yargs/commander)
 - 2-space indent everywhere

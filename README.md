@@ -199,4 +199,4 @@ npm run lint                                   # typecheck + biome lint
 npm run format:check                           # biome
 ```
 
-Node ≥ 24. TypeScript strict mode, ESM, Node16 module resolution. Tests live in `__tests__/` and are type-checked via `tsconfig.test.json`.
+Node ≥ 26. TypeScript strict mode, ESM, Node16 module resolution. Tests live in `__tests__/` and are type-checked via `tsconfig.test.json`.
