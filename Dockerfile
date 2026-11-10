@@ -3,7 +3,7 @@
 # ── Build stage ───────────────────────────────────────────────────────
 # fab's `prepare` script compiles dist/ during `npm ci`, so the source
 # tree must be present before install.
-FROM node:24-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json tsconfig.json ./
@@ -16,7 +16,7 @@ RUN npm ci
 RUN npm prune --omit=dev
 
 # ── Runtime stage ─────────────────────────────────────────────────────
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 

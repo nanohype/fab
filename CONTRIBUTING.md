@@ -10,7 +10,7 @@ architecture map, the conventions, and where every kind of change belongs.
 ## The zero-runtime-deps constraint
 
 Fab ships with **zero required runtime dependencies**. The default
-`managed-agents` transport runs on native `fetch` and Node 24+ — nothing else.
+`managed-agents` transport runs on native `fetch` and Node 26+ — nothing else.
 `@anthropic-ai/claude-agent-sdk` is the single `optionalDependencies` entry,
 consumed only when `FAB_RUNTIME=sdk` (or `sdk-k8s`) is selected, and the code
 must degrade with a clear error when it's absent.

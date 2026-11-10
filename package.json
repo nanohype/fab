@@ -40,7 +40,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "scripts": {
     "build": "tsc && node scripts/copy-standards.mjs",
