@@ -52,7 +52,7 @@
     "lint": "npm run typecheck && biome lint .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "docs": "typedoc",
+    "docs": "node scripts/patch-typedoc-minimatch.mjs && typedoc",
     "standards:check": "node scripts/standards.mjs check",
     "standards:sync": "node scripts/standards.mjs sync",
     "standards:freshness": "node scripts/standards.mjs freshness"
@@ -67,5 +67,10 @@
     "typedoc": "^0.28.19",
     "typescript": "^6.0.2",
     "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "typedoc": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
